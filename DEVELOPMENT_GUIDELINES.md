@@ -1,4 +1,4 @@
-# Development Guidelines - Modern Art Board Game
+[[[[[[[[[[[[[[[[[[[[[[[[# Development Guidelines - Modern Art Board Game
 
 **Purpose**: Step-by-step development guide that follows the Implementation Plan phases
 **Philosophy**: Build incrementally. Test continuously. Ship quality.

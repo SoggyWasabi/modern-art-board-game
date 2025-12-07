@@ -1,6 +1,18 @@
 import type { Card } from './game'
 
 // ===================
+// AUCTION RESULT TYPE
+// ===================
+
+export interface AuctionResult {
+  winnerId: string
+  salePrice: number
+  card: Card
+  profit: number // Money earned by auctioneer (0 if buying from bank)
+  type: 'open' | 'one_offer' | 'hidden' | 'fixed_price' | 'double'
+}
+
+// ===================
 // AUCTION STATE TYPES
 // ===================
 
@@ -17,12 +29,13 @@ export type AuctionState =
 export interface OpenAuctionState {
   type: 'open'
   card: Card
-  auctioneerIndex: number
-  currentHighBid: number | null
-  currentHighBidder: number | null
-  // For digital: countdown timer resets on each bid
-  lastBidTimestamp: number
-  countdownSeconds: number // e.g., 5 seconds
+  auctioneerId: string
+  currentBid: number
+  currentBidderId: string | null
+  isActive: boolean
+  playerOrder: string[] // Order of players for auction
+  currentPlayerIndex: number
+  passCount: number // Number of consecutive passes
 }
 
 // -----------------------
@@ -31,11 +44,13 @@ export interface OpenAuctionState {
 export interface OneOfferAuctionState {
   type: 'one_offer'
   card: Card
-  auctioneerIndex: number
-  currentPlayerIndex: number // Whose turn to bid
-  currentHighBid: number | null
-  currentHighBidder: number | null
-  playersActed: number[] // Players who have bid or passed
+  auctioneerId: string
+  currentBid: number
+  currentBidderId: string | null
+  isActive: boolean
+  turnOrder: string[] // Order: left of auctioneer -> clockwise -> auctioneer last
+  currentTurnIndex: number
+  completedTurns: Set<string> // Players who have taken their turn
 }
 
 // -----------------------
@@ -44,10 +59,12 @@ export interface OneOfferAuctionState {
 export interface HiddenAuctionState {
   type: 'hidden'
   card: Card
-  auctioneerIndex: number
-  phase: 'collecting_bids' | 'revealed'
-  submittedBids: Map<number, number> // playerIndex -> bid (hidden until reveal)
-  revealedBids: Map<number, number> | null // Set after all submit
+  auctioneerId: string
+  bids: Record<string, number> // playerId -> bid amount
+  isActive: boolean
+  tieBreakOrder: string[] // Order for resolving ties (auctioneer first, then clockwise)
+  revealedBids: boolean
+  readyToReveal?: boolean // All players have submitted bids
 }
 
 // -----------------------
@@ -56,10 +73,14 @@ export interface HiddenAuctionState {
 export interface FixedPriceAuctionState {
   type: 'fixed_price'
   card: Card
-  auctioneerIndex: number
-  fixedPrice: number
-  currentPlayerIndex: number // Whose turn to decide
-  passedPlayers: number[] // Players who passed
+  auctioneerId: string
+  price: number
+  isActive: boolean
+  sold: boolean
+  winnerId: string | null
+  turnOrder: string[] // Order: left of auctioneer -> clockwise
+  currentTurnIndex: number
+  passedPlayers: Set<string> // Players who have passed
 }
 
 // -----------------------
@@ -67,24 +88,16 @@ export interface FixedPriceAuctionState {
 // -----------------------
 export interface DoubleAuctionState {
   type: 'double'
-  primaryCard: Card // The Double card
-  primaryAuctioneerIndex: number // Who played the Double
-  phase: DoubleAuctionPhase
+  doubleCard: Card // The Double card being played
+  secondCard: Card | null // Second card offered (same artist)
+  originalAuctioneerId: string // Who played the Double card
+  currentAuctioneerId: string // Who offered the second card (gets money)
+  auctionType: 'double' | 'open' | 'one_offer' | 'hidden' | 'fixed_price' // Type follows second card
+  isActive: boolean
+  sold: boolean
+  winnerId?: string // Who won the auction
+  finalPrice?: number // Final sale price
+  turnOrder: string[] // Order for offering second cards
+  currentTurnIndex: number
+  offers: Map<string, Card> // playerId -> card offered (for tracking)
 }
-
-export type DoubleAuctionPhase =
-  | {
-      type: 'awaiting_second_card'
-      currentOfferIndex: number // Who is being asked to provide second card
-      declinedPlayers: number[] // Players who passed on providing second
-    }
-  | {
-      type: 'auction_in_progress'
-      secondaryCard: Card
-      secondaryAuctioneerIndex: number // Who provided second card (gets money)
-      innerAuction: Exclude<AuctionState, DoubleAuctionState> // The actual auction
-    }
-  | {
-      type: 'resolved_free'
-      recipient: number // Auctioneer gets card free (no one offered second)
-    }

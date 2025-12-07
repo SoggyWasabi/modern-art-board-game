@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { rankArtists, getArtistValue, createInitialBoard } from '../valuation'
-import type { GameBoard, ArtistRoundResult } from '../../types/game'
-import type { Artist } from '../../types/game'
+import type { GameBoard } from '../../types/game'
 
 describe('Artist Valuation - Additional Edge Cases', () => {
   describe('Critical Edge Cases', () => {
@@ -226,14 +225,6 @@ describe('Artist Valuation - Additional Edge Cases', () => {
 
   describe('Rank Validation', () => {
     it('never assigns rank 4 or 5 to any artist', () => {
-      const allArtists: Artist[] = [
-        'Manuel Carvalho',
-        'Sigrid Thaler',
-        'Daniel Melim',
-        'Ramon Martins',
-        'Rafael Silveira',
-      ]
-
       // Test various card distributions
       const testDistributions = [
         [5, 4, 3, 2, 1],
