@@ -171,14 +171,14 @@ function dealCards(deck: Card[], playerCount: number, round: number): Card[][]
 
 ---
 
-## Phase 1.4: Artist Valuation
+## Phase 1.4: Artist Valuation ✅ COMPLETED
 
 **Corresponds to**: IMPLEMENTATION_PLAN Phase 1.4
 
 **Deliverables**:
-- [ ] `engine/valuation.ts` - Artist ranking and value calculation
-- [ ] Tie-breaking by board position
-- [ ] Cumulative value calculation
+- [x] `engine/valuation.ts` - Artist ranking and value calculation
+- [x] Tie-breaking by board position
+- [x] Cumulative value calculation
 
 **Key Functions**:
 ```typescript
@@ -193,15 +193,15 @@ function calculatePaintingValue(board: GameBoard, artist: Artist, round: number)
 4. **Cumulative**: Only if top 3 THIS round
 
 **Tests**:
-- [ ] Clear winner (highest count gets 30k)
-- [ ] Tie-breaker by board position
-- [ ] Top 3 get correct values
-- [ ] Not in top 3 = 0 value (even with history)
-- [ ] Cumulative stacks correctly when in top 3
+- [x] Clear winner (highest count gets 30k)
+- [x] Tie-breaker by board position
+- [x] Top 3 get correct values
+- [x] Not in top 3 = 0 value (even with history)
+- [x] Cumulative stacks correctly when in top 3
 
 **Manual Test**: Debug UI showing artist counts → rankings
 
-**Checkpoint**: Valuation matches rulebook exactly
+**Checkpoint**: ✅ Valuation matches rulebook exactly (13 tests passing)
 
 ---
 
