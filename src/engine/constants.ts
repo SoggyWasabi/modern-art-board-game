@@ -52,6 +52,7 @@ export type AuctionTypeDistribution = {
 }
 
 // Per-artist auction type distribution (easily configurable)
+// Totals: Open=17, Fixed=11, Double=10, Hidden=14, OneOffer=18 (Total=70)
 export const AUCTION_DISTRIBUTION: Record<Artist, AuctionTypeDistribution> = {
   'Manuel Carvalho': {
     double: 2,
@@ -70,23 +71,23 @@ export const AUCTION_DISTRIBUTION: Record<Artist, AuctionTypeDistribution> = {
   'Daniel Melim': {
     double: 2,
     open: 3,
-    one_offer: 3,
+    one_offer: 4,
     hidden: 3,
-    fixed_price: 3,
+    fixed_price: 2,
   },
   'Ramon Martins': {
     double: 2,
     open: 4,
-    one_offer: 3,
+    one_offer: 4,
     hidden: 3,
-    fixed_price: 3,
+    fixed_price: 2,
   },
   'Rafael Silveira': {
     double: 2,
     open: 4,
-    one_offer: 3,
+    one_offer: 4,
     hidden: 3,
-    fixed_price: 4,
+    fixed_price: 3,
   },
 }
 
