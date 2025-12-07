@@ -205,56 +205,56 @@ function calculatePaintingValue(board: GameBoard, artist: Artist, round: number)
 
 ---
 
-## Phase 1.5: Auction Engines
+## Phase 1.5: Auction Engines ✅ COMPLETED
 
 **Corresponds to**: IMPLEMENTATION_PLAN Phase 1.5
 
 **Deliverables**: Implement each auction type in separate files
-- [ ] `engine/auction/open.ts` - Open auction state machine
-- [ ] `engine/auction/oneOffer.ts` - One offer auction
-- [ ] `engine/auction/hidden.ts` - Hidden auction
-- [ ] `engine/auction/fixedPrice.ts` - Fixed price auction
-- [ ] `engine/auction/double.ts` - Double auction (most complex)
+- [x] `engine/auction/open.ts` - Open auction state machine
+- [x] `engine/auction/oneOffer.ts` - One offer auction
+- [x] `engine/auction/hidden.ts` - Hidden auction
+- [x] `engine/auction/fixedPrice.ts` - Fixed price auction
+- [x] `engine/auction/double.ts` - Double auction (most complex)
 
 ### Open Auction Tests:
-- [ ] Any player can bid anytime
-- [ ] Bid must exceed current high bid
-- [ ] Cannot bid more than own money
-- [ ] No bids → auctioneer gets free
-- [ ] Auctioneer wins → pays bank
+- [x] Any player can bid anytime
+- [x] Bid must exceed current high bid
+- [x] Cannot bid more than own money
+- [x] No bids → auctioneer gets free
+- [x] Auctioneer wins → pays bank
 
 ### One Offer Tests:
-- [ ] Turn order: left of auctioneer → clockwise → auctioneer last
-- [ ] Each player gets one chance to bid or pass
-- [ ] Must bid higher than current
-- [ ] No bids → auctioneer gets free
+- [x] Turn order: left of auctioneer → clockwise → auctioneer last
+- [x] Each player gets one chance to bid or pass
+- [x] Must bid higher than current
+- [x] No bids → auctioneer gets free
 
 ### Hidden Auction Tests:
-- [ ] All players submit simultaneously
-- [ ] Bids hidden until all submitted
-- [ ] Highest bid wins
-- [ ] Tie-breaker: auctioneer wins if tied
-- [ ] Tie-breaker: closest clockwise from auctioneer
-- [ ] All bid 0 → auctioneer gets free
+- [x] All players submit simultaneously
+- [x] Bids hidden until all submitted
+- [x] Highest bid wins
+- [x] Tie-breaker: auctioneer wins if tied
+- [x] Tie-breaker: closest clockwise from auctioneer
+- [x] All bid 0 → auctioneer gets free
 
 ### Fixed Price Tests:
-- [ ] Auctioneer sets price ≤ own money
-- [ ] Turn order: left of auctioneer → clockwise
-- [ ] First buyer wins at fixed price
-- [ ] All pass → auctioneer MUST buy
+- [x] Auctioneer sets price ≤ own money
+- [x] Turn order: left of auctioneer → clockwise
+- [x] First buyer wins at fixed price
+- [x] All pass → auctioneer MUST buy
 
 ### Double Auction Tests:
-- [ ] Auctioneer can offer second card (same artist, not Double)
-- [ ] If declined, offer passes left clockwise
-- [ ] Another player offers → they become auctioneer, get money
-- [ ] No one offers → original auctioneer gets Double free
-- [ ] Auction type = second card's type
-- [ ] Winner gets both cards
-- [ ] Next turn = left of final auctioneer
+- [x] Auctioneer can offer second card (same artist, not Double)
+- [x] If declined, offer passes left clockwise
+- [x] Another player offers → they become auctioneer, get money
+- [x] No one offers → original auctioneer gets Double free
+- [x] Auction type = second card's type
+- [x] Winner gets both cards
+- [x] Next turn = left of final auctioneer
 
 **Manual Test**: Debug UI with bid buttons for each auction type
 
-**Checkpoint**: All auction types fully functional with correct rules
+**Checkpoint**: ✅ All auction types fully functional with correct rules
 
 ---
 
