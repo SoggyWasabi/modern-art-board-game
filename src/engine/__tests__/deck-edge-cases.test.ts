@@ -68,14 +68,14 @@ describe('Deck Management - Additional Edge Cases', () => {
         auctionTypeCounts[card.auctionType] = (auctionTypeCounts[card.auctionType] || 0) + 1
       })
 
-      // Should have exactly 5 Double cards (one per artist)
-      expect(auctionTypeCounts['double']).toBe(5)
+      // Should have exactly 10 Double cards (two per artist)
+      expect(auctionTypeCounts['double']).toBe(10)
 
       // Should have total of 70 cards
       const totalCards = Object.values(auctionTypeCounts).reduce((sum, count) => sum + count, 0)
       expect(totalCards).toBe(70)
 
-      // Each artist should have exactly one Double
+      // Each artist should have exactly two Doubles
       const doubleCountsByArtist: Record<string, number> = {}
       deck.forEach(card => {
         if (card.auctionType === 'double') {
@@ -84,7 +84,7 @@ describe('Deck Management - Additional Edge Cases', () => {
       })
       expect(Object.keys(doubleCountsByArtist)).toHaveLength(5)
       Object.values(doubleCountsByArtist).forEach(count => {
-        expect(count).toBe(1)
+        expect(count).toBe(2)
       })
     })
   })

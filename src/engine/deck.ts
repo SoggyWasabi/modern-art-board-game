@@ -1,5 +1,5 @@
 import type { Card, AuctionType } from '../types/game'
-import { ARTISTS, CARD_DISTRIBUTION, CARDS_PER_ROUND } from './constants'
+import { ARTISTS, CARD_DISTRIBUTION, AUCTION_DISTRIBUTION, CARDS_PER_ROUND } from './constants'
 
 // ===================
 // DECK MANAGEMENT
@@ -13,44 +13,37 @@ function generateCardId(): string {
 
 /**
  * Create a full deck of 70 cards with proper distribution
+ * Uses configurable distribution from constants for easy modification
  */
 export function createDeck(): Card[] {
   const deck: Card[] = []
 
-  // For each artist, create the specified number of cards
+  // For each artist, create cards according to distribution config
   for (const artist of ARTISTS) {
     const cardCount = CARD_DISTRIBUTION[artist]
+    const distribution = AUCTION_DISTRIBUTION[artist]
 
-    for (let i = 0; i < cardCount; i++) {
-      // Distribute auction types
-      // From rulebook: approximate distribution
-      let auctionType: AuctionType
+    // Verify the distribution matches the card count
+    const totalDistributed = Object.values(distribution).reduce((sum, count) => sum + count, 0)
+    if (totalDistributed !== cardCount) {
+      throw new Error(`Card count mismatch for ${artist}: Expected ${cardCount}, got ${totalDistributed}`)
+    }
 
-      if (i === 0) {
-        // First card for each artist is always a Double
-        auctionType = 'double'
-      } else if (i <= cardCount * 0.25) {
-        // 25% Open
-        auctionType = 'open'
-      } else if (i <= cardCount * 0.5) {
-        // 25% One Offer
-        auctionType = 'one_offer'
-      } else if (i <= cardCount * 0.75) {
-        // 25% Hidden
-        auctionType = 'hidden'
-      } else {
-        // 25% Fixed Price
-        auctionType = 'fixed_price'
+    let cardIndex = 0
+
+    // Create cards for each auction type
+    for (const [auctionType, count] of Object.entries(distribution)) {
+      for (let i = 0; i < count; i++) {
+        const card: Card = {
+          id: generateCardId(),
+          artist,
+          auctionType: auctionType as AuctionType,
+          artworkId: `${artist.toLowerCase().replace(' ', '_')}_${auctionType}_${i + 1}`,
+        }
+
+        deck.push(card)
+        cardIndex++
       }
-
-      const card: Card = {
-        id: generateCardId(),
-        artist,
-        auctionType,
-        artworkId: `${artist.toLowerCase().replace(' ', '_')}_${i + 1}`,
-      }
-
-      deck.push(card)
     }
   }
 
@@ -119,4 +112,42 @@ export function getCardsToDeal(playerCount: number, round: number): number {
   }
 
   return CARDS_PER_ROUND[playerCount][round - 1]
+}
+
+/**
+ * Validate the deck configuration matches expected totals
+ * Useful for debugging and ensuring configuration consistency
+ */
+export function validateDeckConfiguration(): void {
+  let totalCards = 0
+  let totalDoubles = 0
+
+  for (const artist of ARTISTS) {
+    const cardCount = CARD_DISTRIBUTION[artist]
+    const distribution = AUCTION_DISTRIBUTION[artist]
+
+    const distributedTotal = Object.values(distribution).reduce((sum, count) => sum + count, 0)
+
+    if (distributedTotal !== cardCount) {
+      throw new Error(
+        `Configuration error for ${artist}: ` +
+        `CARD_DISTRIBUTION says ${cardCount}, but AUCTION_DISTRIBUTION totals ${distributedTotal}`
+      )
+    }
+
+    totalCards += cardCount
+    totalDoubles += distribution.double || 0
+  }
+
+  // Verify we have exactly 70 cards
+  if (totalCards !== 70) {
+    throw new Error(`Total cards should be 70, got ${totalCards}`)
+  }
+
+  // Verify we have at least 2 doubles per artist (minimum 10 total)
+  if (totalDoubles < 10) {
+    throw new Error(`Should have at least 10 double cards (2 per artist), got ${totalDoubles}`)
+  }
+
+  console.log(`✓ Deck configuration validated: ${totalCards} cards, ${totalDoubles} doubles`)
 }

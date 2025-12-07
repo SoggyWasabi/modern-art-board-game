@@ -26,13 +26,68 @@ export const AUCTION_TYPES: readonly AuctionType[] = [
 // CARD DISTRIBUTION
 // ===================
 // Total: 70 cards
+// Easy to modify - just change the numbers and everything else updates
 
 export const CARD_DISTRIBUTION: Record<Artist, number> = {
   'Manuel Carvalho': 12,
   'Sigrid Thaler': 13,
-  'Daniel Melim': 15,
+  'Daniel Melim': 14,
   'Ramon Martins': 15,
-  'Rafael Silveira': 15,
+  'Rafael Silveira': 16,
+}
+
+// ===================
+// AUCTION TYPE DISTRIBUTION
+// ===================
+// Configurable distribution of auction types per artist
+// DOUBLE cards: Minimum 2 per artist (can be increased)
+// Other types: Remaining cards split roughly equally
+
+export type AuctionTypeDistribution = {
+  double: number // Minimum 2 per artist
+  open?: number
+  one_offer?: number
+  hidden?: number
+  fixed_price?: number
+}
+
+// Per-artist auction type distribution (easily configurable)
+export const AUCTION_DISTRIBUTION: Record<Artist, AuctionTypeDistribution> = {
+  'Manuel Carvalho': {
+    double: 2,
+    open: 3,
+    one_offer: 3,
+    hidden: 2,
+    fixed_price: 2,
+  },
+  'Sigrid Thaler': {
+    double: 2,
+    open: 3,
+    one_offer: 3,
+    hidden: 3,
+    fixed_price: 2,
+  },
+  'Daniel Melim': {
+    double: 2,
+    open: 3,
+    one_offer: 3,
+    hidden: 3,
+    fixed_price: 3,
+  },
+  'Ramon Martins': {
+    double: 2,
+    open: 4,
+    one_offer: 3,
+    hidden: 3,
+    fixed_price: 3,
+  },
+  'Rafael Silveira': {
+    double: 2,
+    open: 4,
+    one_offer: 3,
+    hidden: 3,
+    fixed_price: 4,
+  },
 }
 
 export const CARDS_PER_ROUND: Record<number, [number, number, number, number]> = {

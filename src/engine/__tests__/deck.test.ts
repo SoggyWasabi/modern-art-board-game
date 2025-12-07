@@ -26,23 +26,23 @@ describe('Deck Management', () => {
       expect(artistCounts['Rafael Silveira']).toBe(CARD_DISTRIBUTION['Rafael Silveira'])
     })
 
-    it('has exactly one Double card per artist', () => {
+    it('has exactly two Double cards per artist', () => {
       const deck = createDeck()
       const doubleCards = deck.filter(card => card.auctionType === 'double')
 
-      expect(doubleCards).toHaveLength(5) // One for each artist
+      expect(doubleCards).toHaveLength(10) // Two for each artist
 
-      // Verify each artist has one Double
+      // Verify each artist has two Doubles
       const artistDoubles: Record<string, number> = {}
       for (const card of doubleCards) {
         artistDoubles[card.artist] = (artistDoubles[card.artist] || 0) + 1
       }
 
-      expect(artistDoubles['Manuel Carvalho']).toBe(1)
-      expect(artistDoubles['Sigrid Thaler']).toBe(1)
-      expect(artistDoubles['Daniel Melim']).toBe(1)
-      expect(artistDoubles['Ramon Martins']).toBe(1)
-      expect(artistDoubles['Rafael Silveira']).toBe(1)
+      expect(artistDoubles['Manuel Carvalho']).toBe(2)
+      expect(artistDoubles['Sigrid Thaler']).toBe(2)
+      expect(artistDoubles['Daniel Melim']).toBe(2)
+      expect(artistDoubles['Ramon Martins']).toBe(2)
+      expect(artistDoubles['Rafael Silveira']).toBe(2)
     })
 
     it('has unique card IDs', () => {
@@ -57,9 +57,10 @@ describe('Deck Management', () => {
       const deck = createDeck()
 
       for (const card of deck) {
-        expect(card.artworkId).toMatch(/^[a-z_]+_\d+$/)
+        // New format: artist_auctionType_number
+        expect(card.artworkId).toMatch(/^[a-z_]+_[a-z_]+_\d+$/)
         expect(card.artist.toLowerCase().replace(' ', '_')).toBe(
-          card.artworkId.split('_').slice(0, -1).join('_')
+          card.artworkId.split('_')[0] + '_' + card.artworkId.split('_')[1]
         )
       }
     })
