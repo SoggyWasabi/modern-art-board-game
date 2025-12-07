@@ -4,6 +4,19 @@
 **Last Updated**: 2025-12-07
 **Status**: Peer Review Incorporated
 
+## Implementation Status ✅
+
+### Phase 1: Core Game Engine (Offline/Local Play)
+
+- ✅ **1.0 Player Selection & Game Setup** - Types and validation logic complete (UI pending)
+- ✅ **1.1 Artists (Board Order)** - All 5 artists defined with proper tie-breaking order
+- ✅ **1.2 Core Data Models** - All game types, player types, and state interfaces defined
+- ✅ **1.3 Deck Management** - Complete deck creation, shuffling, and dealing (20 tests passing)
+- 🔄 **1.4 Artist Valuation** - IN PROGRESS
+- ⏳ **1.5 Auction Engines** - Pending
+- ⏳ **1.6 Round Management** - Pending
+- ⏳ **1.7 Game Flow** - Pending
+
 ---
 
 ## Game Overview Summary
@@ -20,7 +33,328 @@
 
 ## Phase 1: Core Game Engine (Offline/Local Play)
 
-### 1.1 Artists (Board Order - Left to Right)
+### 1.0 Player Selection & Game Setup ✅ COMPLETED
+
+Before any game logic, implement a comprehensive player configuration system:
+
+#### 1.0.1 Game Setup Flow
+
+```typescript
+// ===================
+// GAME SETUP FLOW
+// ===================
+
+interface SetupState {
+  step: 'player_count' | 'player_config' | 'ai_difficulty' | 'ready_to_start';
+  gameSetup: Partial<GameSetup>;
+  validationErrors: string[];
+}
+
+// Step 1: Choose number of players (3-5)
+interface PlayerCountSelection {
+  playerCount: 3 | 4 | 5;
+  maxHumanPlayers: number;  // Cannot exceed playerCount
+}
+
+// Step 2: Configure each player slot
+interface PlayerSlotConfig {
+  slotIndex: number;
+  type: 'human' | 'ai' | 'empty';
+  humanName?: string;
+  aiDifficulty?: 'easy' | 'medium' | 'hard';
+  color: string;
+  avatar?: string;
+}
+
+// Step 3: Validation and game creation
+function validateAndCreateGame(
+  playerCount: number,
+  playerSlots: PlayerSlotConfig[]
+): { success: boolean; gameSetup?: GameSetup; errors: string[] } {
+  const errors: string[] = [];
+
+  // Validate at least 1 human player
+  const humanPlayers = playerSlots.filter(s => s.type === 'human');
+  if (humanPlayers.length === 0) {
+    errors.push('At least one human player is required');
+  }
+
+  // Validate exactly playerCount slots filled
+  const filledSlots = playerSlots.filter(s => s.type !== 'empty');
+  if (filledSlots.length !== playerCount) {
+    errors.push(`Exactly ${playerCount} players must be configured`);
+  }
+
+  // Validate AI players have difficulty
+  const aiWithoutDifficulty = playerSlots.filter(
+    s => s.type === 'ai' && !s.aiDifficulty
+  );
+  if (aiWithoutDifficulty.length > 0) {
+    errors.push('All AI players must have a difficulty level');
+  }
+
+  // Validate unique player names
+  const names = humanPlayers.map(p => p.humanName).filter(Boolean);
+  const uniqueNames = new Set(names);
+  if (names.length !== uniqueNames.size) {
+    errors.push('Player names must be unique');
+  }
+
+  if (errors.length > 0) {
+    return { success: false, errors };
+  }
+
+  // Create game setup
+  const players: PlayerConfig[] = playerSlots
+    .filter(s => s.type !== 'empty')
+    .map((slot, index) => ({
+      id: `player_${index}`,
+      name: slot.type === 'human' ? slot.humanName! : `AI ${slot.aiDifficulty}`,
+      type: slot.type,
+      aiDifficulty: slot.aiDifficulty,
+      color: slot.color,
+      avatar: slot.avatar,
+    }));
+
+  return {
+    success: true,
+    gameSetup: {
+      playerCount: playerCount as 3 | 4 | 5,
+      players,
+      startingMoney: 100,
+    },
+    errors: [],
+  };
+}
+```
+
+#### 1.0.2 UI Component Structure for Setup
+
+```typescript
+// ===================
+// SETUP UI COMPONENTS
+// ===================
+
+// Main setup wizard component
+const GameSetupWizard = () => {
+  const [setupState, setSetupState] = useState<SetupState>({
+    step: 'player_count',
+    gameSetup: {},
+    validationErrors: [],
+  });
+
+  return (
+    <div className="setup-wizard">
+      {setupState.step === 'player_count' && (
+        <PlayerCountSelection
+          onSelect={(count) => setSetupState(prev => ({
+            ...prev,
+            step: 'player_config',
+            gameSetup: { ...prev.gameSetup, playerCount: count }
+          }))}
+        />
+      )}
+
+      {setupState.step === 'player_config' && (
+        <PlayerConfiguration
+          playerCount={setupState.gameSetup.playerCount!}
+          onConfigured={(slots) => setSetupState(prev => ({
+            ...prev,
+            step: 'ai_difficulty',
+            gameSetup: { ...prev.gameSetup, playerSlots: slots }
+          }))}
+        />
+      )}
+
+      {/* Additional steps... */}
+    </div>
+  );
+};
+
+// Player count selector
+const PlayerCountSelection = ({ onSelect }) => {
+  return (
+    <div className="player-count-selection">
+      <h2>Number of Players</h2>
+      <div className="player-count-options">
+        {[3, 4, 5].map(count => (
+          <button
+            key={count}
+            onClick={() => onSelect(count)}
+            className="player-count-btn"
+          >
+            {count} Players
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// Player slot configuration
+const PlayerConfiguration = ({ playerCount, onConfigured }) => {
+  const [slots, setSlots] = useState<PlayerSlotConfig[]>(
+    Array.from({ length: 5 }, (_, i) => ({
+      slotIndex: i,
+      type: i < playerCount ? 'human' : 'empty' as const,
+      color: PLAYER_COLORS[i],
+    }))
+  );
+
+  return (
+    <div className="player-configuration">
+      <h2>Configure Players</h2>
+      {slots.slice(0, playerCount).map((slot, index) => (
+        <PlayerSlot
+          key={index}
+          slot={slot}
+          index={index}
+          onUpdate={(updatedSlot) => {
+            const newSlots = [...slots];
+            newSlots[index] = updatedSlot;
+            setSlots(newSlots);
+          }}
+        />
+      ))}
+      <button
+        onClick={() => onConfigured(slots.slice(0, playerCount))}
+        className="continue-btn"
+      >
+        Continue
+      </button>
+    </div>
+  );
+};
+
+// Individual player slot
+const PlayerSlot = ({ slot, index, onUpdate }) => {
+  return (
+    <div className="player-slot" style={{ borderColor: slot.color }}>
+      <div className="slot-header">
+        <span className="player-number">Player {index + 1}</span>
+        <div className="player-type-selector">
+          <button
+            className={slot.type === 'human' ? 'active' : ''}
+            onClick={() => onUpdate({ ...slot, type: 'human' })}
+          >
+            Human
+          </button>
+          <button
+            className={slot.type === 'ai' ? 'active' : ''}
+            onClick={() => onUpdate({ ...slot, type: 'ai' })}
+          >
+            AI
+          </button>
+        </div>
+      </div>
+
+      {slot.type === 'human' && (
+        <input
+          type="text"
+          placeholder="Enter name"
+          value={slot.humanName || ''}
+          onChange={(e) => onUpdate({ ...slot, humanName: e.target.value })}
+          className="player-name-input"
+        />
+      )}
+
+      {slot.type === 'ai' && (
+        <select
+          value={slot.aiDifficulty || ''}
+          onChange={(e) => onUpdate({
+            ...slot,
+            aiDifficulty: e.target.value as 'easy' | 'medium' | 'hard'
+          })}
+          className="ai-difficulty-select"
+        >
+          <option value="">Select difficulty</option>
+          <option value="easy">Easy</option>
+          <option value="medium">Medium</option>
+          <option value="hard">Hard</option>
+        </select>
+      )}
+
+      <div className="player-color-indicator" style={{ backgroundColor: slot.color }}>
+        {slot.type === 'human' ? '👤' : '🤖'}
+      </div>
+    </div>
+  );
+};
+```
+
+#### 1.0.3 Player Experience Features
+
+```typescript
+// ===================
+// PLAYER EXPERIENCE
+// ===================
+
+interface PlayerProfile {
+  id: string;
+  displayName: string;
+  avatar?: string;
+  favoriteColor?: string;
+  statistics: {
+    gamesPlayed: number;
+    gamesWon: number;
+    favoriteArtist: Artist;
+    averageWinningBid: number;
+  };
+  preferences: {
+    autoSortHand: boolean;
+    showBidHints: boolean;
+    animationSpeed: 'slow' | 'normal' | 'fast';
+    soundEnabled: boolean;
+  };
+}
+
+// Quick start templates
+interface QuickStartTemplate {
+  name: string;
+  description: string;
+  playerCount: 3 | 4 | 5;
+  humanPlayers: number;
+  aiDifficulty: 'easy' | 'medium' | 'hard';
+  icon: string;
+}
+
+const QUICK_START_TEMPLATES: QuickStartTemplate[] = [
+  {
+    name: "Solo Practice",
+    description: "Play against 4 AI opponents to learn the ropes",
+    playerCount: 5,
+    humanPlayers: 1,
+    aiDifficulty: 'easy',
+    icon: '🎯',
+  },
+  {
+    name: "Date Night",
+    description: "Perfect for two players with easy AI",
+    playerCount: 3,
+    humanPlayers: 2,
+    aiDifficulty: 'medium',
+    icon: '💑',
+  },
+  {
+    name: "Game Night",
+    description: "Full 5-player game with one AI to fill",
+    playerCount: 5,
+    humanPlayers: 4,
+    aiDifficulty: 'medium',
+    icon: '🎲',
+  },
+  {
+    name: "Expert Challenge",
+    description: "Face off against hard AI opponents",
+    playerCount: 4,
+    humanPlayers: 1,
+    aiDifficulty: 'hard',
+    icon: '🏆',
+  },
+];
+```
+
+### 1.1 Artists (Board Order - Left to Right) ✅ COMPLETED
 
 This order is **critical** for tie-breaking in artist rankings:
 
@@ -36,7 +370,7 @@ This order is **critical** for tie-breaking in artist rankings:
 
 ---
 
-### 1.2 Core Data Models
+### 1.2 Core Data Models ✅ COMPLETED
 
 ```typescript
 // ===================
@@ -831,9 +1165,1032 @@ interface OpenAuctionUI {
 
 ---
 
-## Implementation Order
+## Phase 6: Visual Design & Branding (Parallel Track)
 
-### Milestone 1: Core Engine
+This phase can be developed independently alongside the game engine. The UI/UX designer will create the complete visual identity, artwork, and design system.
+
+### 6.1 Brand Identity & Theme
+
+#### 6.1.1 Game Branding
+```typescript
+// ===================
+// BRAND IDENTITY
+// ===================
+
+interface BrandIdentity {
+  name: string;
+  tagline: string;
+  logo: {
+    primary: string;      // Main logo path
+    icon: string;         // Favicon/app icon
+    monochrome: string;   // Single color version
+  };
+  brandColors: {
+    primary: ColorPalette;
+    secondary: ColorPalette;
+    accent: ColorPalette;
+  };
+  typography: {
+    heading: TypographyScale;
+    body: TypographyScale;
+    ui: TypographyScale;
+  };
+  iconography: {
+    style: 'line' | 'filled' | 'duotone';
+    set: 'custom' | 'material' | 'feather';
+  };
+  illustration: {
+    style: 'modern' | 'abstract' | 'geometric' | 'artistic';
+    artistProfiles: ArtistVisualProfile[];
+  };
+}
+
+interface ColorPalette {
+  50: string;   // Lightest
+  100: string;
+  200: string;
+  300: string;
+  400: string;
+  500: string;  // Base
+  600: string;
+  700: string;
+  800: string;
+  900: string;  // Darkest
+}
+
+interface ArtistVisualProfile {
+  name: Artist;
+  colorScheme: ColorPalette;
+  visualMotif: string;    // e.g., "geometric patterns", "abstract shapes"
+  backgroundStyle: string;
+  cardBackDesign: string;
+  signatureElement: string; // Unique element for each artist
+}
+```
+
+#### 6.1.2 Visual Style Direction
+
+| Element | Style Choice | Rationale |
+|---------|--------------|-----------|
+| **Overall Theme** | Modern Art Gallery | Clean, sophisticated, art-focused |
+| **Color Mood** | Vibrant but elegant | Reflects art market, not overwhelming |
+| **Typography** | Sans-serif with artistic flair | Modern, readable, premium feel |
+| **Icon Style** | Line art with fills | Sophisticated, consistent |
+| **Animation** | Smooth, physics-based | Premium feel, aids gameplay |
+| **Sound** | Subtle gallery ambiance | Immersive but not distracting |
+
+### 6.2 Card Artwork Design
+
+#### 6.2.1 Artist-Specific Visual Languages
+
+```typescript
+// ===================
+// ARTIST VISUAL GUIDES
+// ===================
+
+const ARTIST_VISUAL_PROFILES: ArtistVisualProfile[] = [
+  {
+    name: 'Manuel Carvalho',
+    colorScheme: {
+      50: '#fef3e2',
+      500: '#f59e0b',
+      900: '#78350f',
+      // ... other shades
+    },
+    visualMotif: 'Abstract geometric patterns with warm oranges',
+    backgroundStyle: 'Textured canvas with subtle gradients',
+    cardBackDesign: 'Minimalist gold frame on cream background',
+    signatureElement: 'Small golden sunburst in corner',
+  },
+  {
+    name: 'Sigrid Thaler',
+    colorScheme: {
+      50: '#f0f9ff',
+      500: '#0ea5e9',
+      900: '#0c4a6e',
+      // ... other shades
+    },
+    visualMotif: 'Fluid, wave-like forms in cool blues',
+    backgroundStyle: 'Watercolor wash effects',
+    cardBackDesign: 'Flowing blue lines on white',
+    signatureElement: 'Wave crest symbol',
+  },
+  // ... other artists
+];
+```
+
+#### 6.2.2 Card Design Specifications
+
+```typescript
+interface CardDesignSpec {
+  dimensions: {
+    width: number;   // e.g., 200px
+    height: number;  // e.g., 280px
+    aspectRatio: number;
+  };
+  layout: {
+    headerHeight: number;    // Artist name
+    imageArea: number;       // Artwork display
+    footerHeight: number;    // Auction type icon
+    margins: MarginSpacing;
+  };
+  typography: {
+    artistName: TextSpec;
+    auctionType: TextSpec;
+  };
+  artworkSpecs: {
+    minResolution: number;   // 512x512 for crisp display
+    format: 'svg' | 'png' | 'webp';
+    styleGuide: string;      // Path to style guide
+  };
+}
+
+// Card variations per artist
+interface CardArtworkVariations {
+  // Each artist needs multiple unique artworks
+  // Total: 70 unique artworks across all artists
+  [artist: string]: {
+    artworks: ArtworkAsset[];
+    distribution: number[];  // How many cards of this artwork
+  };
+}
+```
+
+#### 6.2.3 Auction Type Visual Indicators
+
+```typescript
+interface AuctionTypeIndicator {
+  type: AuctionType;
+  icon: string;           // SVG path or emoji
+  color: string;
+  animation?: string;     // How it appears/animates
+  position: 'corner' | 'bottom' | 'overlay';
+}
+
+const AUCTION_TYPE_INDICATORS: AuctionTypeIndicator[] = [
+  {
+    type: 'open',
+    icon: '📢',           // Or custom SVG
+    color: '#10b981',     // Green - open, accessible
+    position: 'corner',
+    animation: 'pulse-slow',
+  },
+  {
+    type: 'one_offer',
+    icon: '👆',
+    color: '#3b82f6',     // Blue - single action
+    position: 'bottom',
+  },
+  // ... other types
+];
+```
+
+### 6.3 UI Screen Designs
+
+#### 6.3.1 Screen-by-Screen Design Requirements
+
+| Screen | Design Elements | Interactive Elements | Art Requirements |
+|--------|----------------|----------------------|------------------|
+| **Main Menu** | Logo, background art, nav buttons | Hover states, transitions | Gallery ambiance illustration |
+| **Player Setup** | Player slots, color indicators | Type toggles, name inputs | Player avatars/icons |
+| **Game Table** | Felt texture, board layout | Card interactions, bid UI | Table texture, board design |
+| **Auction UI** | Card spotlight, bid controls | Animated bids, timers | Spotlight effects |
+| **Round Summary** | Value tiles, results display | Continue button | Celebration animations |
+| **Game Over** | Winner reveal, scores | Play again, main menu | Trophy/artwork display |
+
+#### 6.3.2 Responsive Design Considerations
+
+```typescript
+// ===================
+// RESPONSIVE BREAKPOINTS
+// ===================
+
+interface Breakpoints {
+  mobile: {
+    max: 640;
+    cardSize: { w: 60; h: 84 };
+    layout: 'scroll' | 'zoom';
+  };
+  tablet: {
+    min: 641; max: 1024;
+    cardSize: { w: 120; h: 168 };
+    layout: 'adapt';
+  };
+  desktop: {
+    min: 1025;
+    cardSize: { w: 200; h: 280 };
+    layout: 'full';
+  };
+}
+
+// Layout adaptations per screen size
+interface LayoutAdaptation {
+  gameTable: {
+    mobile: 'vertical-stack' | 'scroll-horizontal';
+    tablet: 'compact-view';
+    desktop: 'full-table';
+  };
+  playerHand: {
+    mobile: 'scrollable-fan';
+    tablet: 'compact-fan';
+    desktop: 'full-fan';
+  };
+}
+```
+
+### 6.4 Animation & Motion Design
+
+#### 6.4.1 Animation Specification
+
+```typescript
+// ===================
+// ANIMATION LIBRARY
+// ===================
+
+interface AnimationSpec {
+  duration: number;      // milliseconds
+  easing: EasingFunction;
+  delay?: number;
+  repeat?: number | 'infinite';
+}
+
+interface GameAnimations {
+  card: {
+    deal: AnimationSpec;           // Cards dealt to players
+    play: AnimationSpec;           // Card played to table
+    auction: AnimationSpec;        // Move to auction area
+    collect: AnimationSpec;        // Winner takes cards
+    discard: AnimationSpec;        // End of round cleanup
+  };
+  bid: {
+    place: AnimationSpec;          // Bid token appears
+    raise: AnimationSpec;          // Bid amount increases
+    win: AnimationSpec;            // Winner confirmation
+  };
+  ui: {
+    highlight: AnimationSpec;      // Active player/cursor
+    countdown: AnimationSpec;      // Timer tick
+    notification: AnimationSpec;   // Info/error messages
+    transition: AnimationSpec;     // Screen changes
+  };
+}
+
+// Physics-based constants for realistic motion
+const MOTION_CONSTANTS = {
+  gravity: 9.8,
+  friction: 0.95,
+  bounceDamping: 0.7,
+  cardHover: 5,      // pixels lift
+  cardFanAngle: 15,  // degrees per card
+};
+```
+
+#### 6.4.2 Visual Feedback Systems
+
+```typescript
+// ===================
+// VISUAL FEEDBACK
+// ===================
+
+interface FeedbackSystem {
+  turn: {
+    activePlayer: {
+      glow: ColorGlow;
+      pulse: PulseAnimation;
+    };
+    inactivePlayers: {
+      opacity: number;
+      blur: number;
+    };
+  };
+  auction: {
+    biddingActive: {
+      countdownGlow: ColorGlow;
+      buttonPulse: PulseAnimation;
+    };
+    bidPlaced: {
+      confirmation: NotificationSpec;
+      highlight: BorderGlow;
+    };
+  };
+  validation: {
+    invalidMove: ShakeAnimation;
+    insufficientFunds: RedFlash;
+    validAction: GreenFlash;
+  };
+}
+```
+
+---
+
+## Phase 7: UI/UX Implementation (Parallel Track)
+
+This phase implements the design system and creates all UI components. Can be done parallel to Phase 1-2.
+
+### 7.1 Component Library Setup
+
+#### 7.1.1 Design System Structure
+
+```typescript
+// ===================
+// DESIGN TOKENS
+// ===================
+
+// File: src/design/tokens.ts
+export const tokens = {
+  colors: {
+    brand: {
+      primary: { 50: '#fef3e2', 500: '#f59e0b', 900: '#78350f' },
+      secondary: { 50: '#f0f9ff', 500: '#0ea5e9', 900: '#0c4a6e' },
+      // ... all brand colors
+    },
+    neutral: {
+      gray: { 50: '#f9fafb', 500: '#6b7280', 900: '#111827' },
+      white: '#ffffff',
+      black: '#000000',
+    },
+    semantic: {
+      success: '#10b981',
+      warning: '#f59e0b',
+      error: '#ef4444',
+      info: '#3b82f6',
+    },
+  },
+  spacing: {
+    xs: '4px',
+    sm: '8px',
+    md: '16px',
+    lg: '24px',
+    xl: '32px',
+    '2xl': '48px',
+    '3xl': '64px',
+  },
+  typography: {
+    fontFamily: {
+      sans: ['Inter', 'sans-serif'],
+      display: ['Playfair Display', 'serif'],
+      mono: ['JetBrains Mono', 'monospace'],
+    },
+    fontSize: {
+      xs: '12px',
+      sm: '14px',
+      base: '16px',
+      lg: '18px',
+      xl: '20px',
+      '2xl': '24px',
+      '3xl': '30px',
+      '4xl': '36px',
+    },
+    fontWeight: {
+      light: 300,
+      normal: 400,
+      medium: 500,
+      semibold: 600,
+      bold: 700,
+    },
+  },
+  shadows: {
+    sm: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+    md: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+    lg: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+    card: '0 8px 16px -4px rgba(0, 0, 0, 0.15)',
+  },
+  borderRadius: {
+    sm: '4px',
+    md: '8px',
+    lg: '12px',
+    xl: '16px',
+    full: '9999px',
+  },
+  transitions: {
+    fast: '150ms ease-in-out',
+    normal: '250ms ease-in-out',
+    slow: '350ms ease-in-out',
+  },
+};
+```
+
+#### 7.1.2 Base Component Primitives
+
+```typescript
+// ===================
+// COMPONENT PRIMITIVES
+// ===================
+
+// File: src/components/primitives/Button.tsx
+interface ButtonProps {
+  variant: 'primary' | 'secondary' | 'ghost' | 'danger';
+  size: 'sm' | 'md' | 'lg';
+  disabled?: boolean;
+  loading?: boolean;
+  icon?: ReactNode;
+  iconPosition?: 'left' | 'right';
+  fullWidth?: boolean;
+  onClick?: () => void;
+  children: ReactNode;
+}
+
+const Button = forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ variant = 'primary', size = 'md', ...props }, ref) => {
+    const baseClasses = 'font-medium rounded-lg transition-all focus:outline-none focus:ring-2';
+    const variantClasses = {
+      primary: 'bg-brand-primary-500 text-white hover:bg-brand-primary-600 focus:ring-brand-primary-500',
+      secondary: 'bg-gray-100 text-gray-900 hover:bg-gray-200 focus:ring-gray-500',
+      ghost: 'text-gray-700 hover:bg-gray-100 focus:ring-gray-500',
+      danger: 'bg-red-500 text-white hover:bg-red-600 focus:ring-red-500',
+    };
+    const sizeClasses = {
+      sm: 'px-3 py-1.5 text-sm',
+      md: 'px-4 py-2 text-base',
+      lg: 'px-6 py-3 text-lg',
+    };
+
+    return (
+      <motion.button
+        ref={ref}
+        className={clsx(baseClasses, variantClasses[variant], sizeClasses[size])}
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
+        disabled={props.disabled}
+        {...props}
+      />
+    );
+  }
+);
+
+// File: src/components/primitives/Card.tsx
+interface CardBaseProps {
+  size: 'sm' | 'md' | 'lg';
+  elevation: 'none' | 'sm' | 'md' | 'lg';
+  hover: boolean;
+  clickable: boolean;
+  children: ReactNode;
+  onClick?: () => void;
+}
+
+const CardBase = forwardRef<HTMLDivElement, CardBaseProps>(
+  ({ size = 'md', elevation = 'md', hover = true, ...props }, ref) => {
+    const sizeClasses = {
+      sm: 'w-12 h-16',
+      md: 'w-24 h-32',
+      lg: 'w-48 h-64',
+    };
+    const elevationClasses = {
+      none: '',
+      sm: 'shadow-sm',
+      md: 'shadow-card',
+      lg: 'shadow-xl',
+    };
+
+    return (
+      <motion.div
+        ref={ref}
+        className={clsx(
+          'bg-white rounded-lg border border-gray-200',
+          sizeClasses[size],
+          elevationClasses[elevation],
+          hover && 'hover:shadow-xl transition-shadow',
+          props.clickable && 'cursor-pointer'
+        )}
+        whileHover={hover ? { y: -4 } : {}}
+        {...props}
+      />
+    );
+  }
+);
+```
+
+### 7.2 Game-Specific Components
+
+#### 7.2.1 Painting Card Component
+
+```typescript
+// ===================
+// PAINTING CARD
+// ===================
+
+// File: src/components/game/PaintingCard.tsx
+interface PaintingCardProps {
+  card: Card;
+  size: 'sm' | 'md' | 'lg';
+  showAuctionType: boolean;
+  interactive?: boolean;
+  selected?: boolean;
+  onClick?: () => void;
+  orientation?: 'vertical' | 'horizontal';
+}
+
+const PaintingCard: React.FC<PaintingCardProps> = ({
+  card,
+  size,
+  showAuctionType,
+  interactive = false,
+  selected = false,
+  ...props
+}) => {
+  const artworkSrc = `/assets/artworks/${card.artist}/${card.artworkId}.webp`;
+  const profile = ARTIST_VISUAL_PROFILES.find(p => p.name === card.artist);
+  const auctionIndicator = AUCTION_TYPE_INDICATORS.find(
+    i => i.type === card.auctionType
+  );
+
+  return (
+    <motion.div
+      className={clsx(
+        'painting-card relative overflow-hidden',
+        `size-${size}`,
+        selected && 'ring-4 ring-blue-500',
+        interactive && 'cursor-pointer hover:scale-105'
+      )}
+      onClick={props.onClick}
+      whileHover={interactive ? { y: -10, rotate: 2 } : {}}
+      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+    >
+      {/* Card background with artist color scheme */}
+      <div
+        className="absolute inset-0"
+        style={{ backgroundColor: profile?.colorScheme[50] }}
+      />
+
+      {/* Artwork */}
+      <div className="relative h-3/4 p-2">
+        <img
+          src={artworkSrc}
+          alt={`${card.artist} painting`}
+          className="w-full h-full object-cover rounded"
+          loading="lazy"
+        />
+      </div>
+
+      {/* Artist name */}
+      <div className="absolute top-2 left-2 bg-white/90 backdrop-blur px-2 py-1 rounded">
+        <span className="text-sm font-semibold" style={{ color: profile?.colorScheme[700] }}>
+          {card.artist}
+        </span>
+      </div>
+
+      {/* Auction type indicator */}
+      {showAuctionType && auctionIndicator && (
+        <motion.div
+          className="absolute bottom-2 right-2 w-8 h-8 rounded-full flex items-center justify-center bg-white/90 backdrop-blur"
+          style={{ color: auctionIndicator.color }}
+          animate={auctionIndicator.animation ? { scale: [1, 1.1, 1] } : {}}
+          transition={{ repeat: Infinity, duration: 2 }}
+        >
+          {auctionIndicator.icon}
+        </motion.div>
+      )}
+
+      {/* Artist signature element */}
+      {profile?.signatureElement && (
+        <div className="absolute bottom-2 left-2 opacity-30">
+          {profile.signatureElement}
+        </div>
+      )}
+    </motion.div>
+  );
+};
+```
+
+#### 7.2.2 Player Hand Component
+
+```typescript
+// ===================
+// PLAYER HAND
+// ===================
+
+// File: src/components/game/PlayerHand.tsx
+interface PlayerHandProps {
+  cards: Card[];
+  isCurrentPlayer: boolean;
+  playableCards: string[];  // Card IDs that can be played
+  onCardSelect: (cardId: string) => void;
+  maxFanAngle?: number;     // Maximum spread angle
+  cardOverlap?: number;     // How much cards overlap
+}
+
+const PlayerHand: React.FC<PlayerHandProps> = ({
+  cards,
+  isCurrentPlayer,
+  playableCards,
+  onCardSelect,
+  maxFanAngle = 45,
+  cardOverlap = 0.6,
+}) => {
+  const [selectedCard, setSelectedCard] = useState<string | null>(null);
+  const [hoveredCard, setHoveredCard] = useState<string | null>(null);
+
+  // Calculate card positions in a fan
+  const getCardStyle = (index: number, total: number): CSSProperties => {
+    if (total === 1) return {};
+
+    const angleStep = maxFanAngle / (total - 1);
+    const angle = (index - (total - 1) / 2) * angleStep;
+    const rotate = `${angle}deg`;
+
+    const offset = index * (1 - cardOverlap) * 100;
+    const translate = `translateX(${offset}px) translateY(${-Math.abs(angle) * 0.5}px)`;
+
+    return {
+      transform: `${translate} rotate(${rotate})`,
+      zIndex: hoveredCard === cards[index].id ? 20 : 10 + index,
+    };
+  };
+
+  return (
+    <div className="player-hand relative h-40 flex items-end justify-center">
+      {cards.map((card, index) => {
+        const isPlayable = playableCards.includes(card.id);
+        const isHovered = hoveredCard === card.id;
+        const isSelected = selectedCard === card.id;
+
+        return (
+          <motion.div
+            key={card.id}
+            className="absolute"
+            style={getCardStyle(index, cards.length)}
+            animate={{
+              y: isHovered ? -20 : isSelected ? -10 : 0,
+              scale: isHovered ? 1.1 : isSelected ? 1.05 : 1,
+            }}
+            whileHover={isPlayable ? { y: -20, scale: 1.1 } : {}}
+            onHoverStart={() => isPlayable && setHoveredCard(card.id)}
+            onHoverEnd={() => setHoveredCard(null)}
+            onClick={() => {
+              if (isPlayable) {
+                setSelectedCard(card.id === selectedCard ? null : card.id);
+                onCardSelect(card.id);
+              }
+            }}
+          >
+            <PaintingCard
+              card={card}
+              size="md"
+              showAuctionType={true}
+              interactive={isPlayable && isCurrentPlayer}
+              selected={isSelected}
+            />
+            {!isPlayable && (
+              <div className="absolute inset-0 bg-gray-500/50 rounded-lg" />
+            )}
+          </motion.div>
+        );
+      })}
+    </div>
+  );
+};
+```
+
+#### 7.2.3 Auction Interface Components
+
+```typescript
+// ===================
+// AUCTION INTERFACES
+// ===================
+
+// File: src/components/auction/OpenAuction.tsx
+interface OpenAuctionProps {
+  auction: OpenAuctionState;
+  currentPlayerIndex: number;
+  onPlaceBid: (amount: number) => void;
+  onPass: () => void;
+}
+
+const OpenAuction: React.FC<OpenAuctionProps> = ({
+  auction,
+  currentPlayerIndex,
+  onPlaceBid,
+  onPass,
+}) => {
+  const [bidAmount, setBidAmount] = useState(
+    auction.currentHighBid ? auction.currentHighBid + 1 : 1
+  );
+  const timeLeft = auction.countdownSeconds;
+
+  return (
+    <motion.div
+      className="open-auction p-6 bg-white rounded-xl shadow-xl"
+      initial={{ scale: 0.9, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+    >
+      {/* Card being auctioned */}
+      <div className="flex justify-center mb-6">
+        <PaintingCard card={auction.card} size="lg" showAuctionType={false} />
+      </div>
+
+      {/* Current bid info */}
+      <div className="text-center mb-4">
+        {auction.currentHighBid ? (
+          <p className="text-lg">
+            Current bid: <span className="font-bold text-brand-primary-600">
+              ${auction.currentHighBid}k
+            </span> by Player {auction.currentHighBidder + 1}
+          </p>
+        ) : (
+          <p className="text-lg text-gray-600">No bids yet</p>
+        )}
+      </div>
+
+      {/* Countdown timer */}
+      <div className="flex justify-center mb-6">
+        <motion.div
+          className="relative w-16 h-16"
+          animate={{ rotate: 360 }}
+          transition={{ duration: timeLeft, ease: 'linear' }}
+        >
+          <svg className="w-full h-full transform -rotate-90">
+            <circle
+              cx="32"
+              cy="32"
+              r="28"
+              stroke="#e5e7eb"
+              strokeWidth="4"
+              fill="none"
+            />
+            <motion.circle
+              cx="32"
+              cy="32"
+              r="28"
+              stroke="#10b981"
+              strokeWidth="4"
+              fill="none"
+              strokeDasharray={`${2 * Math.PI * 28}`}
+              initial={{ strokeDashoffset: 0 }}
+              animate={{ strokeDashoffset: 2 * Math.PI * 28 * (1 - timeLeft / 5) }}
+            />
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-xl font-bold">{Math.ceil(timeLeft)}</span>
+          </div>
+        </motion.div>
+      </div>
+
+      {/* Bid controls */}
+      <div className="flex items-center justify-center gap-4">
+        <BidInput
+          value={bidAmount}
+          onChange={setBidAmount}
+          min={auction.currentHighBid ? auction.currentHighBid + 1 : 1}
+        />
+        <Button
+          variant="primary"
+          size="lg"
+          onClick={() => onPlaceBid(bidAmount)}
+          disabled={!canAffordBid(bidAmount)}
+        >
+          Bid ${bidAmount}k
+        </Button>
+        {auction.currentHighBid === null && (
+          <Button
+            variant="ghost"
+            size="lg"
+            onClick={onPass}
+          >
+            Pass
+          </Button>
+        )}
+      </div>
+    </motion.div>
+  );
+};
+```
+
+---
+
+## Phase 8: Component Library & Design System (Parallel Track)
+
+Creating a comprehensive component library that can be used across all phases.
+
+### 8.1 Storybook Documentation
+
+#### 8.1.1 Component Documentation Structure
+
+```typescript
+// File: .storybook/main.ts
+export default {
+  stories: ['../src/components/**/*.stories.@(js|jsx|ts|tsx)'],
+  addons: [
+    '@storybook/addon-essentials',
+    '@storybook/addon-docs',
+    '@storybook/addon-controls',
+    '@storybook/addon-backgrounds',
+  ],
+};
+
+// Example: PaintingCard.stories.tsx
+export default {
+  title: 'Game/PaintingCard',
+  component: PaintingCard,
+  parameters: {
+    docs: {
+      description: {
+        component: 'A painting card that displays artwork, artist, and auction type.',
+      },
+    },
+    backgrounds: {
+      default: 'light',
+      values: [
+        { name: 'light', value: '#f8fafc' },
+        { name: 'dark', value: '#1e293b' },
+        { name: 'table', value: '#065f46' },  // Game table green
+      ],
+    },
+  },
+};
+
+const Template = (args) => <PaintingCard {...args} />;
+
+export const Default = Template.bind({});
+Default.args = {
+  card: {
+    id: 'mc-001',
+    artist: 'Manuel Carvalho',
+    auctionType: 'open',
+    artworkId: 'mc-001',
+  },
+  size: 'md',
+  showAuctionType: true,
+};
+
+export const AllSizes = () => (
+  <div className="flex gap-4">
+    <PaintingCard size="sm" {...Default.args} />
+    <PaintingCard size="md" {...Default.args} />
+    <PaintingCard size="lg" {...Default.args} />
+  </div>
+);
+```
+
+#### 8.1.2 Design Token Documentation
+
+```typescript
+// File: src/design/ColorPalette.stories.tsx
+export default {
+  title: 'Design/Colors',
+  parameters: {
+    docs: {
+      description: {
+        component: 'Complete color palette used throughout the application.',
+      },
+    },
+  },
+};
+
+export const BrandColors = () => (
+  <div className="grid grid-cols-3 gap-8">
+    {Object.entries(tokens.colors.brand).map(([name, palette]) => (
+      <div key={name}>
+        <h3 className="text-lg font-semibold mb-2">{name}</h3>
+        <div className="space-y-2">
+          {Object.entries(palette).map(([shade, value]) => (
+            <div key={shade} className="flex items-center gap-2">
+              <div
+                className="w-12 h-12 rounded border"
+                style={{ backgroundColor: value }}
+              />
+              <span className="text-sm">{shade}: {value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    ))}
+  </div>
+);
+```
+
+### 8.2 Testing Strategy for Components
+
+#### 8.2.1 Component Testing Setup
+
+```typescript
+// File: src/components/__tests__/PaintingCard.test.tsx
+import { render, screen, fireEvent } from '@testing-library/react';
+import { PaintingCard } from '../PaintingCard';
+
+describe('PaintingCard', () => {
+  const mockCard = {
+    id: 'test-001',
+    artist: 'Manuel Carvalho' as Artist,
+    auctionType: 'open' as AuctionType,
+    artworkId: 'test-artwork',
+  };
+
+  it('displays artist name', () => {
+    render(<PaintingCard card={mockCard} size="md" showAuctionType />);
+    expect(screen.getByText('Manuel Carvalho')).toBeInTheDocument();
+  });
+
+  it('shows auction type when enabled', () => {
+    render(<PaintingCard card={mockCard} size="md" showAuctionType />);
+    expect(screen.getByText('📢')).toBeInTheDocument();  // Open auction icon
+  });
+
+  it('calls onClick when clicked and interactive', () => {
+    const handleClick = jest.fn();
+    render(
+      <PaintingCard
+        card={mockCard}
+        size="md"
+        showAuctionType
+        interactive
+        onClick={handleClick}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button'));
+    expect(handleClick).toHaveBeenCalledTimes(1);
+  });
+});
+```
+
+#### 8.2.2 Visual Regression Testing
+
+```typescript
+// File: src/components/__tests__/visual/PlayerHand.visual.tsx
+import { render } from '@testing-library/react';
+import { PlayerHand } from '../../game/PlayerHand';
+
+describe('PlayerHand Visual Tests', () => {
+  it('matches snapshot with 5 cards', () => {
+    const { container } = render(
+      <PlayerHand
+        cards={mockCards.slice(0, 5)}
+        isCurrentPlayer={true}
+        playableCards={mockCards.slice(0, 5).map(c => c.id)}
+        onCardSelect={jest.fn()}
+      />
+    );
+    expect(container.firstChild).toMatchSnapshot();
+  });
+});
+```
+
+### 8.3 Performance Optimization
+
+#### 8.3.1 Component Performance
+
+```typescript
+// File: src/components/performance/LazyCard.tsx
+import { lazy, Suspense } from 'react';
+
+const PaintingCard = lazy(() => import('../game/PaintingCard'));
+
+export const LazyPaintingCard = (props) => (
+  <Suspense fallback={<CardSkeleton />}>
+    <PaintingCard {...props} />
+  </Suspense>
+);
+
+// Skeleton placeholder while loading
+const CardSkeleton = () => (
+  <div className="animate-pulse">
+    <div className="bg-gray-200 rounded-lg w-24 h-32" />
+  </div>
+);
+```
+
+#### 8.3.2 Asset Optimization
+
+```typescript
+// File: src/utils/imageOptimization.ts
+export const getOptimizedArtworkSrc = (
+  artist: Artist,
+  artworkId: string,
+  size: 'thumb' | 'small' | 'medium' | 'large'
+): string => {
+  const sizeMap = {
+    thumb: 'w=60&h=84',
+    small: 'w=120&h=168',
+    medium: 'w=240&h=336',
+    large: 'w=480&h=672',
+  };
+
+  return `/api/artwork/${artist}/${artworkId}?${sizeMap[size]}&format=webp`;
+};
+
+// Preload critical assets
+export const preloadArtworks = (cards: Card[]) => {
+  const uniqueArtworks = new Set(
+    cards.map(c => `${c.artist}/${c.artworkId}`)
+  );
+
+  uniqueArtworks.forEach(artwork => {
+    const img = new Image();
+    img.src = getOptimizedArtworkSrc(
+      artwork.split('/')[0] as Artist,
+      artwork.split('/')[1],
+      'medium'
+    );
+  });
+};
+```
+
+---
+
+## Updated Implementation Order (Parallel Tracks)
+
+### Track A: Game Engine & Logic (Phases 1-2)
+**Can be done independently of UI/UX work**
 
 1. [ ] Project setup (React + TypeScript + Vite + Tailwind)
 2. [ ] Define all TypeScript types from this document
@@ -848,36 +2205,51 @@ interface OpenAuctionUI {
    - [ ] Double Auction (most complex, do last)
 7. [ ] Implement round flow and end conditions
 8. [ ] Implement 4-round game flow
+9. [ ] AI Players implementation (Phase 2)
 
-### Milestone 2: Basic UI
+### Track B: Visual Design & Art (Phase 6)
+**Can be done independently and in parallel**
 
-1. [ ] Game table layout
-2. [ ] Card display
-3. [ ] Player hand
-4. [ ] Auction area with controls
-5. [ ] Artist value board
-6. [ ] Round/game summaries
+1. [ ] Brand identity design (logo, colors, typography)
+2. [ ] Artist visual profiles (color schemes, motifs)
+3. [ ] Create 70 unique artwork assets:
+   - 12 for Manuel Carvalho
+   - 13 for Sigrid Thaler
+   - 15 for Daniel Melim
+   - 15 for Ramon Martins
+   - 15 for Rafael Silveira
+4. [ ] UI screen mockups (Figma/Sketch)
+5. [ ] Animation and motion design specifications
+6. [ ] Asset optimization and export
 
-### Milestone 3: AI Players
+### Track C: Component Library (Phase 7-8)
+**Can be done after Phase 6 basic visuals are ready**
 
-1. [ ] AI decision framework
-2. [ ] Easy AI
-3. [ ] Medium AI
-4. [ ] Hard AI
+1. [ ] Design tokens implementation (colors, spacing, typography)
+2. [ ] Component primitives (Button, Input, Card, etc.)
+3. [ ] Game-specific components (PaintingCard, PlayerHand, etc.)
+4. [ ] Auction interface components (all 5 types)
+5. [ ] Storybook documentation
+6. [ ] Component testing (unit + visual regression)
 
-### Milestone 4: Polish
+### Track D: Integration & Polish
+**Requires work from other tracks**
 
-1. [ ] Animations (Framer Motion)
-2. [ ] Sound effects
-3. [ ] Tutorial
-4. [ ] Responsive design
+1. [ ] Integrate engine with UI components
+2. [ ] Implement animations (Framer Motion)
+3. [ ] Add sound effects
+4. [ ] Responsive design adjustments
+5. [ ] Performance optimization
+6. [ ] Tutorial and help system
 
-### Milestone 5: Online (Future)
+### Track E: Online Multiplayer (Future)
+**Phase 5 - after single player complete**
 
-1. [ ] Backend setup
+1. [ ] Backend setup (Node.js + Socket.io)
 2. [ ] WebSocket integration
-3. [ ] Matchmaking
-4. [ ] Accounts
+3. [ ] Matchmaking system
+4. [ ] User accounts and profiles
+5. [ ] Leaderboards and statistics
 
 ---
 

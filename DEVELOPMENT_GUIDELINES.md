@@ -1,215 +1,249 @@
-# Development & Implementation Guidelines
+# Development Guidelines - Modern Art Board Game
 
-## Development Philosophy
-
-**Build incrementally. Test continuously. Ship quality.**
-
-Each feature should be:
-1. Implemented in isolation
-2. Unit tested
-3. Manually testable via debug UI
-4. Reviewed before moving on
+**Purpose**: Step-by-step development guide that follows the Implementation Plan phases
+**Philosophy**: Build incrementally. Test continuously. Ship quality.
 
 ---
 
-## Engineering Principles
+## Quick Reference: What to Build First
 
-### Code Quality
+**Development Order**:
+1. Project Setup (Phase 1)
+2. Player Setup System (Phase 1.0)
+3. Core Types & Constants (Phase 1.1-1.2)
+4. Deck Management (Phase 1.3)
+5. Artist Valuation (Phase 1.4)
+6. Auction Engines (Phase 1.5)
+7. Round Management (Phase 1.6)
+8. Game Flow (Phase 1.7)
+9. AI Players (Phase 2)
+10. UI Shell (Phase 3)
+11. Polish (Phase 4)
 
-- **Type everything** - No `any` types. TypeScript strict mode enabled.
-- **Pure functions first** - Game engine logic should be pure (input → output, no side effects).
-- **Single responsibility** - Each module does one thing well.
-- **Fail fast** - Validate inputs early, throw descriptive errors.
-- **No magic numbers** - Use named constants.
-
-### Architecture
-
-- **Separate concerns** - Engine (logic) knows nothing about React. UI knows nothing about rules.
-- **State is immutable** - Never mutate game state. Return new state objects.
-- **Events for side effects** - UI animations triggered by events, not state diffing.
-- **Dependency injection** - Pass dependencies explicitly for testability.
-
-### Testing
-
-- **Test behavior, not implementation** - Tests should survive refactors.
-- **Edge cases first** - Write tests for boundary conditions before happy path.
-- **No mocks for pure functions** - If you need mocks, reconsider the design.
-- **Readable test names** - `"auctioneer wins hidden auction tie"` not `"test case 7"`.
+Each phase builds on the previous. Don't skip ahead!
 
 ---
 
-## UI/UX Design Principles
+## Phase 1: Project Setup ✅ COMPLETED
 
-### Visual Hierarchy
+**Corresponds to**: IMPLEMENTATION_PLAN Phase 1 (start)
 
-- **Primary action prominent** - Current player's action button should be obvious.
-- **State visible at glance** - Round, turn, money, artist values always visible.
-- **Progressive disclosure** - Show details on hover/tap, not all at once.
+**Deliverables**:
+- [x] Initialize Vite + React + TypeScript
+- [x] Configure Tailwind CSS
+- [x] Set up ESLint + Prettier
+- [x] Configure Vitest for testing
+- [x] Create folder structure
 
-### Feedback
+**Commands**:
+```bash
+npm create vite@latest modern-art-game -- --template react-ts
+cd modern-art-game
+npm install
+npm install -D tailwindcss postcss autoprefixer @types/node
+npx tailwindcss init -p
+npm install -D eslint @typescript-eslint/eslint-plugin prettier
+npm install -D vitest @testing-library/react @testing-library/jest-dom
+```
 
-- **Every action acknowledged** - Visual + optional audio feedback.
-- **Transitions, not teleports** - Cards move, don't just appear.
-- **Loading states** - Even for fast operations (AI "thinking").
+**Folder Structure**:
+```
+src/
+├── components/
+│   ├── game/
+│   ├── auction/
+│   ├── ui/
+│   └── screens/
+├── engine/          # Pure game logic
+├── ai/              # AI strategies
+├── store/           # State management
+├── types/           # TypeScript types
+└── assets/          # Images, sounds
+```
 
-### Accessibility
-
-- **Color not sole indicator** - Use icons/text alongside color.
-- **Keyboard navigable** - Tab order makes sense.
-- **Readable contrast** - WCAG AA minimum.
-
-### Mobile Considerations
-
-- **Touch targets 44px+** - Fingers are imprecise.
-- **No hover-dependent UI** - Hover is a bonus, not requirement.
-- **Landscape orientation** - Board games work better wide.
-
----
-
-## Implementation Phases
-
-Each phase has a **checkpoint** - don't proceed until tests pass and manual testing complete.
-
-### Phase 1: Project Setup
-
-**Deliverables:**
-- [ ] Vite + React + TypeScript project initialized
-- [ ] Tailwind CSS configured
-- [ ] ESLint + Prettier configured
-- [ ] Vitest configured for unit tests
-- [ ] Folder structure created per IMPLEMENTATION_PLAN.md
-
-**Checkpoint:** `npm run dev` shows blank app, `npm test` runs (0 tests).
+**Checkpoint**: ✅ `npm run dev` shows blank React app, `npm test` runs (0 tests)
 
 ---
 
-### Phase 2: Core Types & Constants
+## Phase 1.0: Player Selection & Game Setup ✅ COMPLETED
 
-**Deliverables:**
-- [ ] `engine/types.ts` - All game types
-- [ ] `engine/constants.ts` - Artists, auction types, card distribution
+**Corresponds to**: IMPLEMENTATION_PLAN Phase 1.0
 
-**Tests:**
-- [ ] Type compilation passes
-- [ ] Constants match rulebook values
+**Deliverables**:
+- [x] Player count selection (3-5 players) - Types defined
+- [x] Player configuration slots (Human/AI) - Interfaces created
+- [x] AI difficulty selection - Types defined
+- [x] Game creation validation - Validation logic implemented
+- [ ] Start game functionality - UI pending (Phase 3)
 
-**Checkpoint:** Types importable, no runtime code yet.
+**Key Files**:
+- [x] `src/types/setup.ts` - Setup interfaces and validation logic
+- [ ] `src/components/screens/GameSetup.tsx` - Main setup component
+- [ ] `src/components/setup/PlayerCountSelector.tsx`
+- [ ] `src/components/setup/PlayerSlot.tsx`
 
----
+**Tests**:
+- [x] Validation logic for player configuration
+- [ ] UI component tests pending implementation
 
-### Phase 3: Deck Management
+**Manual Test**: Validation logic tested via test suite
 
-**Deliverables:**
-- [ ] `engine/deck.ts` - `createDeck()`, `shuffleDeck()`, `dealCards()`
-
-**Tests:**
-- [ ] `createDeck()` returns 70 cards
-- [ ] Card distribution matches: Manuel=12, Sigrid=13, Daniel=15, Ramon=15, Rafael=15
-- [ ] `shuffleDeck()` randomizes order
-- [ ] `dealCards()` respects player count and round
-
-**Manual Test:** Console log deck, verify distribution.
-
-**Checkpoint:** Can create, shuffle, and deal a deck correctly.
+**Checkpoint**: ✅ Types and validation logic complete, UI pending
 
 ---
 
-### Phase 4: Artist Valuation
+## Phase 1.1-1.2: Core Types & Constants ✅ COMPLETED
 
-**Deliverables:**
-- [ ] `engine/valuation.ts` - `rankArtists()`, `calculatePaintingValue()`
+**Corresponds to**: IMPLEMENTATION_PLAN Phase 1.1-1.2
 
-**Tests:**
-- [ ] Ranking: highest card count wins
-- [ ] Tie-breaker: board position (Manuel > Rafael)
-- [ ] Top 3 get 30/20/10, others get 0
-- [ ] Cumulative value: only if top 3 THIS round
-- [ ] Zero cards = not ranked
+**Deliverables**:
+- [x] All game types defined
+- [x] Artists and auction type constants
+- [x] Game state interfaces
+- [x] Player interfaces
+- [x] Auction state types
 
-**Manual Test:** Debug UI showing artist counts → rankings.
+**Key Files**:
+- [x] `src/types/game.ts` - All game interfaces
+- [x] `src/types/auction.ts` - Auction state types
+- [x] `src/types/setup.ts` - Setup interfaces
+- [x] `src/engine/constants.ts` - Game constants
 
-**Checkpoint:** Valuation matches rulebook examples exactly.
+**Constants Defined**:
+```typescript
+// Artists in board order (for tie-breaking)
+const ARTISTS = [
+  'Manuel Carvalho',   // Priority 1 (wins ties)
+  'Sigrid Thaler',     // Priority 2
+  'Daniel Melim',      // Priority 3
+  'Ramon Martins',     // Priority 4
+  'Rafael Silveira',   // Priority 5 (loses ties)
+] as const;
+
+// Card distribution
+const CARD_DISTRIBUTION = {
+  'Manuel Carvalho': 12,
+  'Sigrid Thaler': 13,
+  'Daniel Melim': 15,
+  'Ramon Martins': 15,
+  'Rafael Silveira': 15,
+};
+```
+
+**Tests**:
+- [x] TypeScript compiles without errors
+- [x] Constants match rulebook values
+- [x] All interfaces are properly typed
+
+**Checkpoint**: ✅ All types importable and working
 
 ---
 
-### Phase 5: Auction Engine - Open
+## Phase 1.3: Deck Management ✅ COMPLETED
 
-**Deliverables:**
-- [ ] `engine/auction/open.ts` - State machine for open auction
+**Corresponds to**: IMPLEMENTATION_PLAN Phase 1.3
 
-**Tests:**
-- [ ] Any player can bid
+**Deliverables**:
+- [x] `engine/deck.ts` with deck functions
+- [x] Card creation with proper distribution
+- [x] Shuffle algorithm
+- [x] Deal cards based on player count and round
+
+**Key Functions**:
+```typescript
+function createDeck(): Card[]
+function shuffleDeck(deck: Card[]): Card[]
+function dealCards(deck: Card[], playerCount: number, round: number): Card[][]
+```
+
+**Tests**:
+- [x] `createDeck()` returns exactly 70 cards
+- [x] Card distribution matches: Manuel=12, Sigrid=13, Daniel=15, Ramon=15, Rafael=15
+- [x] `shuffleDeck()` produces different orders
+- [x] `dealCards()` respects player count and round:
+  - 3 players: [10, 6, 6, 0] cards per round
+  - 4 players: [9, 4, 4, 0] cards per round
+  - 5 players: [8, 3, 3, 0] cards per round
+
+**Manual Test**: Console log deck, verify distribution and shuffling
+
+**Checkpoint**: ✅ Can create, shuffle, and deal cards correctly
+
+---
+
+## Phase 1.4: Artist Valuation
+
+**Corresponds to**: IMPLEMENTATION_PLAN Phase 1.4
+
+**Deliverables**:
+- [ ] `engine/valuation.ts` - Artist ranking and value calculation
+- [ ] Tie-breaking by board position
+- [ ] Cumulative value calculation
+
+**Key Functions**:
+```typescript
+function rankArtists(cardsPlayed: Record<Artist, number>): ArtistRoundResult[]
+function calculatePaintingValue(board: GameBoard, artist: Artist, round: number): number
+```
+
+**Critical Rules**:
+1. **Ranking**: Highest card count wins
+2. **Tie-breaker**: Board position (Manuel > Rafael)
+3. **Payout**: Top 3 get 30/20/10, others get 0
+4. **Cumulative**: Only if top 3 THIS round
+
+**Tests**:
+- [ ] Clear winner (highest count gets 30k)
+- [ ] Tie-breaker by board position
+- [ ] Top 3 get correct values
+- [ ] Not in top 3 = 0 value (even with history)
+- [ ] Cumulative stacks correctly when in top 3
+
+**Manual Test**: Debug UI showing artist counts → rankings
+
+**Checkpoint**: Valuation matches rulebook exactly
+
+---
+
+## Phase 1.5: Auction Engines
+
+**Corresponds to**: IMPLEMENTATION_PLAN Phase 1.5
+
+**Deliverables**: Implement each auction type in separate files
+- [ ] `engine/auction/open.ts` - Open auction state machine
+- [ ] `engine/auction/oneOffer.ts` - One offer auction
+- [ ] `engine/auction/hidden.ts` - Hidden auction
+- [ ] `engine/auction/fixedPrice.ts` - Fixed price auction
+- [ ] `engine/auction/double.ts` - Double auction (most complex)
+
+### Open Auction Tests:
+- [ ] Any player can bid anytime
 - [ ] Bid must exceed current high bid
 - [ ] Cannot bid more than own money
 - [ ] No bids → auctioneer gets free
 - [ ] Auctioneer wins → pays bank
-- [ ] Winner pays auctioneer (if not self)
 
-**Manual Test:** Debug UI with bid buttons, see state changes.
-
-**Checkpoint:** Open auction fully functional.
-
----
-
-### Phase 6: Auction Engine - One Offer
-
-**Deliverables:**
-- [ ] `engine/auction/oneOffer.ts`
-
-**Tests:**
+### One Offer Tests:
 - [ ] Turn order: left of auctioneer → clockwise → auctioneer last
-- [ ] Each player: one chance to bid or pass
+- [ ] Each player gets one chance to bid or pass
 - [ ] Must bid higher than current
 - [ ] No bids → auctioneer gets free
 
-**Manual Test:** Step through turn order visually.
-
-**Checkpoint:** One offer auction fully functional.
-
----
-
-### Phase 7: Auction Engine - Hidden
-
-**Deliverables:**
-- [ ] `engine/auction/hidden.ts`
-
-**Tests:**
+### Hidden Auction Tests:
 - [ ] All players submit simultaneously
 - [ ] Bids hidden until all submitted
 - [ ] Highest bid wins
 - [ ] Tie-breaker: auctioneer wins if tied
-- [ ] Tie-breaker: else closest clockwise from auctioneer
+- [ ] Tie-breaker: closest clockwise from auctioneer
 - [ ] All bid 0 → auctioneer gets free
 
-**Manual Test:** Submit bids, verify reveal + winner selection.
-
-**Checkpoint:** Hidden auction with correct tie-breaking.
-
----
-
-### Phase 8: Auction Engine - Fixed Price
-
-**Deliverables:**
-- [ ] `engine/auction/fixedPrice.ts`
-
-**Tests:**
+### Fixed Price Tests:
 - [ ] Auctioneer sets price ≤ own money
 - [ ] Turn order: left of auctioneer → clockwise
 - [ ] First buyer wins at fixed price
 - [ ] All pass → auctioneer MUST buy
 
-**Manual Test:** Set various prices, test pass scenarios.
-
-**Checkpoint:** Fixed price auction fully functional.
-
----
-
-### Phase 9: Auction Engine - Double
-
-**Deliverables:**
-- [ ] `engine/auction/double.ts`
-
-**Tests:**
+### Double Auction Tests:
 - [ ] Auctioneer can offer second card (same artist, not Double)
 - [ ] If declined, offer passes left clockwise
 - [ ] Another player offers → they become auctioneer, get money
@@ -218,18 +252,30 @@ Each phase has a **checkpoint** - don't proceed until tests pass and manual test
 - [ ] Winner gets both cards
 - [ ] Next turn = left of final auctioneer
 
-**Manual Test:** Full double auction flow with auctioneer transfer.
+**Manual Test**: Debug UI with bid buttons for each auction type
 
-**Checkpoint:** Double auction with all edge cases.
+**Checkpoint**: All auction types fully functional with correct rules
 
 ---
 
-### Phase 10: Round Management
+## Phase 1.6: Round Management
 
-**Deliverables:**
-- [ ] `engine/round.ts` - Round flow, end conditions
+**Corresponds to**: IMPLEMENTATION_PLAN Phase 1.6
 
-**Tests:**
+**Deliverables**:
+- [ ] `engine/round.ts` - Round flow and end conditions
+- [ ] Track cards played per artist
+- [ ] Handle round-ending scenarios
+- [ ] Deal with unsold cards
+
+**Critical Rules**:
+1. **5th card ends round**
+2. **5th card is not auctioned**
+3. **5th as Double first** → immediate end
+4. **5th as Double second** → both unsold
+5. **Unsold cards count for ranking**
+
+**Tests**:
 - [ ] 5th card of any artist ends round
 - [ ] 5th card not auctioned, counts for ranking
 - [ ] 5th as first of Double → immediate end
@@ -237,201 +283,212 @@ Each phase has a **checkpoint** - don't proceed until tests pass and manual test
 - [ ] Empty hand → player skipped for auction, can still bid
 - [ ] All players empty → round ends
 
-**Manual Test:** Play through a round, trigger various end conditions.
+**Manual Test**: Play through a round, trigger various end conditions
 
-**Checkpoint:** Round lifecycle complete.
+**Checkpoint**: Round lifecycle complete with all edge cases
 
 ---
 
-### Phase 11: Game Flow
+## Phase 1.7: Game Flow
 
-**Deliverables:**
-- [ ] `engine/game.ts` - 4-round game, dealing between rounds, winner
+**Corresponds to**: IMPLEMENTATION_PLAN Phase 1.7
 
-**Tests:**
+**Deliverables**:
+- [ ] `engine/game.ts` - 4-round game management
+- [ ] Dealing between rounds
+- [ ] Winner determination
+- [ ] Early game end handling
+
+**Key Functions**:
+```typescript
+function startGame(setup: GameSetup): GameState
+function nextRound(game: GameState): GameState
+function endGame(game: GameState): GameState
+function getWinner(game: GameState): Player | null
+```
+
+**Tests**:
 - [ ] Correct cards dealt per round per player count
 - [ ] Cards in hand persist between rounds
 - [ ] Paintings sold and discarded each round
 - [ ] After round 4, highest money wins
 - [ ] Early game end if all cards exhausted
 
-**Manual Test:** Play full 4-round game with debug UI.
+**Manual Test**: Play full 4-round game with debug UI
 
-**Checkpoint:** Complete game playable (no AI yet).
-
----
-
-### Phase 12: Basic UI Shell
-
-**Deliverables:**
-- [ ] Game table layout
-- [ ] Player hand display
-- [ ] Artist board (value tiles)
-- [ ] Auction area
-- [ ] Money display
-
-**Tests:**
-- [ ] Components render without error
-- [ ] State displayed correctly
-
-**Manual Test:** UI reflects game state changes.
-
-**Checkpoint:** Playable hot-seat mode (pass device).
+**Checkpoint**: Complete game playable (no AI yet)
 
 ---
 
-### Phase 13: AI - Easy
+## Phase 2: AI Players
 
-**Deliverables:**
+**Corresponds to**: IMPLEMENTATION_PLAN Phase 2
+
+**Deliverables**:
 - [ ] `ai/strategies/easy.ts` - Random valid moves
+- [ ] `ai/strategies/medium.ts` - Expected value based
+- [ ] `ai/strategies/hard.ts` - Strategic play
+- [ ] AI decision framework
 
-**Tests:**
+### Easy AI Tests:
 - [ ] Always returns valid bid (within money)
 - [ ] Always returns valid card to play
 - [ ] Never crashes on any game state
 
-**Manual Test:** Play vs 1 Easy AI, game completes.
+### Medium AI Tests:
+- [ ] Bids proportional to expected value
+- [ ] Makes sensible card choices
+- [ ] Completes games without errors
 
-**Checkpoint:** Single player vs AI works.
+### Hard AI Tests:
+- [ ] Makes non-obvious strategic moves
+- [ ] Attempts market manipulation
+- [ ] Considers opponent positions
 
----
+**Manual Test**: Play full games vs each AI difficulty
 
-### Phase 14: AI - Medium & Hard
-
-**Deliverables:**
-- [ ] `ai/strategies/medium.ts` - Expected value based
-- [ ] `ai/strategies/hard.ts` - Strategic play
-
-**Tests:**
-- [ ] Medium bids proportional to expected value
-- [ ] Hard makes non-obvious strategic moves
-- [ ] Both complete games without errors
-
-**Manual Test:** Play full games, observe AI behavior.
-
-**Checkpoint:** All AI difficulties working.
+**Checkpoint**: All AI difficulties working and provide different challenge levels
 
 ---
 
-### Phase 15: Polish
+## Phase 3: UI Shell
 
-**Deliverables:**
-- [ ] Animations (Framer Motion)
-- [ ] Sound effects
-- [ ] Tutorial overlay
+**Corresponds to**: IMPLEMENTATION_PLAN Phase 3
+
+**Deliverables**:
+- [ ] Game table layout
+- [ ] Player hand display (fanned cards)
+- [ ] Artist board (value tiles)
+- [ ] Auction area
+- [ ] Money display (hidden for opponents)
+- [] Basic game state visualization
+
+**Components**:
+- `GameTable.tsx` - Main play area
+- `PlayerHand.tsx` - Card fan display
+- `ArtistBoard.tsx` - Value tiles
+- `AuctionArea.tsx` - Current auction
+- `PlayerInfo.tsx` - Name, money, turn indicator
+
+**Tests**:
+- [ ] Components render without error
+- [ ] State displayed correctly
+- [ ] Interactive elements work
+
+**Manual Test**: Playable hot-seat mode (pass device to human players)
+
+**Checkpoint**: Complete game playable with UI
+
+---
+
+## Phase 4: Polish
+
+**Corresponds to**: IMPLEMENTATION_PLAN Phase 4 (basic polish)
+
+**Deliverables**:
+- [ ] Card animations (Framer Motion)
+- [ ] Bid animations
+- [ ] Sound effects (optional)
 - [ ] Responsive design
+- [ ] Visual feedback for actions
 
-**Tests:**
+**Tests**:
 - [ ] Animations don't break functionality
-- [ ] Works on mobile viewport
+- [ ] Works on mobile viewport (minimum 320px width)
+- [ ] Touch targets 44px+ on mobile
+- [ ] No performance issues
 
-**Manual Test:** Full game with polish, feels good.
+**Manual Test**: Full game with polish, feels responsive
 
-**Checkpoint:** Ready for user testing.
+**Checkpoint**: Ready for user testing
 
 ---
 
-## Debug UI Requirements
+## Engineering Principles
 
-Build a debug panel (dev mode only) that shows:
+### Code Quality
+- **Type everything** - No `any` types
+- **Pure functions first** - Game logic should be pure
+- **Single responsibility** - Each module does one thing well
+- **Fail fast** - Validate inputs early
+- **No magic numbers** - Use named constants
 
-```
-┌─────────────────────────────────────┐
-│ DEBUG PANEL                    [x]  │
-├─────────────────────────────────────┤
-│ Phase: auction                      │
-│ Round: 2/4                          │
-│ Current Player: 1 (Alice)           │
-│ Auctioneer: 0 (You)                 │
-├─────────────────────────────────────┤
-│ Artist Counts This Round:           │
-│  Manuel: 2  Sigrid: 3  Daniel: 1    │
-│  Ramon: 4   Rafael: 2               │
-├─────────────────────────────────────┤
-│ Player Money (hidden in real game): │
-│  You: 85k  Alice: 72k  Bob: 91k     │
-├─────────────────────────────────────┤
-│ [Force Round End] [Deal Cards]      │
-│ [Set Money] [Add Card to Hand]      │
-└─────────────────────────────────────┘
-```
+### Architecture
+- **Separate concerns** - Engine knows nothing about React
+- **State is immutable** - Never mutate game state
+- **Events for side effects** - UI animations triggered by events
+- **Dependency injection** - Pass dependencies explicitly
+
+### Testing
+- **Test behavior, not implementation**
+- **Edge cases first** - Test boundaries before happy path
+- **No mocks for pure functions**
+- **Readable test names** - Describe what's being tested
 
 ---
 
 ## Git Workflow
 
-```
-main          Always deployable
-  └── dev     Integration branch
-       ├── feature/deck-manager
-       ├── feature/open-auction
-       └── feature/ai-easy
-```
+```bash
+# Branch naming
+feature/player-setup
+feature/auction-open
+feature/ai-medium
 
-- **Commits:** Small, atomic, descriptive messages
-- **PRs:** One phase = one PR (roughly)
-- **No broken tests on dev/main**
+# Commit format
+feat: add player configuration UI
+fix: resolve hidden auction tie-breaking
+test: add deck management tests
+refactor: extract auction validation logic
+
+# Never commit broken tests
+# Each feature should be PR-able when complete
+```
 
 ---
 
 ## Definition of Done
 
 A feature is **done** when:
-
 - [ ] Code complete and typed
 - [ ] Unit tests written and passing
 - [ ] Manual testing performed
 - [ ] No TypeScript errors
 - [ ] No ESLint warnings
 - [ ] Works in debug UI
-- [ ] Code reviewed (if team)
+- [ ] Game flow tested end-to-end
 
 ---
 
-## Quick Reference: Test Commands
+## Quick Commands
 
 ```bash
-# Run all tests
-npm test
+# Development
+npm run dev          # Start dev server
+npm run build        # Production build
+npm run preview      # Preview production build
 
-# Run tests in watch mode
-npm run test:watch
+# Testing
+npm test             # Run all tests
+npm run test:watch   # Watch mode
+npm run test:coverage # Coverage report
 
-# Run specific test file
-npm test -- deck.test.ts
-
-# Run with coverage
-npm run test:coverage
-
-# Type check
-npm run typecheck
-
-# Lint
-npm run lint
+# Code quality
+npm run lint         # ESLint
+npm run typecheck    # TypeScript check
+npm run format       # Prettier
 ```
 
 ---
 
-## Quick Reference: Manual Test Scenarios
+## Debug Mode
 
-### Auction Scenarios to Test
+Add a debug panel (dev mode only) showing:
+- Current phase and round
+- Player money (hidden in real game)
+- Artist counts this round
+- Force round end button
+- Deal cards button
+- Set money button
 
-1. **No bids placed** - Verify auctioneer gets card free
-2. **Auctioneer wins** - Verify payment to bank
-3. **All tied in hidden** - Verify correct winner
-4. **Fixed price all pass** - Verify auctioneer forced buy
-5. **Double with transfer** - Verify new auctioneer gets money
-
-### Round End Scenarios
-
-1. **5th card played normally** - Round ends, card unsold
-2. **5th card as Double first** - Immediate end
-3. **5th card as Double second** - Both unsold
-4. **Player runs out of cards** - Skipped but can bid
-
-### Valuation Scenarios
-
-1. **Clear winner** - Highest count gets 30k
-2. **Two-way tie** - Board position breaks it
-3. **Artist not top 3** - Worth 0 even with history
-4. **Cumulative across rounds** - Values stack correctly
+This helps verify game rules during development.
