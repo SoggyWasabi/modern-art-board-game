@@ -1,13 +1,12 @@
 import type {
   GameState,
-  Player,
   Card,
-  RoundState,
   RoundPhase,
   Artist,
-  GameEvent
+  GameEvent,
+  RoundState
 } from '../types/game'
-import { createDeck, dealCards } from './deck'
+import { dealCards } from './deck'
 import { rankArtists } from './valuation'
 import { ARTISTS } from './constants'
 
@@ -56,15 +55,16 @@ export function startRound(
   }
   // Round 4 deals no cards
 
-  // Create new round state
+  // Create new round state, preserving auctioneer index from incoming state
+  const auctioneerIndex = gameState.round.currentAuctioneerIndex
   const roundState: RoundState = {
     roundNumber,
     cardsPlayedPerArtist: ARTISTS.reduce((acc, artist) => {
       acc[artist] = 0
       return acc
     }, {} as Record<Artist, number>),
-    currentAuctioneerIndex: 0, // First player starts
-    phase: { type: 'awaiting_card_play', activePlayerIndex: 0 }
+    currentAuctioneerIndex: auctioneerIndex,
+    phase: { type: 'awaiting_card_play', activePlayerIndex: auctioneerIndex }
   }
 
   // Add round started event
@@ -193,7 +193,7 @@ export function endRound(gameState: GameState): GameState {
 
   // Update board with this round's values
   const newBoard = { ...gameState.board }
-  results.forEach((result, index) => {
+  results.forEach((result) => {
     if (result.value > 0) {
       newBoard.artistValues[result.artist][gameState.round.roundNumber - 1] = result.value
     }

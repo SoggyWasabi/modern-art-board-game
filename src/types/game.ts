@@ -19,12 +19,22 @@ export interface Card {
   artworkId: string // Reference to visual asset
 }
 
+export interface Painting {
+  card: Card
+  artist: Artist
+  purchasePrice: number
+  purchasedRound: number
+  salePrice?: number
+  soldRound?: number
+}
+
 export interface Player {
   id: string
   name: string
   money: number // Hidden from other players until game end
   hand: Card[] // Cards available to auction
   purchasedThisRound: Card[] // Cleared after selling each round
+  purchases?: Painting[] // All paintings owned by player
   isAI: boolean
   aiDifficulty?: 'easy' | 'medium' | 'hard'
 }
@@ -56,15 +66,32 @@ export type RoundPhase =
   | { type: 'selling_to_bank'; results: ArtistRoundResult[] }
   | { type: 'round_complete' }
 
+export type GamePhase = 'setup' | 'playing' | 'ended'
+
 export interface GameState {
   players: Player[]
   deck: Card[]
   discardPile: Card[]
   board: GameBoard
   round: RoundState
-  gamePhase: 'setup' | 'playing' | 'finished'
-  winner: string | null
+  gamePhase: GamePhase
+  winner: Player | null
   eventLog: GameEvent[] // For animations and history
+}
+
+export interface GameEndResult {
+  winner: Player
+  isTie: boolean
+  tieBreakReason?: string
+  finalScores: Array<{
+    player: Player
+    finalMoney: number
+    unsoldPaintingsValue: number
+    totalScore: number
+    paintingsOwned: number
+  }>
+  totalRounds: number
+  totalCardsPlayed: number
 }
 
 export type GameEvent =
@@ -81,4 +108,5 @@ export type GameEvent =
   | { type: 'money_paid'; from: number; to: number | 'bank'; amount: number }
   | { type: 'round_ended'; unsoldCards: Card[]; rankings: ArtistRoundResult[] }
   | { type: 'paintings_sold'; playerIndex: number; paintings: Card[]; totalValue: number }
-  | { type: 'game_ended'; winner: number; finalScores: Map<number, number> }
+  | { type: 'game_ended'; winner: string | null }
+  | { type: 'bank_sale'; playerId: string; totalSaleValue: number; paintingCount: number; paintings: Painting[] }

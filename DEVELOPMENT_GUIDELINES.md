@@ -258,15 +258,15 @@ function calculatePaintingValue(board: GameBoard, artist: Artist, round: number)
 
 ---
 
-## Phase 1.6: Round Management
+## Phase 1.6: Round Management ✅ COMPLETED
 
 **Corresponds to**: IMPLEMENTATION_PLAN Phase 1.6
 
 **Deliverables**:
-- [ ] `engine/round.ts` - Round flow and end conditions
-- [ ] Track cards played per artist
-- [ ] Handle round-ending scenarios
-- [ ] Deal with unsold cards
+- [x] `engine/round.ts` - Round flow and end conditions
+- [x] Track cards played per artist
+- [x] Handle round-ending scenarios
+- [x] Deal with unsold cards
 
 **Critical Rules**:
 1. **5th card ends round**
@@ -276,28 +276,31 @@ function calculatePaintingValue(board: GameBoard, artist: Artist, round: number)
 5. **Unsold cards count for ranking**
 
 **Tests**:
-- [ ] 5th card of any artist ends round
-- [ ] 5th card not auctioned, counts for ranking
-- [ ] 5th as first of Double → immediate end
-- [ ] 5th as second of Double → both unsold
-- [ ] Empty hand → player skipped for auction, can still bid
-- [ ] All players empty → round ends
+- [x] 5th card of any artist ends round
+- [x] 5th card not auctioned, counts for ranking
+- [x] 5th as first of Double → immediate end (tested in round.test.ts)
+- [x] 5th as second of Double → both unsold (tested in round.test.ts)
+- [x] Empty hand → player skipped for auction, can still bid
+- [x] All players empty → round ends
 
 **Manual Test**: Play through a round, trigger various end conditions
 
-**Checkpoint**: Round lifecycle complete with all edge cases
+**Checkpoint**: ✅ Round lifecycle complete with all edge cases (24 tests passing)
 
 ---
 
-## Phase 1.7: Game Flow
+## Phase 1.7: Game Flow ✅ COMPLETED
 
 **Corresponds to**: IMPLEMENTATION_PLAN Phase 1.7
 
 **Deliverables**:
-- [ ] `engine/game.ts` - 4-round game management
-- [ ] Dealing between rounds
-- [ ] Winner determination
-- [ ] Early game end handling
+- [x] `engine/game.ts` - 4-round game management
+- [x] `engine/selling.ts` - Painting sales to bank
+- [x] `engine/money.ts` - Money transactions
+- [x] `engine/endgame.ts` - Winner determination and statistics
+- [x] Dealing between rounds
+- [x] Winner determination
+- [x] Early game end handling
 
 **Key Functions**:
 ```typescript
@@ -307,16 +310,24 @@ function endGame(game: GameState): GameState
 function getWinner(game: GameState): Player | null
 ```
 
-**Tests**:
-- [ ] Correct cards dealt per round per player count
-- [ ] Cards in hand persist between rounds
-- [ ] Paintings sold and discarded each round
-- [ ] After round 4, highest money wins
-- [ ] Early game end if all cards exhausted
+**Tests** (79 tests across game.test.ts, game-edge-cases.test.ts, game-integration.test.ts):
+- [x] Correct cards dealt per round per player count (3/4/5 players)
+- [x] Cards in hand persist between rounds
+- [x] Paintings sold and discarded each round
+- [x] After round 4, highest money wins
+- [x] Early game end if all cards exhausted
+- [x] Winner determination with tie-breaking (most paintings)
+- [x] Shared victory when still tied
+- [x] Auctioneer rotation between rounds
+- [x] Round 4 deals no cards
+- [x] Cumulative artist values across rounds
+- [x] Event logging (round_started, card_played, game_ended, bank_sale)
+- [x] Full 4-round game simulation
+- [x] Money flow verification
 
 **Manual Test**: Play full 4-round game with debug UI
 
-**Checkpoint**: Complete game playable (no AI yet)
+**Checkpoint**: ✅ Complete game playable (no AI yet) - 154 tests passing
 
 ---
 

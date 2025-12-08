@@ -14,8 +14,7 @@ import {
 } from '../round'
 import { createDeck } from '../deck'
 import { createInitialBoard } from '../valuation'
-import type { GameState, Player, RoundState } from '../../types/game'
-import type { Artist } from '../../types/game'
+import type { GameState, Player } from '../../types/game'
 
 describe('Round Management', () => {
   // Helper to create test game state
@@ -25,6 +24,7 @@ describe('Round Management', () => {
       name: `Player ${i + 1}`,
       money: 100,
       hand: [],
+      purchasedThisRound: [],
       isAI: false
     }))
 
@@ -71,7 +71,7 @@ describe('Round Management', () => {
       gameState.round.roundNumber = 1
       // Give players existing hands
       gameState.players.forEach(player => {
-        player.hand = [{ id: 'test', artist: 'Manuel Carvalho', auctionType: 'open', artworkId: 'test' }]
+        player.hand = [{ id: 'test', artist: 'Manuel Carvalho' as const, auctionType: 'open', artworkId: 'test' }]
       })
 
       const newGameState = startRound(gameState, 2)
@@ -86,7 +86,7 @@ describe('Round Management', () => {
       const gameState = createTestGameState(3)
       // Give players existing hands
       gameState.players.forEach(player => {
-        player.hand = [{ id: 'test', artist: 'Manuel Carvalho', auctionType: 'open', artworkId: 'test' }]
+        player.hand = [{ id: 'test', artist: 'Manuel Carvalho' as const, auctionType: 'open', artworkId: 'test' }]
       })
 
       const newGameState = startRound(gameState, 4)
@@ -103,7 +103,7 @@ describe('Round Management', () => {
       const gameState = createTestGameState()
       const card = {
         id: 'test_card',
-        artist: 'Manuel Carvalho' as Artist,
+        artist: 'Manuel Carvalho' as const as const,
         auctionType: 'open' as const,
         artworkId: 'test_artwork'
       }
@@ -117,27 +117,27 @@ describe('Round Management', () => {
       expect(newGameState.players[0].hand).toHaveLength(0)
 
       // Artist count should be updated
-      expect(newGameState.round.cardsPlayedPerArtist['Manuel Carvalho']).toBe(1)
+      expect(newGameState.round.cardsPlayedPerArtist['Manuel Carvalho' as const]).toBe(1)
     })
 
     it('handles 5th card rule - ends round immediately', () => {
       const gameState = createTestGameState()
       const card = {
         id: 'test_card',
-        artist: 'Manuel Carvalho' as Artist,
+        artist: 'Manuel Carvalho' as const as const,
         auctionType: 'open' as const,
         artworkId: 'test_artwork'
       }
 
       // Set up 4 cards already played for this artist
-      gameState.round.cardsPlayedPerArtist['Manuel Carvalho'] = 4
+      gameState.round.cardsPlayedPerArtist['Manuel Carvalho' as const] = 4
       gameState.players[0].hand = [card]
 
       const newGameState = playCard(gameState, 0, 0)
 
       // Should move to round ending phase
       expect(newGameState.round.phase.type).toBe('round_ending')
-      expect(newGameState.round.cardsPlayedPerArtist['Manuel Carvalho']).toBe(5)
+      expect(newGameState.round.cardsPlayedPerArtist['Manuel Carvalho' as const]).toBe(5)
     })
 
     it('throws error for invalid card index', () => {
@@ -150,7 +150,7 @@ describe('Round Management', () => {
   describe('shouldRoundEnd', () => {
     it('returns true when an artist has 5 cards', () => {
       const gameState = createTestGameState()
-      gameState.round.cardsPlayedPerArtist['Manuel Carvalho'] = 5
+      gameState.round.cardsPlayedPerArtist['Manuel Carvalho' as const] = 5
 
       expect(shouldRoundEnd(gameState)).toBe(true)
     })
@@ -168,7 +168,7 @@ describe('Round Management', () => {
       const gameState = createTestGameState()
       // Give players cards
       gameState.players.forEach(player => {
-        player.hand = [{ id: 'test', artist: 'Manuel Carvalho', auctionType: 'open', artworkId: 'test' }]
+        player.hand = [{ id: 'test', artist: 'Manuel Carvalho' as const, auctionType: 'open', artworkId: 'test' }]
       })
 
       expect(shouldRoundEnd(gameState)).toBe(false)
@@ -191,11 +191,11 @@ describe('Round Management', () => {
       const newGameState = endRound(gameState)
 
       // Check board values for round 1 (index 0)
-      expect(newGameState.board.artistValues['Manuel Carvalho'][0]).toBe(30)
-      expect(newGameState.board.artistValues['Sigrid Thaler'][0]).toBe(20)
-      expect(newGameState.board.artistValues['Daniel Melim'][0]).toBe(10)
-      expect(newGameState.board.artistValues['Ramon Martins'][0]).toBe(0)
-      expect(newGameState.board.artistValues['Rafael Silveira'][0]).toBe(0)
+      expect(newGameState.board.artistValues['Manuel Carvalho' as const][0]).toBe(30)
+      expect(newGameState.board.artistValues['Sigrid Thaler' as const][0]).toBe(20)
+      expect(newGameState.board.artistValues['Daniel Melim' as const][0]).toBe(10)
+      expect(newGameState.board.artistValues['Ramon Martins' as const][0]).toBe(0)
+      expect(newGameState.board.artistValues['Rafael Silveira' as const][0]).toBe(0)
 
       // Should be in selling phase
       expect(newGameState.round.phase.type).toBe('selling_to_bank')
@@ -215,13 +215,7 @@ describe('Round Management', () => {
       gameState.round.phase = {
         type: 'auction',
         auction: {
-          type: 'open',
-          card: {
-            id: 'test',
-            artist: 'Manuel Carvalho',
-            auctionType: 'open',
-            artworkId: 'test'
-          },
+          type: 'open' as const,
           auctioneerId: 'player_0',
           currentBid: 10,
           currentBidderId: 'player_1',
@@ -239,14 +233,14 @@ describe('Round Management', () => {
   describe('canPlayerPlayCard', () => {
     it('returns true for active player with cards', () => {
       const gameState = createTestGameState()
-      gameState.players[0].hand = [{ id: 'test', artist: 'Manuel Carvalho', auctionType: 'open', artworkId: 'test' }]
+      gameState.players[0].hand = [{ id: 'test', artist: 'Manuel Carvalho' as const, auctionType: 'open', artworkId: 'test' }]
 
       expect(canPlayerPlayCard(gameState, 0)).toBe(true)
     })
 
     it('returns false for inactive player', () => {
       const gameState = createTestGameState()
-      gameState.players[1].hand = [{ id: 'test', artist: 'Manuel Carvalho', auctionType: 'open', artworkId: 'test' }]
+      gameState.players[1].hand = [{ id: 'test', artist: 'Manuel Carvalho' as const, auctionType: 'open', artworkId: 'test' }]
 
       expect(canPlayerPlayCard(gameState, 1)).toBe(false)
     })
@@ -262,13 +256,7 @@ describe('Round Management', () => {
       gameState.round.phase = {
         type: 'auction',
         auction: {
-          type: 'open',
-          card: {
-            id: 'test',
-            artist: 'Manuel Carvalho',
-            auctionType: 'open',
-            artworkId: 'test'
-          },
+          type: 'open' as const,
           auctioneerId: 'player_0',
           currentBid: 0,
           currentBidderId: null,
@@ -287,8 +275,8 @@ describe('Round Management', () => {
     it('returns cards for active player', () => {
       const gameState = createTestGameState()
       const cards = [
-        { id: 'card1', artist: 'Manuel Carvalho', auctionType: 'open', artworkId: 'art1' },
-        { id: 'card2', artist: 'Sigrid Thaler', auctionType: 'hidden', artworkId: 'art2' }
+        { id: 'card1', artist: 'Manuel Carvalho' as const as const, auctionType: 'open' as const, artworkId: 'art1' },
+        { id: 'card2', artist: 'Sigrid Thaler' as const as const, auctionType: 'hidden' as const, artworkId: 'art2' }
       ]
       gameState.players[0].hand = cards
 
@@ -298,7 +286,7 @@ describe('Round Management', () => {
 
     it('returns empty array for inactive player', () => {
       const gameState = createTestGameState()
-      gameState.players[1].hand = [{ id: 'test', artist: 'Manuel Carvalho', auctionType: 'open', artworkId: 'test' }]
+      gameState.players[1].hand = [{ id: 'test', artist: 'Manuel Carvalho' as const, auctionType: 'open', artworkId: 'test' }]
 
       expect(getPlayableCards(gameState, 1)).toEqual([])
     })
@@ -310,13 +298,7 @@ describe('Round Management', () => {
       gameState.round.phase = {
         type: 'auction',
         auction: {
-          type: 'open',
-          card: {
-            id: 'test',
-            artist: 'Manuel Carvalho',
-            auctionType: 'open',
-            artworkId: 'test'
-          },
+          type: 'open' as const,
           auctioneerId: 'player_0',
           currentBid: 0,
           currentBidderId: null,
@@ -352,10 +334,10 @@ describe('Round Management', () => {
   describe('getRemainingCards', () => {
     it('counts cards across all players', () => {
       const gameState = createTestGameState(3)
-      gameState.players[0].hand = [{ id: '1', artist: 'Manuel Carvalho', auctionType: 'open', artworkId: 'a' }]
+      gameState.players[0].hand = [{ id: '1', artist: 'Manuel Carvalho' as const, auctionType: 'open', artworkId: 'a' }]
       gameState.players[1].hand = [
-        { id: '2', artist: 'Sigrid Thaler', auctionType: 'hidden', artworkId: 'b' },
-        { id: '3', artist: 'Daniel Melim', auctionType: 'fixed_price', artworkId: 'c' }
+        { id: '2', artist: 'Sigrid Thaler' as const, auctionType: 'hidden', artworkId: 'b' },
+        { id: '3', artist: 'Daniel Melim' as const, auctionType: 'fixed_price', artworkId: 'c' }
       ]
       gameState.players[2].hand = []
 
@@ -367,19 +349,19 @@ describe('Round Management', () => {
     it('returns true when player has cards of artist', () => {
       const gameState = createTestGameState()
       gameState.players[1].hand = [
-        { id: 'test', artist: 'Manuel Carvalho', auctionType: 'open', artworkId: 'test' }
+        { id: 'test', artist: 'Manuel Carvalho' as const, auctionType: 'open', artworkId: 'test' }
       ]
 
-      expect(hasPlayerCardsOfArtist(gameState, 'Manuel Carvalho')).toBe(true)
+      expect(hasPlayerCardsOfArtist(gameState, 'Manuel Carvalho' as const)).toBe(true)
     })
 
     it('returns false when no player has cards of artist', () => {
       const gameState = createTestGameState()
       gameState.players.forEach(player => {
-        player.hand = [{ id: 'test', artist: 'Sigrid Thaler', auctionType: 'open', artworkId: 'test' }]
+        player.hand = [{ id: 'test', artist: 'Sigrid Thaler' as const, auctionType: 'open', artworkId: 'test' }]
       })
 
-      expect(hasPlayerCardsOfArtist(gameState, 'Manuel Carvalho')).toBe(false)
+      expect(hasPlayerCardsOfArtist(gameState, 'Manuel Carvalho' as const)).toBe(false)
     })
   })
 })
