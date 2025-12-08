@@ -97,7 +97,8 @@ export interface DoubleAuctionState {
   sold: boolean
   winnerId?: string // Who won the auction
   finalPrice?: number // Final sale price
-  turnOrder: string[] // Order for offering second cards
+  turnOrder: string[] // Order for offering second cards (original auctioneer first)
   currentTurnIndex: number
   offers: Map<string, Card> // playerId -> card offered (for tracking)
+  phase: 'offering' | 'bidding' // Phase of the double auction
 }

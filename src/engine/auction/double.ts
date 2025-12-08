@@ -25,11 +25,16 @@ export function createDoubleAuction(
     throw new Error('First card must be a double auction card')
   }
 
-  // Determine turn order (left of auctioneer first)
+  // Determine turn order
+  // Original auctioneer gets first chance to offer
+  // Then passes clockwise
   const auctioneerIndex = players.findIndex(p => p.id === auctioneer.id)
   const turnOrder: string[] = []
 
-  // Add players to the left (clockwise)
+  // Add original auctioneer first (they get first chance to offer)
+  turnOrder.push(auctioneer.id)
+
+  // Then add players to the left (clockwise)
   for (let i = 1; i < players.length; i++) {
     const index = (auctioneerIndex + i) % players.length
     turnOrder.push(players[index].id)
@@ -45,8 +50,9 @@ export function createDoubleAuction(
     isActive: true,
     sold: false,
     turnOrder,
-    currentTurnIndex: 0,
+    currentTurnIndex: 0, // Start with original auctioneer
     offers: new Map<string, Card>(), // playerId -> card offered
+    phase: 'offering' // 'offering' or 'bidding'
   }
 }
 
@@ -332,4 +338,51 @@ export function getCardsForWinner(state: DoubleAuctionState): Card[] {
   }
 
   return cards
+}
+
+/**
+ * Check if player has a card of the same artist (for offering in double auction)
+ * In real implementation, this would check the player's hand
+ */
+export function hasMatchingCard(
+  playerId: string,
+  doubleCard: Card,
+  playerHand: Card[]
+): boolean {
+  return playerHand.some(card =>
+    card.artist === doubleCard.artist &&
+    card.auctionType !== 'double'
+  )
+}
+
+/**
+ * Get all possible second cards a player can offer
+ */
+export function getPossibleSecondCards(
+  playerId: string,
+  doubleCard: Card,
+  playerHand: Card[]
+): Card[] {
+  return playerHand.filter(card =>
+    card.artist === doubleCard.artist &&
+    card.auctionType !== 'double'
+  )
+}
+
+/**
+ * Start the bidding phase after a second card has been offered
+ */
+export function startBiddingPhase(
+  state: DoubleAuctionState,
+  secondCard: Card,
+  auctioneerId: string
+): DoubleAuctionState {
+  return {
+    ...state,
+    secondCard,
+    currentAuctioneerId: auctioneerId,
+    auctionType: secondCard.auctionType,
+    phase: 'bidding',
+    currentTurnIndex: 0 // Reset for bidding phase
+  }
 }

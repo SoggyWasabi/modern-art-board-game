@@ -11,10 +11,10 @@ import {
   getNextAuctioneerIndex,
   getRemainingCards,
   hasPlayerCardsOfArtist
-} from '../round'
-import { createDeck } from '../deck'
-import { createInitialBoard } from '../valuation'
-import type { GameState, Player } from '../../types/game'
+} from '../../round'
+import { createDeck } from '../../deck'
+import { createInitialBoard } from '../../valuation'
+import type { GameState, Player } from '../../../types/game'
 
 describe('Round Management', () => {
   // Helper to create test game state

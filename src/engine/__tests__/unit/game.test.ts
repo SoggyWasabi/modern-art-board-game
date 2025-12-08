@@ -11,15 +11,15 @@ import {
   checkEarlyGameEnd,
   validateGameState,
   getGameStats
-} from '../game'
-import { endRound } from '../round'
-import { sellAllPaintingsToBank } from '../selling'
-import { determineWinner } from '../endgame'
-import type { GameSetup, PlayerConfig } from '../../types/setup'
-import type { GameState, Player, Card, Painting } from '../../types/game'
-import { ARTISTS } from '../constants'
-import { createInitialBoard } from '../valuation'
-import { createDeck } from '../deck'
+} from '../../game'
+import { endRound } from '../../round'
+import { sellAllPaintingsToBank } from '../../selling'
+import { determineWinner } from '../../endgame'
+import type { GameSetup, PlayerConfig } from '../../../types/setup'
+import type { GameState, Player, Card, Painting } from '../../../types/game'
+import { ARTISTS } from '../../constants'
+import { createInitialBoard } from '../../valuation'
+import { createDeck } from '../../deck'
 
 describe('Game Flow (Phase 1.7)', () => {
   // Helper to create a test game setup

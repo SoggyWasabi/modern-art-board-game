@@ -5,7 +5,7 @@ import {
   calculatePaintingValue,
   updateBoardWithRoundResults,
   createInitialBoard,
-} from '../valuation'
+} from '../../valuation'
 import type { GameBoard, ArtistRoundResult } from '../../types/game'
 import type { Artist } from '../../types/game'
 

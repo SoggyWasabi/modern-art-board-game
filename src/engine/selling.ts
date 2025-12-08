@@ -53,14 +53,27 @@ export function sellPlayerPaintingsToBank(
   // Update player's money
   let newGameState = processBankSale(gameState, playerId, totalSaleValue)
 
-  // Remove sold paintings from player's collection and add to discard pile
+  // Remove only sold paintings from player's collection and add to discard pile
+  // Keep zero-value paintings in player's collection
+  const unsoldPaintings = player.purchases.filter(painting => {
+    const value = calculatePaintingValue(
+      gameState.board,
+      painting.artist,
+      gameState.round.roundNumber - 1,
+      gameState.round.phase.type === 'selling_to_bank'
+        ? gameState.round.phase.results
+        : []
+    )
+    return value === 0
+  })
+
   newGameState = {
     ...newGameState,
     players: newGameState.players.map(p => {
       if (p.id === playerId) {
         return {
           ...p,
-          purchases: [] // All paintings sold
+          purchases: unsoldPaintings // Keep zero-value paintings
         }
       }
       return p
@@ -177,6 +190,10 @@ export function getAllPlayersSaleEarnings(gameState: GameState): Array<{
 export function getTotalPaintingValue(gameState: GameState): number {
   let totalValue = 0
 
+  const roundResults = gameState.round.phase.type === 'selling_to_bank'
+    ? gameState.round.phase.results
+    : []
+
   gameState.players.forEach(player => {
     if (player.purchases) {
       player.purchases.forEach(painting => {
@@ -184,7 +201,7 @@ export function getTotalPaintingValue(gameState: GameState): number {
           gameState.board,
           painting.artist,
           gameState.round.roundNumber - 1,
-          0 // dummy parameter
+          roundResults
         )
         totalValue += value
       })
@@ -225,12 +242,16 @@ export function getPlayersMostValuableArtist(
 
   const artistValues: Record<string, { value: number; count: number }> = {}
 
+  const roundResults = gameState.round.phase.type === 'selling_to_bank'
+    ? gameState.round.phase.results
+    : []
+
   player.purchases.forEach(painting => {
     const value = calculatePaintingValue(
       gameState.board,
       painting.artist,
       gameState.round.roundNumber - 1,
-      0 // dummy parameter
+      roundResults
     )
     if (!artistValues[painting.artist]) {
       artistValues[painting.artist] = { value: 0, count: 0 }

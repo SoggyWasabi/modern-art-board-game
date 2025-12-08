@@ -222,6 +222,8 @@ export function getGameStatistics(gameState: GameState) {
     roundsPlayed: gameState.round.roundNumber,
     totalMoneyInGame: moneyStats.total,
     averageMoney: moneyStats.average,
+    min: moneyStats.min,
+    max: moneyStats.max,
     moneyGap: moneyStats.max - moneyStats.min,
     rankings,
     artistStats: gameState.round.cardsPlayedPerArtist

@@ -24,10 +24,18 @@ export function transferMoney(
     throw new Error('Transfer amount must be positive')
   }
 
+  if (amount === 0) {
+    return players // No change for zero amount
+  }
+
   return players.map(player => {
     if (player.id === fromPlayerId) {
       if (player.money < amount) {
         throw new Error(`Player ${player.name} doesn't have enough money (${player.money} < ${amount})`)
+      }
+      // If transferring to same player, no change
+      if (fromPlayerId === toPlayerId) {
+        return player
       }
       return { ...player, money: player.money - amount }
     }
@@ -83,6 +91,7 @@ export function receiveFromBank(
 
 /**
  * Process an auction result (update money for all parties)
+ * @deprecated Use auction/executor.ts executeAuction instead for proper player-to-player transfers
  */
 export function processAuctionPayment(
   gameState: GameState,
@@ -91,13 +100,24 @@ export function processAuctionPayment(
   const { winnerId, salePrice, profit, auctioneerId } = result
   let newPlayers = [...gameState.players]
 
-  // Winner pays for the painting
-  newPlayers = payToBank(winnerId, salePrice, newPlayers)
-
-  // Auctioneer receives the profit (difference between sale price and what they might have paid)
-  if (profit > 0 && auctioneerId !== winnerId) {
-    // If auctioneer sold to someone else, they get the money
+  if (winnerId === auctioneerId) {
+    // Auctioneer wins their own auction - pays to bank
+    newPlayers = payToBank(winnerId, salePrice, newPlayers)
+  } else if (salePrice > 0) {
+    // Player-to-player transfer - winner pays auctioneer
+    const winnerIndex = newPlayers.findIndex(p => p.id === winnerId)
     const auctioneerIndex = newPlayers.findIndex(p => p.id === auctioneerId)
+
+    if (winnerIndex !== -1) {
+      if (newPlayers[winnerIndex].money < salePrice) {
+        throw new Error(`Winner ${newPlayers[winnerIndex].name} doesn't have enough money (${newPlayers[winnerIndex].money} < ${salePrice})`)
+      }
+      newPlayers[winnerIndex] = {
+        ...newPlayers[winnerIndex],
+        money: newPlayers[winnerIndex].money - salePrice
+      }
+    }
+
     if (auctioneerIndex !== -1) {
       newPlayers[auctioneerIndex] = {
         ...newPlayers[auctioneerIndex],

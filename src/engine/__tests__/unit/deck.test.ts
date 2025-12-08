@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { createDeck, shuffleDeck, dealCards, getCardsToDeal } from '../deck'
-import { CARD_DISTRIBUTION } from '../constants'
+import { createDeck, shuffleDeck, dealCards, getCardsToDeal } from '../../deck'
+import { CARD_DISTRIBUTION, AUCTION_DISTRIBUTION, ARTISTS } from '../../constants'
 
 describe('Deck Management', () => {
   describe('createDeck', () => {
@@ -277,6 +277,151 @@ describe('Deck Management', () => {
 
       // Should have 4 cards left (not dealt in round 4)
       expect(deckIndex).toBe(66)
+    })
+  })
+})
+describe('Card Distribution', () => {
+  describe('Deck Composition', () => {
+    it('ensures no duplicate cards in deck', () => {
+      const deck = createDeck()
+      
+      const cardIds = new Set<string>()
+      const duplicates: string[] = []
+
+      deck.forEach(card => {
+        if (cardIds.has(card.id)) {
+          duplicates.push(card.id)
+        } else {
+          cardIds.add(card.id)
+        }
+      })
+
+      expect(duplicates).toHaveLength(0)
+      expect(cardIds.size).toBe(70)
+    })
+
+    it('ensures all artwork IDs are unique', () => {
+      const deck = createDeck()
+      
+      const artworkIds = new Set<string>()
+      const duplicates: string[] = []
+
+      deck.forEach(card => {
+        if (artworkIds.has(card.artworkId)) {
+          duplicates.push(card.artworkId)
+        } else {
+          artworkIds.add(card.artworkId)
+        }
+      })
+
+      expect(duplicates).toHaveLength(0)
+      expect(artworkIds.size).toBe(70)
+    })
+  })
+
+  describe('Card Distribution Verification', () => {
+    it('has correct distribution of auction types per artist', () => {
+      const deck = createDeck()
+
+      // Group cards by artist and auction type
+      const artistAuctionCounts: Record<string, Record<string, number>> = {}
+
+      deck.forEach(card => {
+        if (!artistAuctionCounts[card.artist]) {
+          artistAuctionCounts[card.artist] = {}
+        }
+        artistAuctionCounts[card.artist][card.auctionType] =
+          (artistAuctionCounts[card.artist][card.auctionType] || 0) + 1
+      })
+
+      // Verify each artist has the correct auction type distribution
+      ARTISTS.forEach(artist => {
+        const expected = AUCTION_DISTRIBUTION[artist]
+        const actual = artistAuctionCounts[artist]
+
+        expect(actual.double).toBe(expected.double)
+        expect(actual.open).toBe(expected.open)
+        expect(actual.one_offer).toBe(expected.one_offer)
+        expect(actual.hidden).toBe(expected.hidden)
+        expect(actual.fixed_price).toBe(expected.fixed_price)
+      })
+
+      // Verify total counts match CARD_DISTRIBUTION
+      Object.entries(artistAuctionCounts).forEach(([artist, counts]) => {
+        const total = Object.values(counts).reduce((sum, count) => sum + count, 0)
+        expect(total).toBe(CARD_DISTRIBUTION[artist])
+      })
+    })
+
+    it('has correct distribution of artists', () => {
+      const deck = createDeck()
+
+      // Should match CARD_DISTRIBUTION constants
+      const artistCounts: Record<string, number> = {}
+      deck.forEach(card => {
+        artistCounts[card.artist] = (artistCounts[card.artist] || 0) + 1
+      })
+
+      expect(artistCounts['Manuel Carvalho']).toBe(12)
+      expect(artistCounts['Sigrid Thaler']).toBe(13)
+      expect(artistCounts['Daniel Melim']).toBe(14)
+      expect(artistCounts['Ramon Martins']).toBe(15)
+      expect(artistCounts['Rafael Silveira']).toBe(16)
+    })
+  })
+
+  describe('Dealing Distribution', () => {
+    it('deals varied artists and auction types to players', () => {
+      const deck = createDeck()
+      const hands = dealCards(deck, 4, 1)
+      
+      // Collect all dealt cards
+      const dealtCards = hands.flat()
+      
+      // Check we have cards from multiple artists
+      const artistsInHands = new Set(dealtCards.map(c => c.artist))
+      expect(artistsInHands.size).toBeGreaterThan(1)
+      
+      // Check we have multiple auction types
+      const auctionTypesInHands = new Set(dealtCards.map(c => c.auctionType))
+      expect(auctionTypesInHands.size).toBeGreaterThan(1)
+    })
+
+    it('provides reasonable distribution when dealing', () => {
+      const deck = createDeck()
+      const hands = dealCards(deck, 4, 1)
+
+      const dealtCards = hands.flat()
+      const auctionTypeCounts: Record<string, number> = {}
+
+      dealtCards.forEach(card => {
+        auctionTypeCounts[card.auctionType] = (auctionTypeCounts[card.auctionType] || 0) + 1
+      })
+
+      // Should have multiple auction types in dealt cards
+      expect(Object.keys(auctionTypeCounts).length).toBeGreaterThan(1)
+
+      // With only 36 cards dealt initially, some types might not appear
+      // but we should have at least 2 types
+      const totalDealt = Object.values(auctionTypeCounts).reduce((a, b) => a + b, 0)
+      expect(totalDealt).toBe(36)
+    })
+
+    it('ensures no player gets all cards of one artist in initial deal', () => {
+      const deck = createDeck()
+      const hands = dealCards(deck, 4, 1)
+      
+      hands.forEach(hand => {
+        const artistCounts: Record<string, number> = {}
+        hand.forEach(card => {
+          artistCounts[card.artist] = (artistCounts[card.artist] || 0) + 1
+        })
+        
+        // With 9 cards initially, having up to 5 of same artist is possible but not all 14
+        Object.values(artistCounts).forEach(count => {
+          expect(count).toBeLessThan(14)
+        })
+      })
     })
   })
 })
