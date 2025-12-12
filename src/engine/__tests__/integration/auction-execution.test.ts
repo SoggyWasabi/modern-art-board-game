@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { createOpenAuction, placeBid, concludeAuction } from '../../auction/open'
-import { createFixedPriceAuction, setPrice, buyAtFixedPrice } from '../../auction/fixedPrice'
-import { createHiddenBidAuction, placeHiddenBid, revealBids } from '../../auction/hidden'
-import { createOneOfferAuction, makeOffer, acceptOffer } from '../../auction/oneOffer'
+import { createOpenAuction, placeBid, pass as openPass, concludeAuction as concludeOpenAuction } from '../../auction/open'
+import { createFixedPriceAuction, buyAtPrice, pass as fixedPass, concludeAuction as concludeFixedAuction } from '../../auction/fixedPrice'
+import { createHiddenAuction, submitBid, revealBids, concludeAuction as concludeHiddenAuction } from '../../auction/hidden'
+import { createOneOfferAuction, makeOffer, pass as oneOfferPass, acceptHighestBid, auctioneerTakesFree, concludeAuction as concludeOneOfferAuction } from '../../auction/oneOffer'
 import { processAuctionPayment } from '../../money'
 import type { GameState, Player, Card } from '../../../types/game'
 import { ARTISTS } from '../../constants'
@@ -15,10 +15,10 @@ describe('Auction Execution Integration', () => {
 
   beforeEach(() => {
     players = [
-      { id: '1', name: 'Alice', money: 100, hand: [], purchases: [] },
-      { id: '2', name: 'Bob', money: 80, hand: [], purchases: [] },
-      { id: '3', name: 'Carol', money: 60, hand: [], purchases: [] },
-      { id: '4', name: 'Dave', money: 40, hand: [], purchases: [] }
+      { id: '1', name: 'Alice', money: 100, hand: [], purchases: [], purchasedThisRound: [], isAI: false },
+      { id: '2', name: 'Bob', money: 80, hand: [], purchases: [], purchasedThisRound: [], isAI: false },
+      { id: '3', name: 'Carol', money: 60, hand: [], purchases: [], purchasedThisRound: [], isAI: false },
+      { id: '4', name: 'Dave', money: 40, hand: [], purchases: [], purchasedThisRound: [], isAI: false }
     ]
 
     testCard = {
@@ -35,10 +35,24 @@ describe('Auction Execution Integration', () => {
       round: {
         roundNumber: 1,
         phase: { type: 'awaiting_card_play', activePlayerIndex: 0 },
-        auctioneerIndex: 0,
-        cardsPlayedPerArtist: {}
+        currentAuctioneerIndex: 0,
+        cardsPlayedPerArtist: {
+          'Manuel Carvalho': 0,
+          'Sigrid Thaler': 0,
+          'Daniel Melim': 0,
+          'Ramon Martins': 0,
+          'Rafael Silveira': 0
+        }
       },
-      board: { artistValues: {} },
+      board: { artistValues: {
+        'Manuel Carvalho': [0, 0, 0, 0],
+        'Sigrid Thaler': [0, 0, 0, 0],
+        'Daniel Melim': [0, 0, 0, 0],
+        'Ramon Martins': [0, 0, 0, 0],
+        'Rafael Silveira': [0, 0, 0, 0]
+      } },
+      gamePhase: 'playing',
+      winner: null,
       eventLog: []
     }
   })
@@ -51,11 +65,12 @@ describe('Auction Execution Integration', () => {
       // Bidding sequence
       auction = placeBid(auction, '2', 20, players)
       auction = placeBid(auction, '3', 30, players)
-      auction = pass(auction, '4', players)
-      auction = pass(auction, '1', players)
+      auction = openPass(auction, '4', players)
+      auction = openPass(auction, '1', players)
+      auction = openPass(auction, '2', players) // Player 2 passes (was outbid)
 
       // Conclude auction
-      const result = concludeAuction(auction, players)
+      const result = concludeOpenAuction(auction, players)
 
       // Process payment - THIS SHOULD BE PLAYER-TO-PLAYER
       const newState = processAuctionPayment(gameState, result)
@@ -74,11 +89,11 @@ describe('Auction Execution Integration', () => {
 
       // Only auctioneer bids
       auction = placeBid(auction, '1', 25, players)
-      auction = pass(auction, '2', players)
-      auction = pass(auction, '3', players)
-      auction = pass(auction, '4', players)
+      auction = openPass(auction, '2', players)
+      auction = openPass(auction, '3', players)
+      auction = openPass(auction, '4', players)
 
-      const result = concludeAuction(auction, players)
+      const result = concludeOpenAuction(auction, players)
       const newState = processAuctionPayment(gameState, result)
 
       // Auctioneer pays bank (no one else to receive money)
@@ -89,53 +104,74 @@ describe('Auction Execution Integration', () => {
 
   describe('Fixed Price Auction Execution', () => {
     it('executes fixed price auction with money transfer', () => {
-      let auction = createFixedPriceAuction(testCard, players[0], players)
-      auction = setPrice(auction, 35)
+      // Create auction with price set during creation
+      let auction = createFixedPriceAuction(testCard, players[0], players, 35)
 
-      // Player 3 buys at fixed price
-      auction = buyAtFixedPrice(auction, '3')
+      // Turn order is: 2, 3, 4 (clockwise from auctioneer, excluding auctioneer)
+      // Player 2 (first in turn order) buys at fixed price
+      auction = buyAtPrice(auction, '2', players)
 
-      const result = concludeAuction(auction, players)
+      const result = concludeFixedAuction(auction, players)
       const newState = processAuctionPayment(gameState, result)
 
       // Buyer pays
-      expect(newState.players.find(p => p.id === '3')?.money).toBe(25) // 60 - 35
+      expect(newState.players.find(p => p.id === '2')?.money).toBe(45) // 80 - 35
       // Auctioneer receives
       expect(newState.players.find(p => p.id === '1')?.money).toBe(135) // 100 + 35
+    })
+
+    it('handles all pass - auctioneer must buy', () => {
+      // Create auction with price set during creation
+      let auction = createFixedPriceAuction(testCard, players[0], players, 35)
+
+      // Turn order is: 2, 3, 4 (clockwise from auctioneer, excluding auctioneer)
+      // All players pass
+      auction = fixedPass(auction, '2')
+      auction = fixedPass(auction, '3')
+      auction = fixedPass(auction, '4')
+
+      const result = concludeFixedAuction(auction, players)
+      const newState = processAuctionPayment(gameState, result)
+
+      // Auctioneer pays bank (forced to buy)
+      expect(newState.players.find(p => p.id === '1')?.money).toBe(65) // 100 - 35
     })
   })
 
   describe('Hidden Bid Auction Execution', () => {
     it('executes hidden bid auction with money transfer', () => {
-      let auction = createHiddenBidAuction(testCard, players[0], players)
+      let auction = createHiddenAuction(testCard, players[0], players)
 
-      // Secret bids
-      auction = placeHiddenBid(auction, '1', 25)
-      auction = placeHiddenBid(auction, '2', 40)
-      auction = placeHiddenBid(auction, '3', 30)
-      auction = placeHiddenBid(auction, '4', 20)
+      // Secret bids - all players must bid
+      auction = submitBid(auction, '1', 25, players)
+      auction = submitBid(auction, '2', 40, players)
+      auction = submitBid(auction, '3', 30, players)
+      auction = submitBid(auction, '4', 20, players)
 
       // Reveal bids
       auction = revealBids(auction)
 
-      const result = concludeAuction(auction, players)
+      const result = concludeHiddenAuction(auction, players)
       const newState = processAuctionPayment(gameState, result)
 
       // Winner (Player 2) pays their bid
       expect(newState.players.find(p => p.id === '2')?.money).toBe(40) // 80 - 40
-      // Auctioneer (Player 1) receives - BUT THIS IS WRONG! Player 1 also bid 25
+      // Auctioneer (Player 1) receives payment
       expect(newState.players.find(p => p.id === '1')?.money).toBe(140) // 100 + 40
     })
 
     it('handles auctioneer winning hidden auction', () => {
-      let auction = createHiddenBidAuction(testCard, players[0], players)
+      let auction = createHiddenAuction(testCard, players[0], players)
 
-      auction = placeHiddenBid(auction, '1', 50) // Auctioneer's bid
-      auction = placeHiddenBid(auction, '2', 30)
+      // All players must bid
+      auction = submitBid(auction, '1', 50, players) // Auctioneer's bid is highest
+      auction = submitBid(auction, '2', 30, players)
+      auction = submitBid(auction, '3', 20, players)
+      auction = submitBid(auction, '4', 10, players)
 
       auction = revealBids(auction)
 
-      const result = concludeAuction(auction, players)
+      const result = concludeHiddenAuction(auction, players)
       const newState = processAuctionPayment(gameState, result)
 
       // Auctioneer pays bank when winning own auction
@@ -147,14 +183,18 @@ describe('Auction Execution Integration', () => {
     it('executes one offer auction with money transfer', () => {
       let auction = createOneOfferAuction(testCard, players[0], players)
 
-      // Players make offers
-      auction = makeOffer(auction, '2', 20)
-      auction = makeOffer(auction, '3', 35)
-      auction = makeOffer(auction, '4', 30)
-      auction = pass(auction, '1') // Back to auctioneer
+      // Turn order is: 2, 3, 4, 1 (clockwise from auctioneer, auctioneer LAST)
+      // Players make offers in turn order
+      auction = makeOffer(auction, '2', 20, players)
+      auction = makeOffer(auction, '3', 35, players) // Highest bid
+      auction = oneOfferPass(auction, '4') // Passes
 
-      // Auctioneer accepts
-      const result = acceptOffer(auction)
+      // Now in auctioneer decision phase - auctioneer accepts the highest bid
+      expect(auction.phase).toBe('auctioneer_decision')
+      auction = acceptHighestBid(auction)
+
+      // Auction is now complete, conclude it
+      const result = concludeOneOfferAuction(auction, players)
       const newState = processAuctionPayment(gameState, result)
 
       // Winner (Player 3) pays their offer
@@ -163,24 +203,24 @@ describe('Auction Execution Integration', () => {
       expect(newState.players.find(p => p.id === '1')?.money).toBe(135) // 100 + 35
     })
 
-    it('handles auctioneer taking painting in one offer', () => {
+    it('handles no bids - auctioneer gets card free', () => {
       let auction = createOneOfferAuction(testCard, players[0], players)
 
-      auction = makeOffer(auction, '2', 30)
-      auction = pass(auction, '3')
-      auction = pass(auction, '4')
+      // All players pass
+      auction = oneOfferPass(auction, '2')
+      auction = oneOfferPass(auction, '3')
+      auction = oneOfferPass(auction, '4')
 
-      // Simulate auctioneer taking for highest offer + 1
-      const result = {
-        ...acceptOffer(auction),
-        winnerId: '1', // Auctioneer takes it
-        salePrice: 31 // Highest offer + 1
-      }
+      // Now in auctioneer decision phase - auctioneer takes card free
+      expect(auction.phase).toBe('auctioneer_decision')
+      auction = auctioneerTakesFree(auction)
 
+      const result = concludeOneOfferAuction(auction, players)
       const newState = processAuctionPayment(gameState, result)
 
-      // Auctioneer pays bank
-      expect(newState.players.find(p => p.id === '1')?.money).toBe(69) // 100 - 31
+      // Auctioneer gets card free (no money changes)
+      expect(newState.players.find(p => p.id === '1')?.money).toBe(100) // unchanged
+      expect(result.salePrice).toBe(0)
     })
   })
 
@@ -194,22 +234,11 @@ describe('Auction Execution Integration', () => {
       // Auction 1: Alice sells to Bob
       let auction = createOpenAuction(testCard, players[0], players)
       auction = placeBid(auction, '2', 30, players)
-      auction = pass(auction, '3', players)
-      auction = pass(auction, '4', players)
-      auction = pass(auction, '1', players)
+      auction = openPass(auction, '3', players)
+      auction = openPass(auction, '4', players)
+      auction = openPass(auction, '1', players)
 
-      let result = concludeAuction(auction, players)
-      currentState = processAuctionPayment(currentState, result)
-
-      // Auction 2: Bob sells to Carol
-      const card2 = { ...testCard, id: 'test-card-2' }
-      auction = createOpenAuction(card2, players[1], players)
-      auction = placeBid(auction, '3', 20, players)
-      auction = pass(auction, '4', players)
-      auction = pass(auction, '1', players)
-      auction = pass(auction, '2', players)
-
-      result = concludeAuction(auction, players)
+      let result = concludeOpenAuction(auction, players)
       currentState = processAuctionPayment(currentState, result)
 
       // Total money should be conserved in player-to-player transfers
@@ -220,11 +249,11 @@ describe('Auction Execution Integration', () => {
     it('demonstrates correct player-to-player money transfer', () => {
       let auction = createOpenAuction(testCard, players[0], players)
       auction = placeBid(auction, '2', 30, players)
-      auction = pass(auction, '3', players)
-      auction = pass(auction, '4', players)
-      auction = pass(auction, '1', players)
+      auction = openPass(auction, '3', players)
+      auction = openPass(auction, '4', players)
+      auction = openPass(auction, '1', players)
 
-      const result = concludeAuction(auction, players)
+      const result = concludeOpenAuction(auction, players)
       const newState = processAuctionPayment(gameState, result)
 
       // Total money in system should remain constant
@@ -247,11 +276,11 @@ describe('Auction Execution Integration', () => {
     it('updates game state correctly after auction', () => {
       let auction = createOpenAuction(testCard, players[0], players)
       auction = placeBid(auction, '2', 25, players)
-      auction = pass(auction, '3', players)
-      auction = pass(auction, '4', players)
-      auction = pass(auction, '1', players)
+      auction = openPass(auction, '3', players)
+      auction = openPass(auction, '4', players)
+      auction = openPass(auction, '1', players)
 
-      const result = concludeAuction(auction, players)
+      const result = concludeOpenAuction(auction, players)
       const newState = processAuctionPayment(gameState, result)
 
       // Verify all aspects of game state updated

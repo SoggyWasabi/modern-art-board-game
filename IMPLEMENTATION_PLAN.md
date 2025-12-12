@@ -526,18 +526,24 @@ interface OpenAuctionState {
 // Rules:
 // - Starts with player to LEFT of auctioneer
 // - Goes CLOCKWISE around table
-// - Each player: bid higher OR pass (one chance only)
-// - Auctioneer bids LAST
-// - If no bids: auctioneer gets painting FREE
+// - Each player gets ONE chance to bid higher OR pass
+// - Auctioneer bids LAST (enters decision phase after others act)
+// - Auctioneer options in decision phase:
+//   - Accept highest bid (winner pays auctioneer)
+//   - Outbid everyone (auctioneer keeps painting, pays bank)
+//   - If no bids: take painting FREE
 
 interface OneOfferAuctionState {
   type: 'one_offer';
   card: Card;
-  auctioneerIndex: number;
-  currentPlayerIndex: number;       // Whose turn to bid
-  currentHighBid: number | null;
-  currentHighBidder: number | null;
-  playersActed: number[];           // Players who have bid or passed
+  auctioneerId: string;
+  currentBid: number;
+  currentBidderId: string | null;
+  isActive: boolean;
+  turnOrder: string[];              // Order: left of auctioneer -> clockwise -> auctioneer LAST
+  currentTurnIndex: number;
+  completedTurns: Set<string>;      // Players who have taken their turn
+  phase: 'bidding' | 'auctioneer_decision';  // Current auction phase
 }
 
 // -----------------------
@@ -627,7 +633,7 @@ type DoubleAuctionPhase =
 | Auction Type | Starting Player | Order | Auctioneer Position |
 |--------------|-----------------|-------|---------------------|
 | **Open** | Anyone | Any order | Can bid anytime |
-| **One Offer** | Left of auctioneer | Clockwise | Bids LAST |
+| **One Offer** | Left of auctioneer | Clockwise | Bids LAST (decision phase) |
 | **Hidden** | Simultaneous | N/A | Simultaneous with others |
 | **Fixed Price** | Left of auctioneer | Clockwise | If all pass, MUST buy |
 | **Double** | Depends on second card's type | Per second card | Per second card |

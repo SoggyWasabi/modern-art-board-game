@@ -116,6 +116,7 @@ export function concludeAuction(
 
     return {
       winnerId: state.auctioneerId,
+      auctioneerId: state.auctioneerId,
       salePrice: 0,
       card: state.card,
       profit: 0,
@@ -135,6 +136,7 @@ export function concludeAuction(
   if (winner.id === auctioneer.id) {
     return {
       winnerId: winner.id,
+      auctioneerId: state.auctioneerId,
       salePrice: state.currentBid,
       card: state.card,
       profit: 0, // No profit when buying from bank
@@ -145,6 +147,7 @@ export function concludeAuction(
   // Another player won - auctioneer gets the money
   return {
     winnerId: winner.id,
+    auctioneerId: state.auctioneerId,
     salePrice: state.currentBid,
     card: state.card,
     profit: state.currentBid,

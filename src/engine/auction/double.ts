@@ -186,10 +186,11 @@ export function concludeAuction(
     throw new Error('Cannot conclude incomplete auction')
   }
 
-  // No one offered - original auctioneer gets double card for free
-  if (!state.secondCard || !state.currentAuctioneerId || state.currentAuctioneerId === state.originalAuctioneerId) {
+  // No one offered a second card - original auctioneer gets double card for free
+  if (!state.secondCard) {
     return {
       winnerId: state.originalAuctioneerId,
+      auctioneerId: state.originalAuctioneerId,
       salePrice: 0,
       card: state.doubleCard, // Only gets the double card
       profit: 0,
@@ -213,6 +214,7 @@ export function concludeAuction(
   if (winner.id === currentAuctioneer.id) {
     return {
       winnerId: winner.id,
+      auctioneerId: state.currentAuctioneerId,
       salePrice: state.finalPrice,
       card: state.doubleCard, // Winner gets both cards, but we return the double card as primary
       profit: 0, // No profit when buying from bank
@@ -223,6 +225,7 @@ export function concludeAuction(
   // Another player won - current auctioneer gets the money
   return {
     winnerId: winner.id,
+    auctioneerId: state.currentAuctioneerId,
     salePrice: state.finalPrice,
     card: state.doubleCard, // Winner gets both cards
     profit: state.finalPrice,

@@ -46,12 +46,12 @@ describe('Open Auction', () => {
     })
 
     it('requires bid to be higher than current bid', () => {
-      placeBid(auction, '1', 5, players)
+      const withBid = placeBid(auction, '1', 5, players)
 
-      expect(() => placeBid(auction, '2', 5, players))
+      expect(() => placeBid(withBid, '2', 5, players))
         .toThrow('Bid must be higher than current bid of 5')
 
-      expect(() => placeBid(auction, '2', 3, players))
+      expect(() => placeBid(withBid, '2', 3, players))
         .toThrow('Bid must be higher than current bid of 5')
     })
 
@@ -116,7 +116,13 @@ describe('Open Auction', () => {
 
   describe('concludeAuction', () => {
     it('returns card to auctioneer when no bids placed', () => {
-      const result = concludeAuction(auction, players)
+      // All players must pass (except auctioneer) to end auction
+      let endedAuction = pass(auction, '2', players)
+      endedAuction = pass(endedAuction, '3', players)
+      endedAuction = pass(endedAuction, '4', players)
+      // Auction ends when all non-bidders pass
+
+      const result = concludeAuction(endedAuction, players)
 
       expect(result.winnerId).toBe('1') // Auctioneer
       expect(result.salePrice).toBe(0)
@@ -242,18 +248,28 @@ describe('Open Auction', () => {
       expect(currentAuction.currentBid).toBe(50)
       expect(currentAuction.currentBidderId).toBe('1')
 
-      // Round 9: Player 4 goes all out (but can't exceed their money)
-      currentAuction = placeBid(currentAuction, '4', 55, players)
-      expect(currentAuction.currentBid).toBe(55)
-      expect(currentAuction.currentBidderId).toBe('4')
+      // Round 9: Player 4 goes all out (can only bid up to 40)
+      // But current bid is 50, so Player 4 can't afford to bid higher
+      expect(() => placeBid(currentAuction, '4', 55, players))
+        .toThrow('Player only has 40, cannot bid 55')
 
-      // Round 10: Final showdown - Player 2 can't afford more
-      expect(() => placeBid(currentAuction, '2', 65, players))
-        .toThrow('Player only has 80, cannot bid 65')
+      // Round 9 (alt): Player 3 tries (has $60, can still bid)
+      currentAuction = placeBid(currentAuction, '3', 55, players)
+      expect(currentAuction.currentBid).toBe(55)
+      expect(currentAuction.currentBidderId).toBe('3')
+
+      // Round 10: Final showdown - Player 2 can still afford to bid higher
+      currentAuction = placeBid(currentAuction, '2', 60, players)
+      expect(currentAuction.currentBid).toBe(60)
+      expect(currentAuction.currentBidderId).toBe('2')
+
+      // Now Player 2 can't bid 85 (only has 80)
+      expect(() => placeBid(currentAuction, '2', 85, players))
+        .toThrow('Player only has 80, cannot bid 85')
 
       // Final state
-      expect(currentAuction.currentBid).toBe(55)
-      expect(currentAuction.currentBidderId).toBe('4')
+      expect(currentAuction.currentBid).toBe(60)
+      expect(currentAuction.currentBidderId).toBe('2')
       expect(currentAuction.passCount).toBe(0)
 
       // Verify auction is still active (need passes to conclude)

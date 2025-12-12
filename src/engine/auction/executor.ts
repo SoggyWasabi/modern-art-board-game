@@ -36,13 +36,13 @@ export function executeAuction(
     newPlayers = transferMoney(winnerId, auctioneerId, salePrice, newPlayers)
   }
 
-  // Move the painting to winner's collection
+  // Move the painting to winner's current round purchases
   newPlayers = newPlayers.map(player => {
     if (player.id === winnerId) {
       return {
         ...player,
-        purchases: [
-          ...(player.purchases || []),
+        purchasedThisRound: [
+          ...(player.purchasedThisRound || []),
           {
             card: auctionCard,
             artist: auctionCard.artist,

@@ -1,28 +1,44 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { createOneOfferAuction, makeOffer, pass, acceptOffer, concludeAuction } from '../../../auction/oneOffer'
-import type { OneOfferAuctionState } from '../../../types/auction'
+import {
+  createOneOfferAuction,
+  makeOffer,
+  pass,
+  acceptHighestBid,
+  auctioneerOutbid,
+  auctioneerTakesFree,
+  concludeAuction,
+  getCurrentPlayer,
+  isPlayerTurn,
+  isAuctioneerDecisionPhase,
+  isValidBid,
+  getValidActions,
+  getAuctionStatus
+} from '../../../auction/oneOffer'
+import type { OneOfferAuctionState } from '../../../../types/auction'
 import { ARTISTS } from '../../../constants'
+import type { Player, Card } from '../../../../types/game'
 
 describe('One Offer Auction', () => {
   let auction: OneOfferAuctionState
-  let players: Array<{ id: string; name: string; money: number }>
+  let players: Player[]
+  let testCard: Card
 
   beforeEach(() => {
     players = [
-      { id: '1', name: 'Alice', money: 100 },
-      { id: '2', name: 'Bob', money: 80 },
-      { id: '3', name: 'Carol', money: 60 },
-      { id: '4', name: 'Dave', money: 40 }
+      { id: '1', name: 'Alice', money: 100, hand: [], purchases: [], purchasedThisRound: [] },
+      { id: '2', name: 'Bob', money: 80, hand: [], purchases: [], purchasedThisRound: [] },
+      { id: '3', name: 'Carol', money: 60, hand: [], purchases: [], purchasedThisRound: [] },
+      { id: '4', name: 'Dave', money: 40, hand: [], purchases: [], purchasedThisRound: [] }
     ]
 
-    const card = {
+    testCard = {
       id: 'card-1',
       artist: ARTISTS[3],
       auctionType: 'one_offer' as const,
       artworkId: 'ramon_martins_one_offer_1'
     }
 
-    auction = createOneOfferAuction(card, players[0], players)
+    auction = createOneOfferAuction(testCard, players[0], players)
   })
 
   describe('createOneOfferAuction', () => {
@@ -30,73 +46,102 @@ describe('One Offer Auction', () => {
       expect(auction.type).toBe('one_offer')
       expect(auction.auctioneerId).toBe('1')
       expect(auction.isActive).toBe(true)
-      expect(auction.offers).toEqual([])
-      expect(auction.currentPlayerIndex).toBe(1) // Start with player to left of auctioneer
-      expect(auction.highestOffer).toBe(0)
-      expect(auction.highestOffererId).toBeNull()
-      expect(auction.passedPlayers).toEqual(new Set())
+      expect(auction.currentBid).toBe(0)
+      expect(auction.currentBidderId).toBeNull()
+      expect(auction.phase).toBe('bidding')
+      // Turn order: left of auctioneer, clockwise, auctioneer LAST
+      expect(auction.turnOrder).toEqual(['2', '3', '4', '1'])
+      expect(auction.currentTurnIndex).toBe(0)
+      expect(auction.completedTurns.size).toBe(0)
+    })
+
+    it('sets correct turn order with auctioneer LAST', () => {
+      // Player 3 is auctioneer
+      const player3Auction = createOneOfferAuction(testCard, players[2], players)
+      // Turn order: 4, 1, 2 (clockwise from player 3), then 3 (auctioneer) LAST
+      expect(player3Auction.turnOrder).toEqual(['4', '1', '2', '3'])
+    })
+
+    it('handles auctioneer at end of player list', () => {
+      // Player 4 is auctioneer
+      const player4Auction = createOneOfferAuction(testCard, players[3], players)
+      // Turn order: 1, 2, 3 (wraps around), then 4 (auctioneer) LAST
+      expect(player4Auction.turnOrder).toEqual(['1', '2', '3', '4'])
+    })
+
+    it('handles 3-player game', () => {
+      const threePlayers = players.slice(0, 3)
+      const threePlayerAuction = createOneOfferAuction(testCard, threePlayers[0], threePlayers)
+      // Turn order: 2, 3 (clockwise), then 1 (auctioneer) LAST
+      expect(threePlayerAuction.turnOrder).toEqual(['2', '3', '1'])
     })
   })
 
   describe('makeOffer', () => {
-    it('allows current player to make an offer', () => {
-      const result = makeOffer(auction, '2', 20)
+    it('allows current player to make a bid', () => {
+      const result = makeOffer(auction, '2', 20, players)
 
-      expect(result.offers).toHaveLength(1)
-      expect(result.offers[0]).toEqual({
-        playerId: '2',
-        amount: 20,
-        timestamp: expect.any(Number)
-      })
-      expect(result.highestOffer).toBe(20)
-      expect(result.highestOffererId).toBe('2')
-      expect(result.currentPlayerIndex).toBe(2) // Moves to next player
+      expect(result.currentBid).toBe(20)
+      expect(result.currentBidderId).toBe('2')
+      expect(result.completedTurns.has('2')).toBe(true)
+      expect(result.currentTurnIndex).toBe(1) // Moved to next player
+      expect(result.phase).toBe('bidding') // Still in bidding phase
     })
 
-    it('requires offer to be positive', () => {
-      expect(() => makeOffer(auction, '2', 0))
-        .toThrow('Offer must be at least 1')
+    it('requires bid to be higher than current bid', () => {
+      const withBid = makeOffer(auction, '2', 20, players)
 
-      expect(() => makeOffer(auction, '2', -5))
-        .toThrow('Offer must be at least 1')
+      expect(() => makeOffer(withBid, '3', 15, players))
+        .toThrow('Bid must be higher than current bid of 20')
+
+      expect(() => makeOffer(withBid, '3', 20, players))
+        .toThrow('Bid must be higher than current bid of 20')
     })
 
-    it('requires offer to be higher than current highest', () => {
-      // First offer
-      auction = makeOffer(auction, '2', 20)
+    it('allows higher bids', () => {
+      let result = makeOffer(auction, '2', 20, players)
+      result = makeOffer(result, '3', 25, players)
 
-      // Second offer must be higher
-      expect(() => makeOffer(auction, '3', 15))
-        .toThrow('Offer must be higher than current highest offer of 20')
-
-      expect(() => makeOffer(auction, '3', 20))
-        .toThrow('Offer must be higher than current highest offer of 20')
-    })
-
-    it('allows higher offers', () => {
-      auction = makeOffer(auction, '2', 20)
-      const result = makeOffer(auction, '3', 25)
-
-      expect(result.highestOffer).toBe(25)
-      expect(result.highestOffererId).toBe('3')
-      expect(result.offers).toHaveLength(2)
+      expect(result.currentBid).toBe(25)
+      expect(result.currentBidderId).toBe('3')
     })
 
     it('requires player to have enough money', () => {
-      expect(() => makeOffer(auction, '4', 50))
-        .toThrow('Player only has 40, cannot offer 50')
+      expect(() => makeOffer(auction, '2', 100, players))
+        .toThrow('Player only has 80, cannot bid 100')
     })
 
-    it('only allows current player to make offer', () => {
-      expect(() => makeOffer(auction, '3', 20)) // Player 3 not current
-        .toThrow('It is not player 3\'s turn')
+    it('requires it to be the player turn', () => {
+      expect(() => makeOffer(auction, '3', 20, players))
+        .toThrow("Not this player's turn")
     })
 
-    it('prevents offering after auction concluded', () => {
-      const concludedAuction = { ...auction, isActive: false }
+    it('prevents bidding after auction concluded', () => {
+      const concluded = { ...auction, isActive: false }
 
-      expect(() => makeOffer(concludedAuction, '2', 20))
+      expect(() => makeOffer(concluded, '2', 20, players))
         .toThrow('Auction is not active')
+    })
+
+    it('prevents bidding in auctioneer decision phase', () => {
+      let state = makeOffer(auction, '2', 20, players)
+      state = makeOffer(state, '3', 25, players)
+      state = pass(state, '4')
+      // Now in auctioneer decision phase
+
+      expect(state.phase).toBe('auctioneer_decision')
+      expect(() => makeOffer(state, '1', 30, players))
+        .toThrow('Bidding phase has ended')
+    })
+
+    it('transitions to auctioneer decision phase after all others bid', () => {
+      let state = makeOffer(auction, '2', 20, players)
+      state = makeOffer(state, '3', 25, players)
+      state = makeOffer(state, '4', 30, players)
+
+      expect(state.phase).toBe('auctioneer_decision')
+      expect(state.isActive).toBe(true)
+      expect(getCurrentPlayer(state)).toBe('1') // Auctioneer's turn
     })
   })
 
@@ -104,345 +149,449 @@ describe('One Offer Auction', () => {
     it('allows current player to pass', () => {
       const result = pass(auction, '2')
 
-      expect(result.passedPlayers.has('2')).toBe(true)
-      expect(result.currentPlayerIndex).toBe(2) // Moves to next player
+      expect(result.completedTurns.has('2')).toBe(true)
+      expect(result.currentTurnIndex).toBe(1) // Moved to next player
+      expect(result.currentBid).toBe(0) // No change to current bid
+      expect(result.phase).toBe('bidding')
     })
 
-    it('moves to next player after pass', () => {
-      let result = pass(auction, '2') // Player 2 passes
-      expect(result.currentPlayerIndex).toBe(2) // Player 3's turn
-
-      result = pass(result, '3') // Player 3 passes
-      expect(result.currentPlayerIndex).toBe(3) // Player 4's turn
-
-      result = pass(result, '4') // Player 4 passes
-      expect(result.currentPlayerIndex).toBe(0) // Back to auctioneer
+    it('requires it to be the player turn', () => {
+      expect(() => pass(auction, '3'))
+        .toThrow("Not this player's turn")
     })
 
-    it('concludes offer phase when everyone passes', () => {
-      let result = auction
+    it('prevents passing after auction concluded', () => {
+      const concluded = { ...auction, isActive: false }
 
-      // Everyone else passes
-      result = pass(result, '2')
-      result = pass(result, '3')
-      result = pass(result, '4')
-
-      // Auction moves to decision phase
-      expect(result.isActive).toBe(true)
-      expect(result.phase).toBe('auctioneer_decision')
-      expect(result.currentPlayerIndex).toBe(0) // Auctioneer's turn to decide
+      expect(() => pass(concluded, '2'))
+        .toThrow('Auction is not active')
     })
 
-    it('skips passed players in turn order', () => {
-      const withOffer = makeOffer(auction, '2', 20)
+    it('transitions to auctioneer decision phase when all others pass', () => {
+      let state = pass(auction, '2')
+      state = pass(state, '3')
+      state = pass(state, '4')
 
-      // Player 3 passes
-      let result = pass(withOffer, '3')
-      expect(result.currentPlayerIndex).toBe(3) // Should skip to player 4
-
-      // Player 4 can still offer
-      result = makeOffer(result, '4', 25)
-      expect(result.highestOffer).toBe(25)
-      expect(result.highestOffererId).toBe('4')
+      expect(state.phase).toBe('auctioneer_decision')
+      expect(state.isActive).toBe(true)
+      expect(getCurrentPlayer(state)).toBe('1') // Auctioneer's turn
     })
 
-    it('prevents same player from passing twice', () => {
-      let result = pass(auction, '2')
+    it('prevents passing in auctioneer decision phase', () => {
+      let state = pass(auction, '2')
+      state = pass(state, '3')
+      state = pass(state, '4')
 
-      expect(() => pass(result, '2'))
-        .toThrow('Player 2 has already passed')
+      expect(state.phase).toBe('auctioneer_decision')
+      expect(() => pass(state, '1'))
+        .toThrow('Cannot pass during auctioneer decision phase')
     })
   })
 
-  describe('acceptOffer', () => {
-    it('allows auctioneer to accept highest offer', () => {
-      // Some offers made
-      auction = makeOffer(auction, '2', 20)
-      auction = makeOffer(auction, '3', 30)
-      auction = makeOffer(auction, '4', 25)
+  describe('acceptHighestBid', () => {
+    it('allows auctioneer to accept highest bid', () => {
+      let state = makeOffer(auction, '2', 20, players)
+      state = makeOffer(state, '3', 30, players)
+      state = pass(state, '4')
 
-      // Everyone passes
-      auction = pass(auction, '1') // Back to auctioneer
-      auction.phase = 'auctioneer_decision'
+      expect(state.phase).toBe('auctioneer_decision')
 
-      const result = acceptOffer(auction)
+      const result = acceptHighestBid(state)
 
       expect(result.isActive).toBe(false)
-      expect(result.winnerId).toBe('3') // Highest offerer
-      expect(result.salePrice).toBe(30)
+      expect(result.currentBid).toBe(30)
+      expect(result.currentBidderId).toBe('3')
+      expect(result.completedTurns.has('1')).toBe(true)
     })
 
-    it('throws error when no offers made', () => {
-      auction.phase = 'auctioneer_decision'
+    it('throws error when no bid to accept', () => {
+      let state = pass(auction, '2')
+      state = pass(state, '3')
+      state = pass(state, '4')
 
-      expect(() => acceptOffer(auction))
-        .toThrow('No offers to accept')
-    })
-
-    it('only allows auctioneer to accept', () => {
-      auction.phase = 'auctioneer_decision'
-
-      expect(() => acceptOffer(auction, '2'))
-        .toThrow('Only auctioneer can accept offer')
+      expect(state.phase).toBe('auctioneer_decision')
+      expect(() => acceptHighestBid(state))
+        .toThrow('No bid to accept')
     })
 
     it('throws error when not in decision phase', () => {
-      expect(() => acceptOffer(auction))
-        .toThrow('Auctioneer must wait for all players to pass or make offers')
+      expect(() => acceptHighestBid(auction))
+        .toThrow('Can only accept bid during auctioneer decision phase')
+    })
+
+    it('throws error when auction not active', () => {
+      const concluded = { ...auction, isActive: false, phase: 'auctioneer_decision' as const }
+
+      expect(() => acceptHighestBid(concluded))
+        .toThrow('Auction is not active')
+    })
+  })
+
+  describe('auctioneerOutbid', () => {
+    it('allows auctioneer to outbid and keep painting', () => {
+      let state = makeOffer(auction, '2', 20, players)
+      state = makeOffer(state, '3', 30, players)
+      state = pass(state, '4')
+
+      expect(state.phase).toBe('auctioneer_decision')
+
+      const result = auctioneerOutbid(state, 35, players)
+
+      expect(result.isActive).toBe(false)
+      expect(result.currentBid).toBe(35)
+      expect(result.currentBidderId).toBe('1') // Auctioneer
+      expect(result.completedTurns.has('1')).toBe(true)
+    })
+
+    it('requires outbid to be higher than current bid', () => {
+      let state = makeOffer(auction, '2', 20, players)
+      state = makeOffer(state, '3', 30, players)
+      state = pass(state, '4')
+
+      expect(() => auctioneerOutbid(state, 25, players))
+        .toThrow('Bid must be higher than current bid of 30')
+
+      expect(() => auctioneerOutbid(state, 30, players))
+        .toThrow('Bid must be higher than current bid of 30')
+    })
+
+    it('requires auctioneer to have enough money', () => {
+      let state = makeOffer(auction, '2', 20, players)
+      state = makeOffer(state, '3', 30, players)
+      state = pass(state, '4')
+
+      expect(() => auctioneerOutbid(state, 150, players))
+        .toThrow('Auctioneer only has 100, cannot bid 150')
+    })
+
+    it('throws error when not in decision phase', () => {
+      expect(() => auctioneerOutbid(auction, 50, players))
+        .toThrow('Can only outbid during auctioneer decision phase')
+    })
+  })
+
+  describe('auctioneerTakesFree', () => {
+    it('allows auctioneer to take painting free when no bids', () => {
+      let state = pass(auction, '2')
+      state = pass(state, '3')
+      state = pass(state, '4')
+
+      expect(state.phase).toBe('auctioneer_decision')
+
+      const result = auctioneerTakesFree(state)
+
+      expect(result.isActive).toBe(false)
+      expect(result.currentBid).toBe(0)
+      expect(result.currentBidderId).toBe('1') // Auctioneer
+      expect(result.completedTurns.has('1')).toBe(true)
+    })
+
+    it('throws error when there are bids', () => {
+      let state = makeOffer(auction, '2', 20, players)
+      state = pass(state, '3')
+      state = pass(state, '4')
+
+      expect(state.phase).toBe('auctioneer_decision')
+      expect(() => auctioneerTakesFree(state))
+        .toThrow('Cannot take free when there are bids')
+    })
+
+    it('throws error when not in decision phase', () => {
+      expect(() => auctioneerTakesFree(auction))
+        .toThrow('Can only take free during auctioneer decision phase')
     })
   })
 
   describe('concludeAuction', () => {
-    it('concludes with winner paying their offer', () => {
-      auction = makeOffer(auction, '2', 20)
-      auction = makeOffer(auction, '3', 30)
-      auction.phase = 'auctioneer_decision'
-      auction.isActive = false
-      auction.winnerId = '3'
-      auction.salePrice = 30
+    it('determines winner when auctioneer accepts bid', () => {
+      let state = makeOffer(auction, '2', 20, players)
+      state = makeOffer(state, '3', 30, players)
+      state = pass(state, '4')
+      state = acceptHighestBid(state)
 
-      const result = concludeAuction(auction, players)
+      const result = concludeAuction(state, players)
 
       expect(result.winnerId).toBe('3')
       expect(result.salePrice).toBe(30)
       expect(result.profit).toBe(30) // Auctioneer gets the money
+      expect(result.auctioneerId).toBe('1')
     })
 
-    it('auctioneer pays bank when they take painting', () => {
-      // Auctioneer decides to take painting for highest offer + 1
-      auction = makeOffer(auction, '2', 20)
-      auction = makeOffer(auction, '3', 30)
-      auction.phase = 'auctioneer_decision'
-      auction.isActive = false
-      auction.winnerId = '1' // Auctioneer
-      auction.salePrice = 31 // Highest offer + 1
+    it('auctioneer gets card free when no one bids', () => {
+      let state = pass(auction, '2')
+      state = pass(state, '3')
+      state = pass(state, '4')
+      state = auctioneerTakesFree(state)
 
-      const result = concludeAuction(auction, players)
+      const result = concludeAuction(state, players)
 
-      expect(result.winnerId).toBe('1')
-      expect(result.salePrice).toBe(31)
-      expect(result.profit).toBe(0) // No profit, pays bank
-    })
-
-    it('handles auctioneer taking painting with no offers', () => {
-      // Everyone passes, no offers made
-      auction = pass(auction, '2')
-      auction = pass(auction, '3')
-      auction = pass(auction, '4')
-      auction.phase = 'auctioneer_decision'
-      auction.isActive = false
-      auction.winnerId = '1' // Auctioneer takes for free
-      auction.salePrice = 0
-
-      const result = concludeAuction(auction, players)
-
-      expect(result.winnerId).toBe('1')
+      expect(result.winnerId).toBe('1') // Auctioneer
       expect(result.salePrice).toBe(0)
       expect(result.profit).toBe(0)
     })
 
+    it('auctioneer pays bank when they outbid', () => {
+      let state = makeOffer(auction, '2', 20, players)
+      state = makeOffer(state, '3', 30, players)
+      state = pass(state, '4')
+      state = auctioneerOutbid(state, 35, players)
+
+      const result = concludeAuction(state, players)
+
+      expect(result.winnerId).toBe('1') // Auctioneer
+      expect(result.salePrice).toBe(35)
+      expect(result.profit).toBe(0) // No profit - pays bank
+    })
+
     it('throws error when auction still active', () => {
       expect(() => concludeAuction(auction, players))
-        .toThrow('Auction must be concluded first')
+        .toThrow('Cannot conclude active auction')
+    })
+  })
+
+  describe('Utility Functions', () => {
+    it('getCurrentPlayer returns whose turn it is', () => {
+      expect(getCurrentPlayer(auction)).toBe('2') // First in turn order
+
+      const afterPass = pass(auction, '2')
+      expect(getCurrentPlayer(afterPass)).toBe('3') // Next player
+    })
+
+    it('getCurrentPlayer returns auctioneer in decision phase', () => {
+      let state = pass(auction, '2')
+      state = pass(state, '3')
+      state = pass(state, '4')
+
+      expect(getCurrentPlayer(state)).toBe('1') // Auctioneer
+    })
+
+    it('getCurrentPlayer returns null when auction ended', () => {
+      let state = pass(auction, '2')
+      state = pass(state, '3')
+      state = pass(state, '4')
+      state = auctioneerTakesFree(state)
+
+      expect(getCurrentPlayer(state)).toBeNull()
+    })
+
+    it('isPlayerTurn checks if it is player turn', () => {
+      expect(isPlayerTurn(auction, '2')).toBe(true)
+      expect(isPlayerTurn(auction, '3')).toBe(false)
+      expect(isPlayerTurn(auction, '1')).toBe(false) // Auctioneer goes last
+    })
+
+    it('isAuctioneerDecisionPhase returns correct phase', () => {
+      expect(isAuctioneerDecisionPhase(auction)).toBe(false)
+
+      let state = pass(auction, '2')
+      state = pass(state, '3')
+      state = pass(state, '4')
+
+      expect(isAuctioneerDecisionPhase(state)).toBe(true)
+    })
+
+    it('isValidBid checks if bid is valid', () => {
+      expect(isValidBid(auction, '2', 20, players)).toBe(true)
+      expect(isValidBid(auction, '3', 20, players)).toBe(false) // Not their turn
+      expect(isValidBid(auction, '2', 100, players)).toBe(false) // Can't afford
+    })
+
+    it('getValidActions returns available actions for current player', () => {
+      const actions = getValidActions(auction, '2', players)
+
+      // Should have pass option
+      expect(actions.some(a => a.type === 'pass')).toBe(true)
+
+      // Should have bid options
+      const bidActions = actions.filter(a => a.type === 'bid')
+      expect(bidActions.length).toBeGreaterThan(0)
+      expect(bidActions[0].amount).toBe(1) // Minimum bid
+    })
+
+    it('getValidActions returns auctioneer options in decision phase', () => {
+      let state = makeOffer(auction, '2', 20, players)
+      state = pass(state, '3')
+      state = pass(state, '4')
+
+      const actions = getValidActions(state, '1', players)
+
+      // Should have accept option
+      expect(actions.some(a => a.type === 'accept')).toBe(true)
+
+      // Should have bid options (to outbid)
+      const bidActions = actions.filter(a => a.type === 'bid')
+      expect(bidActions.length).toBeGreaterThan(0)
+      expect(bidActions[0].amount).toBe(21) // Must be higher than 20
+    })
+
+    it('getValidActions returns take_free when no bids', () => {
+      let state = pass(auction, '2')
+      state = pass(state, '3')
+      state = pass(state, '4')
+
+      const actions = getValidActions(state, '1', players)
+
+      // Should only have take_free option
+      expect(actions).toEqual([{ type: 'take_free' }])
+    })
+
+    it('getValidActions returns empty for non-current player', () => {
+      const actions = getValidActions(auction, '3', players)
+      expect(actions).toEqual([])
+    })
+
+    it('getAuctionStatus returns correct status', () => {
+      const status = getAuctionStatus(auction)
+
+      expect(status.currentPlayer).toBe('2')
+      expect(status.remainingPlayers).toBe(4) // All 4 including auctioneer
+      expect(status.completedPlayers).toBe(0)
+      expect(status.phase).toBe('bidding')
+      expect(status.highestBid).toBe(0)
+      expect(status.highestBidder).toBeNull()
     })
   })
 
   describe('Complete Auction Scenarios', () => {
-    it('handles auction with single offer', () => {
-      // Only one player makes offer
-      auction = makeOffer(auction, '2', 25)
-      auction = pass(auction, '3')
-      auction = pass(auction, '4')
-      auction.phase = 'auctioneer_decision'
+    it('handles competitive bidding then auctioneer accepts', () => {
+      let state = makeOffer(auction, '2', 20, players)
+      state = makeOffer(state, '3', 25, players)
+      state = makeOffer(state, '4', 30, players)
 
-      // Auctioneer accepts
-      const accepted = acceptOffer(auction)
-      const result = concludeAuction(accepted, players)
+      expect(state.phase).toBe('auctioneer_decision')
+
+      state = acceptHighestBid(state)
+      const result = concludeAuction(state, players)
+
+      expect(result.winnerId).toBe('4')
+      expect(result.salePrice).toBe(30)
+      expect(result.profit).toBe(30)
+    })
+
+    it('handles mixed bids and passes then auctioneer accepts', () => {
+      let state = makeOffer(auction, '2', 25, players)
+      state = pass(state, '3')
+      state = pass(state, '4')
+
+      expect(state.phase).toBe('auctioneer_decision')
+
+      state = acceptHighestBid(state)
+      const result = concludeAuction(state, players)
 
       expect(result.winnerId).toBe('2')
       expect(result.salePrice).toBe(25)
       expect(result.profit).toBe(25)
     })
 
-    it('handles competitive bidding', () => {
-      // Multiple offers
-      auction = makeOffer(auction, '2', 20)
-      auction = makeOffer(auction, '3', 35)
-      auction = makeOffer(auction, '4', 40)
-      auction = pass(auction, '1') // Back to auctioneer
-      auction.phase = 'auctioneer_decision'
-
-      const accepted = acceptOffer(auction)
-      const result = concludeAuction(accepted, players)
-
-      expect(result.winnerId).toBe('4')
-      expect(result.salePrice).toBe(40)
-      expect(result.profit).toBe(40)
-    })
-
     it('handles auctioneer outbidding everyone', () => {
-      auction = makeOffer(auction, '2', 30)
-      auction = makeOffer(auction, '3', 35)
-      auction.phase = 'auctioneer_decision'
+      let state = makeOffer(auction, '2', 20, players)
+      state = makeOffer(state, '3', 35, players)
+      state = makeOffer(state, '4', 40, players)
 
-      // Auctioneer decides to take for 36
-      auction.isActive = false
-      auction.winnerId = '1'
-      auction.salePrice = 36
+      expect(state.phase).toBe('auctioneer_decision')
 
-      const result = concludeAuction(auction, players)
+      // Auctioneer has 100, can outbid
+      state = auctioneerOutbid(state, 50, players)
+      const result = concludeAuction(state, players)
 
-      expect(result.winnerId).toBe('1')
-      expect(result.salePrice).toBe(36)
-      expect(result.profit).toBe(0)
-    })
-
-    it('handles auctioneer taking with insufficient funds', () => {
-      // Create auctioneer with limited money
-      const poorAuctioneer = { ...players[0], money: 25 }
-      const poorPlayers = [poorAuctioneer, ...players.slice(1)]
-      const poorAuction = createOneOfferAuction(auction.card, poorPlayers[0], poorPlayers)
-
-      // High offer comes in
-      poorAuction = makeOffer(poorAuction, '2', 40)
-      poorAuction.phase = 'auctioneer_decision'
-
-      // Auctioneer takes anyway (game rules allow debt)
-      poorAuction.isActive = false
-      poorAuction.winnerId = '1'
-      poorAuction.salePrice = 41
-
-      const result = concludeAuction(poorAuction, poorPlayers)
-
-      expect(result.winnerId).toBe('1')
-      expect(result.salePrice).toBe(41)
-    })
-
-    it('handles strategic low offers', () => {
-      // Players make low offers hoping auctioneer passes
-      auction = makeOffer(auction, '2', 5)
-      auction = makeOffer(auction, '3', 8)
-      auction = pass(auction, '4')
-      auction.phase = 'auctioneer_decision'
-
-      // Auctioneer accepts low offer
-      const accepted = acceptOffer(auction)
-      const result = concludeAuction(accepted, players)
-
-      expect(result.winnerId).toBe('3')
-      expect(result.salePrice).toBe(8)
-      expect(result.profit).toBe(8)
+      expect(result.winnerId).toBe('1') // Auctioneer
+      expect(result.salePrice).toBe(50)
+      expect(result.profit).toBe(0) // Pays bank
     })
 
     it('handles all players passing', () => {
-      // No one makes an offer
-      auction = pass(auction, '2')
-      auction = pass(auction, '3')
-      auction = pass(auction, '4')
-      auction.phase = 'auctioneer_decision'
+      let state = pass(auction, '2')
+      state = pass(state, '3')
+      state = pass(state, '4')
 
-      // Auctioneer takes for free
-      auction.isActive = false
-      auction.winnerId = '1'
-      auction.salePrice = 0
+      expect(state.phase).toBe('auctioneer_decision')
 
-      const result = concludeAuction(auction, players)
+      state = auctioneerTakesFree(state)
+      const result = concludeAuction(state, players)
 
       expect(result.winnerId).toBe('1')
       expect(result.salePrice).toBe(0)
       expect(result.profit).toBe(0)
     })
 
-    it('handles maximum bidding scenario', () => {
-      // Players bid all their money
-      auction = makeOffer(auction, '2', 80) // All-in
-      auction = makeOffer(auction, '3', 60) // All-in
-      auction = pass(auction, '4') // Can't beat 80
-      auction.phase = 'auctioneer_decision'
+    it('handles 3-player game complete flow', () => {
+      const threePlayers = players.slice(0, 3)
+      let state = createOneOfferAuction(testCard, threePlayers[0], threePlayers)
 
-      const accepted = acceptOffer(auction)
-      const result = concludeAuction(accepted, players)
+      // Turn order: [2, 3, 1]
+      expect(state.turnOrder).toEqual(['2', '3', '1'])
 
-      expect(result.winnerId).toBe('2')
-      expect(result.salePrice).toBe(80)
+      state = makeOffer(state, '2', 15, threePlayers)
+      state = makeOffer(state, '3', 20, threePlayers)
+
+      expect(state.phase).toBe('auctioneer_decision')
+
+      state = acceptHighestBid(state)
+      const result = concludeAuction(state, threePlayers)
+
+      expect(result.winnerId).toBe('3')
+      expect(result.salePrice).toBe(20)
     })
   })
 
-  describe('Turn Order and Edge Cases', () => {
-    it('handles 3-player game turn order', () => {
-      const threePlayers = players.slice(0, 3)
-      const threePlayerAuction = createOneOfferAuction(auction.card, players[0], threePlayers)
+  describe('Edge Cases', () => {
+    it('handles player bidding exactly their money', () => {
+      // Dave has exactly $40
+      let state = makeOffer(auction, '2', 20, players)
+      state = pass(state, '3')
+      state = makeOffer(state, '4', 40, players) // Dave all-in
 
-      expect(threePlayerAuction.currentPlayerIndex).toBe(1) // Player 2
+      expect(state.phase).toBe('auctioneer_decision')
 
-      let result = pass(threePlayerAuction, '2')
-      expect(result.currentPlayerIndex).toBe(2) // Player 3
+      state = acceptHighestBid(state)
+      const result = concludeAuction(state, players)
 
-      result = pass(result, '3')
-      expect(result.phase).toBe('auctioneer_decision') // All passed
+      expect(result.winnerId).toBe('4')
+      expect(result.salePrice).toBe(40)
     })
 
-    it('handles 5-player game turn order', () => {
-      const fivePlayers = [
-        ...players,
-        { id: '5', name: 'Eve', money: 50 }
-      ]
-      const fivePlayerAuction = createOneOfferAuction(auction.card, players[0], fivePlayers)
+    it('handles minimum bid of 1', () => {
+      let state = makeOffer(auction, '2', 1, players)
+      state = pass(state, '3')
+      state = pass(state, '4')
 
-      expect(fivePlayerAuction.currentPlayerIndex).toBe(1) // Player 2
+      state = acceptHighestBid(state)
+      const result = concludeAuction(state, players)
 
-      let result = fivePlayerAuction
-      result = pass(result, '2')
-      expect(result.currentPlayerIndex).toBe(2) // Player 3
-
-      result = pass(result, '3')
-      expect(result.currentPlayerIndex).toBe(3) // Player 4
-
-      result = pass(result, '4')
-      expect(result.currentPlayerIndex).toBe(4) // Player 5
-
-      result = pass(result, '5')
-      expect(result.phase).toBe('auctioneer_decision') // All passed
+      expect(result.winnerId).toBe('2')
+      expect(result.salePrice).toBe(1)
+      expect(result.profit).toBe(1)
     })
 
-    it('handles offer timing and tracking', () => {
-      const startTime = Date.now()
+    it('handles auctioneer outbidding with exactly enough money', () => {
+      let state = makeOffer(auction, '2', 80, players)
+      state = pass(state, '3')
+      state = pass(state, '4')
 
-      auction = makeOffer(auction, '2', 20)
-
-      expect(auction.offers[0].timestamp).toBeGreaterThanOrEqual(startTime)
-      expect(auction.offers[0].timestamp).toBeLessThanOrEqual(Date.now())
-    })
-
-    it('handles auctioneer with no money taking painting', () => {
-      // Create broke auctioneer
-      const brokeAuctioneer = { ...players[0], money: 0 }
-      const brokePlayers = [brokeAuctioneer, ...players.slice(1)]
-      const brokeAuction = createOneOfferAuction(auction.card, brokePlayers[0], brokePlayers)
-
-      // High offer comes in
-      brokeAuction = makeOffer(brokeAuction, '2', 30)
-      brokeAuction.phase = 'auctioneer_decision'
-
-      // Auctioneer takes anyway, going into debt
-      brokeAuction.isActive = false
-      brokeAuction.winnerId = '1'
-      brokeAuction.salePrice = 31
-
-      const result = concludeAuction(brokeAuction, brokePlayers)
+      // Auctioneer has exactly 100
+      state = auctioneerOutbid(state, 100, players)
+      const result = concludeAuction(state, players)
 
       expect(result.winnerId).toBe('1')
-      expect(result.salePrice).toBe(31)
+      expect(result.salePrice).toBe(100)
     })
 
-    it('prevents offers after auctioneer decision phase', () => {
-      auction = makeOffer(auction, '2', 20)
-      auction = pass(auction, '3')
-      auction = pass(auction, '4')
-      auction.phase = 'auctioneer_decision'
+    it('handles player with less money than current bid', () => {
+      // Bob bids 50
+      let state = makeOffer(auction, '2', 50, players)
 
-      expect(() => makeOffer(auction, '1', 25))
-        .toThrow('Auctioneer decision phase - no more offers')
+      // Carol has 60, can still outbid
+      state = makeOffer(state, '3', 55, players)
+
+      // Dave only has 40, cannot outbid - must pass
+      // (In real game, they would just pass)
+      expect(() => makeOffer(state, '4', 60, players))
+        .toThrow('Player only has 40, cannot bid 60')
+
+      // Dave passes instead
+      state = pass(state, '4')
+
+      expect(state.phase).toBe('auctioneer_decision')
     })
   })
 })

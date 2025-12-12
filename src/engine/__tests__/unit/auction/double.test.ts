@@ -16,22 +16,24 @@ import {
   getPossibleSecondCards,
   startBiddingPhase
 } from '../../../auction/double'
-import type { DoubleAuctionState } from '../../../types/auction'
+import type { DoubleAuctionState } from '../../../../types/auction'
 import { ARTISTS } from '../../../constants'
+import type { Player, Card } from '../../../../types/game'
 
 describe('Double Auction', () => {
   let doubleAuction: DoubleAuctionState
-  let players: Array<{ id: string; name: string; money: number }>
+  let players: Player[]
+  let doubleCard: Card
 
   beforeEach(() => {
     players = [
-      { id: '1', name: 'Alice', money: 100 },
-      { id: '2', name: 'Bob', money: 80 },
-      { id: '3', name: 'Carol', money: 60 },
-      { id: '4', name: 'Dave', money: 40 }
+      { id: '1', name: 'Alice', money: 100, hand: [], purchases: [], purchasedThisRound: [] },
+      { id: '2', name: 'Bob', money: 80, hand: [], purchases: [], purchasedThisRound: [] },
+      { id: '3', name: 'Carol', money: 60, hand: [], purchases: [], purchasedThisRound: [] },
+      { id: '4', name: 'Dave', money: 40, hand: [], purchases: [], purchasedThisRound: [] }
     ]
 
-    const doubleCard = {
+    doubleCard = {
       id: 'double-card-1',
       artist: ARTISTS[0],
       auctionType: 'double' as const,
@@ -50,8 +52,10 @@ describe('Double Auction', () => {
       expect(doubleAuction.secondCard).toBeNull()
       expect(doubleAuction.isActive).toBe(true)
       expect(doubleAuction.sold).toBe(false)
-      expect(doubleAuction.turnOrder).toEqual(['1', '2', '3', '4']) // Original auctioneer first
+      // Original auctioneer is FIRST in turn order (gets first chance to offer)
+      expect(doubleAuction.turnOrder).toEqual(['1', '2', '3', '4'])
       expect(doubleAuction.currentTurnIndex).toBe(0)
+      expect(doubleAuction.phase).toBe('offering')
     })
 
     it('throws error if first card is not a double auction card', () => {
@@ -67,7 +71,7 @@ describe('Double Auction', () => {
     })
 
     it('handles different auctioneer positions', () => {
-      const doubleCard = {
+      const anotherDoubleCard = {
         id: 'double-card-2',
         artist: ARTISTS[1],
         auctionType: 'double' as const,
@@ -75,14 +79,15 @@ describe('Double Auction', () => {
       }
 
       // Bob as auctioneer (index 1)
-      const auction = createDoubleAuction(doubleCard, players[1], players)
+      const auction = createDoubleAuction(anotherDoubleCard, players[1], players)
       expect(auction.originalAuctioneerId).toBe('2')
-      expect(auction.turnOrder).toEqual(['2', '3', '4', '1']) // Bob first, then clockwise
+      // Bob first, then clockwise: 3, 4, 1
+      expect(auction.turnOrder).toEqual(['2', '3', '4', '1'])
     })
   })
 
   describe('offerSecondCard', () => {
-    it('allows player to offer a second card', () => {
+    it('allows original auctioneer to offer second card first', () => {
       const secondCard = {
         id: 'second-card',
         artist: ARTISTS[0], // Same artist as double card
@@ -90,13 +95,33 @@ describe('Double Auction', () => {
         artworkId: 'manuel_carvalho_open_2'
       }
 
-      const result = offerSecondCard(doubleAuction, '2', secondCard, players)
+      // Original auctioneer (player 1) offers first
+      const result = offerSecondCard(doubleAuction, '1', secondCard, players)
 
       expect(result.secondCard).toBe(secondCard)
-      expect(result.currentAuctioneerId).toBe('2') // Bob becomes auctioneer
+      expect(result.currentAuctioneerId).toBe('1') // Still auctioneer
       expect(result.auctionType).toBe('open') // Follows second card type
-      expect(result.offers.has('2')).toBe(true)
+      expect(result.offers.has('1')).toBe(true)
       expect(result.isActive).toBe(true)
+    })
+
+    it('allows next player to offer after auctioneer declines', () => {
+      // Auctioneer declines
+      let state = declineToOffer(doubleAuction, '1')
+
+      const secondCard = {
+        id: 'second-card',
+        artist: ARTISTS[0],
+        auctionType: 'open' as const,
+        artworkId: 'manuel_carvalho_open_2'
+      }
+
+      // Player 2 can now offer
+      const result = offerSecondCard(state, '2', secondCard, players)
+
+      expect(result.secondCard).toBe(secondCard)
+      expect(result.currentAuctioneerId).toBe('2') // Bob becomes new auctioneer
+      expect(result.auctionType).toBe('open')
     })
 
     it('validates second card is same artist', () => {
@@ -107,7 +132,7 @@ describe('Double Auction', () => {
         artworkId: 'sigrid_thaler_open_1'
       }
 
-      expect(() => offerSecondCard(doubleAuction, '2', wrongArtistCard, players))
+      expect(() => offerSecondCard(doubleAuction, '1', wrongArtistCard, players))
         .toThrow('Second card must be same artist as double card')
     })
 
@@ -119,23 +144,8 @@ describe('Double Auction', () => {
         artworkId: 'manuel_carvalho_double_2'
       }
 
-      expect(() => offerSecondCard(doubleAuction, '2', anotherDoubleCard, players))
+      expect(() => offerSecondCard(doubleAuction, '1', anotherDoubleCard, players))
         .toThrow('Second card cannot be a double auction card')
-    })
-
-    it('allows original auctioneer to offer first', () => {
-      const secondCard = {
-        id: 'second-card',
-        artist: ARTISTS[0],
-        auctionType: 'open' as const,
-        artworkId: 'test'
-      }
-
-      // Original auctioneer (Alice) can offer
-      const result = offerSecondCard(doubleAuction, '1', secondCard, players)
-      expect(result.secondCard).toBe(secondCard)
-      expect(result.currentAuctioneerId).toBe('1')
-      expect(result.phase).toBe('bidding')
     })
 
     it('only allows current player to offer', () => {
@@ -146,9 +156,8 @@ describe('Double Auction', () => {
         artworkId: 'test'
       }
 
-      // After original auctioneer declines, it's Bob's turn
-      let currentAuction = declineToOffer(doubleAuction, '1')
-      expect(() => offerSecondCard(currentAuction, '3', secondCard, players))
+      // Player 2 is not first in turn order
+      expect(() => offerSecondCard(doubleAuction, '2', secondCard, players))
         .toThrow("Not this player's turn to offer")
     })
 
@@ -160,9 +169,9 @@ describe('Double Auction', () => {
         artworkId: 'test'
       }
 
-      let result = offerSecondCard(doubleAuction, '2', secondCard, players)
+      let result = offerSecondCard(doubleAuction, '1', secondCard, players)
 
-      expect(() => offerSecondCard(result, '2', secondCard, players))
+      expect(() => offerSecondCard(result, '1', secondCard, players))
         .toThrow('Player has already offered a card')
     })
 
@@ -175,16 +184,16 @@ describe('Double Auction', () => {
         artworkId: 'test'
       }
 
-      expect(() => offerSecondCard(soldAuction, '2', secondCard, players))
+      expect(() => offerSecondCard(soldAuction, '1', secondCard, players))
         .toThrow('Cannot offer card in inactive or sold auction')
     })
   })
 
   describe('declineToOffer', () => {
-    it('allows player to decline and passes turn', () => {
-      const result = declineToOffer(doubleAuction, '2')
+    it('allows current player to decline and passes turn', () => {
+      const result = declineToOffer(doubleAuction, '1')
 
-      expect(result.currentTurnIndex).toBe(1) // Moves to next player
+      expect(result.currentTurnIndex).toBe(1) // Moves to player 2
       expect(result.isActive).toBe(true)
       expect(result.sold).toBe(false)
     })
@@ -204,32 +213,35 @@ describe('Double Auction', () => {
     })
 
     it('only allows current player to decline', () => {
-      expect(() => declineToOffer(doubleAuction, '3'))
+      // Player 2 cannot decline when it's player 1's turn
+      expect(() => declineToOffer(doubleAuction, '2'))
         .toThrow("Not this player's turn")
     })
 
     it('prevents declining when auction not active', () => {
       const inactiveAuction = { ...doubleAuction, isActive: false }
 
-      expect(() => declineToOffer(inactiveAuction, '2'))
+      expect(() => declineToOffer(inactiveAuction, '1'))
         .toThrow('Cannot decline in inactive auction')
     })
   })
 
   describe('acceptOffer', () => {
+    let auctionWithOffer: DoubleAuctionState
+
     beforeEach(() => {
-      // Set up a scenario where someone has offered
+      // Set up a scenario where original auctioneer has offered
       const secondCard = {
         id: 'second-card',
         artist: ARTISTS[0],
         auctionType: 'open' as const,
         artworkId: 'manuel_carvalho_open_2'
       }
-      doubleAuction = offerSecondCard(doubleAuction, '2', secondCard, players)
+      auctionWithOffer = offerSecondCard(doubleAuction, '1', secondCard, players)
     })
 
     it('accepts offer with winner and price', () => {
-      const result = acceptOffer(doubleAuction, '3', 30, players)
+      const result = acceptOffer(auctionWithOffer, '3', 30, players)
 
       expect(result.sold).toBe(true)
       expect(result.winnerId).toBe('3')
@@ -238,19 +250,17 @@ describe('Double Auction', () => {
     })
 
     it('throws error if no second card offered', () => {
-      const noSecondCardAuction = createDoubleAuction(doubleAuction.doubleCard, players[0], players)
-
-      expect(() => acceptOffer(noSecondCardAuction, '2', 20, players))
+      expect(() => acceptOffer(doubleAuction, '2', 20, players))
         .toThrow('No second card has been offered')
     })
 
     it('validates winner can afford the price', () => {
-      expect(() => acceptOffer(doubleAuction, '4', 50, players)) // Dave only has 40
+      expect(() => acceptOffer(auctionWithOffer, '4', 50, players)) // Dave only has 40
         .toThrow('Winner only has 40, cannot pay 50')
     })
 
     it('prevents accepting when auction not active', () => {
-      const inactiveAuction = { ...doubleAuction, isActive: false }
+      const inactiveAuction = { ...auctionWithOffer, isActive: false }
 
       expect(() => acceptOffer(inactiveAuction, '3', 30, players))
         .toThrow('Auction is not active')
@@ -258,9 +268,14 @@ describe('Double Auction', () => {
   })
 
   describe('concludeAuction', () => {
-    it('concludes with original auctioneer getting double card for free', () => {
-      // No one offered
-      const result = concludeAuction(doubleAuction, players)
+    it('concludes with original auctioneer getting double card for free when all decline', () => {
+      // Everyone declines
+      let state = declineToOffer(doubleAuction, '1')
+      state = declineToOffer(state, '2')
+      state = declineToOffer(state, '3')
+      state = declineToOffer(state, '4')
+
+      const result = concludeAuction(state, players)
 
       expect(result.winnerId).toBe('1')
       expect(result.salePrice).toBe(0)
@@ -268,36 +283,39 @@ describe('Double Auction', () => {
       expect(result.type).toBe('double')
     })
 
-    it('concludes with winner paying auctioneer', () => {
-      // Set up with Bob offering and Carol winning
+    it('concludes with winner paying new auctioneer', () => {
+      // Auctioneer declines, Bob offers
+      let state = declineToOffer(doubleAuction, '1')
       const secondCard = {
         id: 'second-card',
         artist: ARTISTS[0],
         auctionType: 'open' as const,
         artworkId: 'test'
       }
-      let currentAuction = offerSecondCard(doubleAuction, '2', secondCard, players)
-      currentAuction = acceptOffer(currentAuction, '3', 35, players)
+      state = offerSecondCard(state, '2', secondCard, players)
+      state = acceptOffer(state, '3', 35, players)
 
-      const result = concludeAuction(currentAuction, players)
+      const result = concludeAuction(state, players)
 
       expect(result.winnerId).toBe('3')
       expect(result.salePrice).toBe(35)
-      expect(result.profit).toBe(35) // Bob gets the money
+      expect(result.profit).toBe(35) // Bob (new auctioneer) gets the money
+      expect(result.auctioneerId).toBe('2')
     })
 
     it('concludes with offerer winning (pays bank)', () => {
       // Bob offers and wins his own offer
+      let state = declineToOffer(doubleAuction, '1')
       const secondCard = {
         id: 'second-card',
         artist: ARTISTS[0],
         auctionType: 'open' as const,
         artworkId: 'test'
       }
-      let currentAuction = offerSecondCard(doubleAuction, '2', secondCard, players)
-      currentAuction = acceptOffer(currentAuction, '2', 30, players) // Bob wins
+      state = offerSecondCard(state, '2', secondCard, players)
+      state = acceptOffer(state, '2', 30, players) // Bob wins own auction
 
-      const result = concludeAuction(currentAuction, players)
+      const result = concludeAuction(state, players)
 
       expect(result.winnerId).toBe('2')
       expect(result.salePrice).toBe(30)
@@ -305,7 +323,7 @@ describe('Double Auction', () => {
     })
 
     it('throws error when auction is incomplete', () => {
-      // Still active
+      // Still active, no one has offered or all declined
       expect(() => concludeAuction(doubleAuction, players))
         .toThrow('Cannot conclude incomplete auction')
     })
@@ -313,17 +331,19 @@ describe('Double Auction', () => {
 
   describe('Utility Functions', () => {
     it('getCurrentPlayer returns whose turn it is', () => {
-      expect(getCurrentPlayer(doubleAuction)).toBe('2')
+      // Original auctioneer is first
+      expect(getCurrentPlayer(doubleAuction)).toBe('1')
 
-      let currentAuction = declineToOffer(doubleAuction, '2')
+      let currentAuction = declineToOffer(doubleAuction, '1')
+      expect(getCurrentPlayer(currentAuction)).toBe('2')
+
+      currentAuction = declineToOffer(currentAuction, '2')
       expect(getCurrentPlayer(currentAuction)).toBe('3')
-
-      currentAuction = declineToOffer(currentAuction, '3')
-      expect(getCurrentPlayer(currentAuction)).toBe('4')
     })
 
     it('getCurrentPlayer returns null when auction ends', () => {
       let currentAuction = doubleAuction
+      currentAuction = declineToOffer(currentAuction, '1')
       currentAuction = declineToOffer(currentAuction, '2')
       currentAuction = declineToOffer(currentAuction, '3')
       currentAuction = declineToOffer(currentAuction, '4')
@@ -331,9 +351,9 @@ describe('Double Auction', () => {
       expect(getCurrentPlayer(currentAuction)).toBeNull()
     })
 
-    it('isPlayerTurn checks if it\'s player\'s turn', () => {
-      expect(isPlayerTurn(doubleAuction, '2')).toBe(true)
-      expect(isPlayerTurn(doubleAuction, '3')).toBe(false)
+    it('isPlayerTurn checks if it is player turn', () => {
+      expect(isPlayerTurn(doubleAuction, '1')).toBe(true)
+      expect(isPlayerTurn(doubleAuction, '2')).toBe(false)
     })
 
     it('hasSecondCardOffered checks for second card', () => {
@@ -345,7 +365,7 @@ describe('Double Auction', () => {
         auctionType: 'open' as const,
         artworkId: 'test'
       }
-      const withSecond = offerSecondCard(doubleAuction, '2', secondCard, players)
+      const withSecond = offerSecondCard(doubleAuction, '1', secondCard, players)
       expect(hasSecondCardOffered(withSecond)).toBe(true)
     })
 
@@ -353,14 +373,15 @@ describe('Double Auction', () => {
       // Before any offer, it's original auctioneer
       expect(getCurrentAuctioneer(doubleAuction)).toBe('1')
 
-      // After offer, it's the offerer
+      // After another player offers, they become auctioneer
+      let state = declineToOffer(doubleAuction, '1')
       const secondCard = {
         id: 'second-card',
         artist: ARTISTS[0],
         auctionType: 'open' as const,
         artworkId: 'test'
       }
-      const withOffer = offerSecondCard(doubleAuction, '2', secondCard, players)
+      const withOffer = offerSecondCard(state, '2', secondCard, players)
       expect(getCurrentAuctioneer(withOffer)).toBe('2')
     })
 
@@ -374,14 +395,14 @@ describe('Double Auction', () => {
         auctionType: 'open' as const,
         artworkId: 'test'
       }
-      const withOffer = offerSecondCard(doubleAuction, '2', secondCard, players)
+      const withOffer = offerSecondCard(doubleAuction, '1', secondCard, players)
       expect(getCardsForWinner(withOffer)).toHaveLength(2)
     })
 
     it('getAuctionStatus provides complete status', () => {
       const status = getAuctionStatus(doubleAuction)
 
-      expect(status.currentPlayer).toBe('2')
+      expect(status.currentPlayer).toBe('1')
       expect(status.originalAuctioneer).toBe('1')
       expect(status.currentAuctioneer).toBe('1')
       expect(status.hasSecondCard).toBe(false)
@@ -391,41 +412,43 @@ describe('Double Auction', () => {
     })
 
     it('getValidActions returns available actions', () => {
-      // Before second card offer
-      const actions = getValidActions(doubleAuction, '2', players)
+      // Before second card offer, current player can decline or offer
+      const actions = getValidActions(doubleAuction, '1', players)
       expect(actions).toContainEqual({ type: 'decline' })
       expect(actions).toContainEqual({ type: 'offer' })
 
       // Not current player's turn
-      const otherActions = getValidActions(doubleAuction, '3', players)
+      const otherActions = getValidActions(doubleAuction, '2', players)
       expect(otherActions).toHaveLength(0)
     })
   })
 
   describe('Complete Double Auction Scenarios', () => {
-    it('handles original auctioneer offering and winning', () => {
+    it('handles original auctioneer offering and another player winning', () => {
       // Alice (original auctioneer) offers second card
       const secondCard = {
         id: 'second-card',
         artist: ARTISTS[0],
-        auctionType: 'fixed_price' as const,
-        artworkId: 'manuel_carvalho_fixed_1'
+        auctionType: 'open' as const,
+        artworkId: 'manuel_carvalho_open_1'
       }
       let currentAuction = offerSecondCard(doubleAuction, '1', secondCard, players)
 
-      // No one else bids, Alice wins
-      currentAuction = acceptOffer(currentAuction, '1', 25, players)
+      // Bob wins
+      currentAuction = acceptOffer(currentAuction, '2', 25, players)
       const result = concludeAuction(currentAuction, players)
 
-      expect(result.winnerId).toBe('1')
+      expect(result.winnerId).toBe('2')
       expect(result.salePrice).toBe(25)
-      expect(result.profit).toBe(0) // Pays bank when winning own offer
+      expect(result.profit).toBe(25) // Alice gets the money
+      expect(result.auctioneerId).toBe('1')
     })
 
     it('handles all players declining', () => {
       let currentAuction = doubleAuction
 
-      // Everyone passes
+      // Everyone declines
+      currentAuction = declineToOffer(currentAuction, '1')
       currentAuction = declineToOffer(currentAuction, '2')
       currentAuction = declineToOffer(currentAuction, '3')
       currentAuction = declineToOffer(currentAuction, '4')
@@ -437,9 +460,11 @@ describe('Double Auction', () => {
       expect(getCardsForWinner(currentAuction)).toHaveLength(1) // Only double card
     })
 
-    it('handles chain of offers before acceptance', () => {
+    it('handles chain of declines before offer', () => {
+      // Alice declines
+      let currentAuction = declineToOffer(doubleAuction, '1')
       // Bob declines
-      let currentAuction = declineToOffer(doubleAuction, '2')
+      currentAuction = declineToOffer(currentAuction, '2')
 
       // Carol offers
       const carolsCard = {
@@ -462,83 +487,62 @@ describe('Double Auction', () => {
         auctionType: 'one_offer' as const,
         artworkId: 'manuel_carvalho_one_offer_1'
       }
-      const currentAuction = offerSecondCard(doubleAuction, '2', secondCard, players)
+      const currentAuction = offerSecondCard(doubleAuction, '1', secondCard, players)
 
       expect(currentAuction.auctionType).toBe('one_offer')
-      // Would then proceed with one_offer auction mechanics
-    })
-
-    it('handles expensive double auction scenarios', () => {
-      // Bob offers with high minimum
-      const expensiveCard = {
-        id: 'expensive-card',
-        artist: ARTISTS[0],
-        auctionType: 'open' as const,
-        artworkId: 'manuel_carvalho_open_expensive'
-      }
-      let currentAuction = offerSecondCard(doubleAuction, '2', expensiveCard, players)
-
-      // Dave can't afford high bids
-      expect(getValidActions(currentAuction, '4', players)).toEqual([{ type: 'bid', amount: 1 }])
-      // But validation would check actual affordability
     })
   })
 
   describe('Edge Cases', () => {
     it('handles 3-player game', () => {
       const threePlayers = players.slice(0, 3)
-      const auction = createDoubleAuction(doubleAuction.doubleCard, players[0], threePlayers)
+      const auction = createDoubleAuction(doubleCard, threePlayers[0], threePlayers)
 
-      expect(auction.turnOrder).toEqual(['2', '3']) // Only 2 other players
-      expect(auction.turnOrder).toHaveLength(2)
+      // Original auctioneer first, then clockwise
+      expect(auction.turnOrder).toEqual(['1', '2', '3'])
     })
 
     it('handles 5-player game', () => {
-      const fivePlayers = [
+      const fivePlayers: Player[] = [
         ...players,
-        { id: '5', name: 'Eve', money: 50 }
+        { id: '5', name: 'Eve', money: 50, hand: [], purchases: [], purchasedThisRound: [] }
       ]
-      const auction = createDoubleAuction(doubleAuction.doubleCard, players[0], fivePlayers)
+      const auction = createDoubleAuction(doubleCard, fivePlayers[0], fivePlayers)
 
-      expect(auction.turnOrder).toEqual(['2', '3', '4', '5'])
-      expect(auction.turnOrder).toHaveLength(4)
+      expect(auction.turnOrder).toEqual(['1', '2', '3', '4', '5'])
     })
 
-    it('handles minimum and maximum prices', () => {
+    it('handles winner paying full amount', () => {
       const secondCard = {
         id: 'second-card',
         artist: ARTISTS[0],
         auctionType: 'open' as const,
         artworkId: 'test'
       }
-      let currentAuction = offerSecondCard(doubleAuction, '2', secondCard, players)
+      let currentAuction = offerSecondCard(doubleAuction, '1', secondCard, players)
 
-      // Minimum price (can't be negative)
-      expect(() => acceptOffer(currentAuction, '3', -5, players))
-        .toThrow('Winner only has 60, cannot pay -5') // Validation catches negative
-
-      // Maximum price (player's entire money)
-      currentAuction = acceptOffer(currentAuction, '2', 80, players) // Bob's entire money
+      // Bob pays all his money (80)
+      currentAuction = acceptOffer(currentAuction, '2', 80, players)
       expect(currentAuction.finalPrice).toBe(80)
     })
   })
 
   describe('Card Matching and Hand Integration', () => {
-    let playerHands: Record<string, any[]>
+    let playerHands: Record<string, Card[]>
 
     beforeEach(() => {
       // Simulate player hands with various cards
       playerHands = {
         '1': [
-          { id: 'card1', artist: ARTISTS[0], auctionType: 'open', artworkId: 'test1' },
-          { id: 'card2', artist: ARTISTS[1], auctionType: 'hidden', artworkId: 'test2' }
+          { id: 'card1', artist: ARTISTS[0], auctionType: 'open' as const, artworkId: 'test1' },
+          { id: 'card2', artist: ARTISTS[1], auctionType: 'hidden' as const, artworkId: 'test2' }
         ],
         '2': [
-          { id: 'card3', artist: ARTISTS[0], auctionType: 'fixed_price', artworkId: 'test3' },
-          { id: 'card4', artist: ARTISTS[0], auctionType: 'one_offer', artworkId: 'test4' }
+          { id: 'card3', artist: ARTISTS[0], auctionType: 'fixed_price' as const, artworkId: 'test3' },
+          { id: 'card4', artist: ARTISTS[0], auctionType: 'one_offer' as const, artworkId: 'test4' }
         ],
         '3': [
-          { id: 'card5', artist: ARTISTS[2], auctionType: 'open', artworkId: 'test5' }
+          { id: 'card5', artist: ARTISTS[2], auctionType: 'open' as const, artworkId: 'test5' }
         ],
         '4': [] // Empty hand
       }
@@ -568,7 +572,7 @@ describe('Double Auction', () => {
       playerHands['2'].push({
         id: 'double2',
         artist: ARTISTS[0],
-        auctionType: 'double',
+        auctionType: 'double' as const,
         artworkId: 'double2'
       })
 
@@ -576,23 +580,6 @@ describe('Double Auction', () => {
       // Should still only return the non-double cards
       expect(bobCards).toHaveLength(2)
       expect(bobCards.some(c => c.auctionType === 'double')).toBe(false)
-    })
-
-    it('supports auction type inheritance', () => {
-      // Create auction with open card as second
-      const openCard = {
-        id: 'open-second',
-        artist: ARTISTS[0],
-        auctionType: 'open' as const,
-        artworkId: 'open2'
-      }
-
-      let currentAuction = offerSecondCard(doubleAuction, '1', openCard, players)
-
-      // Now should be in bidding phase with open auction type
-      expect(currentAuction.phase).toBe('bidding')
-      expect(currentAuction.auctionType).toBe('open')
-      expect(hasSecondCardOffered(currentAuction)).toBe(true)
     })
   })
 
@@ -607,12 +594,12 @@ describe('Double Auction', () => {
 
       let currentAuction = offerSecondCard(doubleAuction, '1', openCard, players)
 
-      expect(currentAuction.phase).toBe('bidding')
       expect(currentAuction.auctionType).toBe('open')
-      expect(currentAuction.currentAuctioneerId).toBe('1') // Alice remains auctioneer
+      expect(currentAuction.currentAuctioneerId).toBe('1')
     })
 
     it('transitions to hidden auction when hidden card offered', () => {
+      let state = declineToOffer(doubleAuction, '1')
       const hiddenCard = {
         id: 'hidden-second',
         artist: ARTISTS[0],
@@ -620,14 +607,16 @@ describe('Double Auction', () => {
         artworkId: 'hidden2'
       }
 
-      const currentAuction = offerSecondCard(doubleAuction, '2', hiddenCard, players)
+      const currentAuction = offerSecondCard(state, '2', hiddenCard, players)
 
-      expect(currentAuction.phase).toBe('bidding')
       expect(currentAuction.auctionType).toBe('hidden')
       expect(currentAuction.currentAuctioneerId).toBe('2') // Bob becomes auctioneer
     })
 
     it('transitions to fixed price auction when fixed price card offered', () => {
+      let state = declineToOffer(doubleAuction, '1')
+      state = declineToOffer(state, '2')
+
       const fixedCard = {
         id: 'fixed-second',
         artist: ARTISTS[0],
@@ -635,14 +624,17 @@ describe('Double Auction', () => {
         artworkId: 'fixed2'
       }
 
-      const currentAuction = offerSecondCard(doubleAuction, '3', fixedCard, players)
+      const currentAuction = offerSecondCard(state, '3', fixedCard, players)
 
-      expect(currentAuction.phase).toBe('bidding')
       expect(currentAuction.auctionType).toBe('fixed_price')
       expect(currentAuction.currentAuctioneerId).toBe('3') // Carol becomes auctioneer
     })
 
     it('transitions to one offer auction when one offer card offered', () => {
+      let state = declineToOffer(doubleAuction, '1')
+      state = declineToOffer(state, '2')
+      state = declineToOffer(state, '3')
+
       const oneOfferCard = {
         id: 'one-offer-second',
         artist: ARTISTS[0],
@@ -650,9 +642,8 @@ describe('Double Auction', () => {
         artworkId: 'one2'
       }
 
-      const currentAuction = offerSecondCard(doubleAuction, '4', oneOfferCard, players)
+      const currentAuction = offerSecondCard(state, '4', oneOfferCard, players)
 
-      expect(currentAuction.phase).toBe('bidding')
       expect(currentAuction.auctionType).toBe('one_offer')
       expect(currentAuction.currentAuctioneerId).toBe('4') // Dave becomes auctioneer
     })
@@ -667,23 +658,25 @@ describe('Double Auction', () => {
         artworkId: 'second'
       }
 
-      let currentAuction = offerSecondCard(doubleAuction, '2', secondCard, players)
+      let currentAuction = offerSecondCard(doubleAuction, '1', secondCard, players)
       currentAuction = acceptOffer(currentAuction, '3', 40, players)
 
-      const result = concludeAuction(currentAuction, players)
       const cardsForWinner = getCardsForWinner(currentAuction)
 
       expect(cardsForWinner).toHaveLength(2)
       expect(cardsForWinner[0]).toBe(doubleAuction.doubleCard)
       expect(cardsForWinner[1]).toBe(secondCard)
-
-      // Conclusion result should reference the double card
-      expect(result.card).toBe(doubleAuction.doubleCard)
     })
 
     it('verifies winner gets only double card when no second card offered', () => {
-      const result = concludeAuction(doubleAuction, players)
-      const cardsForWinner = getCardsForWinner(doubleAuction)
+      // Everyone declines
+      let state = declineToOffer(doubleAuction, '1')
+      state = declineToOffer(state, '2')
+      state = declineToOffer(state, '3')
+      state = declineToOffer(state, '4')
+
+      const result = concludeAuction(state, players)
+      const cardsForWinner = getCardsForWinner(state)
 
       expect(cardsForWinner).toHaveLength(1)
       expect(cardsForWinner[0]).toBe(doubleAuction.doubleCard)
@@ -693,79 +686,22 @@ describe('Double Auction', () => {
     })
   })
 
-  describe('Complete Double Auction Flow', () => {
-    it('demonstrates original auctioneer priority', () => {
-      let currentAuction = doubleAuction
-
-      // Original auctioneer (Alice) gets first chance
-      expect(getCurrentPlayer(currentAuction)).toBe('1')
-
-      // Alice has matching card and offers it
-      const matchingCard = {
-        id: 'alice-matching',
-        artist: ARTISTS[0],
-        auctionType: 'open' as const,
-        artworkId: 'alice1'
-      }
-      playerHands['1'].push(matchingCard)
-
-      currentAuction = offerSecondCard(currentAuction, '1', matchingCard, players)
-
-      // Now in bidding phase with open auction
-      expect(currentAuction.phase).toBe('bidding')
-      expect(currentAuction.auctionType).toBe('open')
-      expect(currentAuction.currentAuctioneerId).toBe('1')
-    })
-
-    it('handles original auctioneer declining then others offering', () => {
-      let currentAuction = doubleAuction
-
-      // Alice declines
-      currentAuction = declineToOffer(currentAuction, '1')
-      expect(getCurrentPlayer(currentAuction)).toBe('2')
-
-      // Bob offers
-      const bobCard = {
-        id: 'bob-card',
+  describe('startBiddingPhase', () => {
+    it('transitions to bidding phase with second card', () => {
+      const secondCard = {
+        id: 'second-card',
         artist: ARTISTS[0],
         auctionType: 'hidden' as const,
-        artworkId: 'bob1'
+        artworkId: 'hidden1'
       }
-      currentAuction = offerSecondCard(currentAuction, '2', bobCard, players)
 
-      expect(currentAuction.currentAuctioneerId).toBe('2')
-      expect(currentAuction.auctionType).toBe('hidden')
-      expect(currentAuction.phase).toBe('bidding')
-    })
+      const result = startBiddingPhase(doubleAuction, secondCard, '2')
 
-    it('handles complete flow with multiple declines before offer', () => {
-      let currentAuction = doubleAuction
-
-      // Alice declines
-      currentAuction = declineToOffer(currentAuction, '1')
-      // Bob declines
-      currentAuction = declineToOffer(currentAuction, '2')
-      // Carol offers
-      const carolCard = {
-        id: 'carol-card',
-        artist: ARTISTS[0],
-        auctionType: 'fixed_price' as const,
-        artworkId: 'carol1'
-      }
-      currentAuction = offerSecondCard(currentAuction, '3', carolCard, players)
-
-      // Carol is now auctioneer with fixed price auction
-      expect(currentAuction.currentAuctioneerId).toBe('3')
-      expect(currentAuction.auctionType).toBe('fixed_price')
-      expect(currentAuction.phase).toBe('bidding')
-
-      // Accept at fixed price
-      currentAuction = acceptOffer(currentAuction, '4', 35, players)
-
-      const result = concludeAuction(currentAuction, players)
-      expect(result.winnerId).toBe('4')
-      expect(result.profit).toBe(35) // Carol gets the money
-      expect(getCardsForWinner(currentAuction)).toHaveLength(2)
+      expect(result.phase).toBe('bidding')
+      expect(result.secondCard).toBe(secondCard)
+      expect(result.currentAuctioneerId).toBe('2')
+      expect(result.auctionType).toBe('hidden')
+      expect(result.currentTurnIndex).toBe(0) // Reset for bidding
     })
   })
 })

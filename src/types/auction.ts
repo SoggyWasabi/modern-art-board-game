@@ -6,6 +6,7 @@ import type { Card } from './game'
 
 export interface AuctionResult {
   winnerId: string
+  auctioneerId: string
   salePrice: number
   card: Card
   profit: number // Money earned by auctioneer (0 if buying from bank)
@@ -41,6 +42,12 @@ export interface OpenAuctionState {
 // -----------------------
 // ONE OFFER AUCTION
 // -----------------------
+// Rules:
+// - Turn order: left of auctioneer → clockwise → auctioneer LAST
+// - Each player gets one chance to bid or pass
+// - Must bid higher than current bid
+// - After all others act, auctioneer can: accept highest bid OR outbid (pay bank)
+// - No bids → auctioneer gets painting FREE
 export interface OneOfferAuctionState {
   type: 'one_offer'
   card: Card
@@ -48,9 +55,10 @@ export interface OneOfferAuctionState {
   currentBid: number
   currentBidderId: string | null
   isActive: boolean
-  turnOrder: string[] // Order: left of auctioneer -> clockwise -> auctioneer last
+  turnOrder: string[] // Order: left of auctioneer -> clockwise -> auctioneer LAST
   currentTurnIndex: number
   completedTurns: Set<string> // Players who have taken their turn
+  phase: 'bidding' | 'auctioneer_decision' // Phase of the auction
 }
 
 // -----------------------

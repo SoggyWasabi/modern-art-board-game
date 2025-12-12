@@ -1,253 +1,224 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { createHiddenBidAuction, placeHiddenBid, revealBids, concludeAuction } from '../../../auction/hidden'
-import type { HiddenBidAuctionState } from '../../../types/auction'
+import { createHiddenAuction, submitBid, revealBids, concludeAuction } from '../../../auction/hidden'
+import type { HiddenAuctionState } from '../../../../types/auction'
 import { ARTISTS } from '../../../constants'
+import type { Player, Card } from '../../../../types/game'
 
 describe('Hidden Bid Auction', () => {
-  let auction: HiddenBidAuctionState
-  let players: Array<{ id: string; name: string; money: number }>
+  let auction: HiddenAuctionState
+  let players: Player[]
+  let testCard: Card
 
   beforeEach(() => {
     players = [
-      { id: '1', name: 'Alice', money: 100 },
-      { id: '2', name: 'Bob', money: 80 },
-      { id: '3', name: 'Carol', money: 60 },
-      { id: '4', name: 'Dave', money: 40 }
+      { id: '1', name: 'Alice', money: 100, hand: [], purchases: [], purchasedThisRound: [] },
+      { id: '2', name: 'Bob', money: 80, hand: [], purchases: [], purchasedThisRound: [] },
+      { id: '3', name: 'Carol', money: 60, hand: [], purchases: [], purchasedThisRound: [] },
+      { id: '4', name: 'Dave', money: 40, hand: [], purchases: [], purchasedThisRound: [] }
     ]
 
-    const card = {
+    testCard = {
       id: 'card-1',
       artist: ARTISTS[1],
       auctionType: 'hidden' as const,
       artworkId: 'sigrid_thaler_hidden_1'
     }
 
-    auction = createHiddenBidAuction(card, players[0], players)
+    auction = createHiddenAuction(testCard, players[0], players)
   })
 
-  describe('createHiddenBidAuction', () => {
-    it('creates initial hidden bid auction state', () => {
+  describe('createHiddenAuction', () => {
+    it('creates initial hidden auction state', () => {
       expect(auction.type).toBe('hidden')
       expect(auction.auctioneerId).toBe('1')
       expect(auction.isActive).toBe(true)
-      expect(auction.revealed).toBe(false)
-      expect(auction.bids).toEqual(new Map())
-      expect(auction.playerOrder).toEqual(['1', '2', '3', '4'])
+      expect(auction.revealedBids).toBe(false)
+      expect(auction.bids).toEqual({})
+      // Tie-break order: auctioneer first, then clockwise
+      expect(auction.tieBreakOrder).toEqual(['1', '2', '3', '4'])
     })
   })
 
   describe('submitBid', () => {
     it('allows players to place secret bids', () => {
-      const result = placeHiddenBid(auction, '1', 15)
+      const result = submitBid(auction, '1', 15, players)
 
-      expect(result.bids.get('1')).toBe(15)
+      expect(result.bids['1']).toBe(15)
       expect(result.isActive).toBe(true)
-      expect(result.revealed).toBe(false)
+      expect(result.revealedBids).toBe(false)
     })
 
-    it('requires bid to be positive', () => {
-      expect(() => placeHiddenBid(auction, '1', 0))
-        .toThrow('Bid must be at least 1')
-
-      expect(() => placeHiddenBid(auction, '1', -5))
-        .toThrow('Bid must be at least 1')
+    it('allows zero bids (passing)', () => {
+      const result = submitBid(auction, '1', 0, players)
+      expect(result.bids['1']).toBe(0)
     })
 
     it('requires bidder to have enough money', () => {
-      expect(() => placeHiddenBid(auction, '4', 50))
+      expect(() => submitBid(auction, '4', 50, players))
         .toThrow('Player only has 40, cannot bid 50')
     })
 
     it('prevents player from bidding twice', () => {
-      const withBid = placeHiddenBid(auction, '1', 20)
+      const withBid = submitBid(auction, '1', 20, players)
 
-      expect(() => placeHiddenBid(withBid, '1', 25))
-        .toThrow('Player has already placed a bid')
+      expect(() => submitBid(withBid, '1', 25, players))
+        .toThrow('Player has already submitted a bid')
     })
 
     it('prevents bidding after reveal', () => {
-      const withBids = placeHiddenBid(auction, '1', 20)
-      const revealed = revealBids(withBids)
+      // All players must bid before reveal
+      let state = submitBid(auction, '1', 20, players)
+      state = submitBid(state, '2', 25, players)
+      state = submitBid(state, '3', 15, players)
+      state = submitBid(state, '4', 10, players)
+      const revealed = revealBids(state)
 
-      expect(() => placeHiddenBid(revealed, '2', 25))
-        .toThrow('Bids have been revealed')
+      expect(() => submitBid(revealed, '2', 25, players))
+        .toThrow('Cannot submit bid to inactive or revealed auction')
+    })
+
+    it('marks ready to reveal when all players have bid', () => {
+      let state = submitBid(auction, '1', 20, players)
+      expect(state.readyToReveal).toBeFalsy()
+
+      state = submitBid(state, '2', 25, players)
+      expect(state.readyToReveal).toBeFalsy()
+
+      state = submitBid(state, '3', 15, players)
+      expect(state.readyToReveal).toBeFalsy()
+
+      state = submitBid(state, '4', 10, players)
+      expect(state.readyToReveal).toBe(true)
     })
   })
 
   describe('revealBids', () => {
     beforeEach(() => {
-      auction = placeHiddenBid(auction, '1', 20)
-      auction = placeHiddenBid(auction, '2', 25)
-      auction = placeHiddenBid(auction, '3', 15)
-      auction = placeHiddenBid(auction, '4', 30)
+      // All players must bid before reveal
+      auction = submitBid(auction, '1', 20, players)
+      auction = submitBid(auction, '2', 25, players)
+      auction = submitBid(auction, '3', 30, players)
+      auction = submitBid(auction, '4', 15, players)
     })
 
-    it('reveals all placed bids', () => {
-      const revealed = revealBids(auction)
+    it('reveals all bids', () => {
+      const result = revealBids(auction)
 
-      expect(revealed.revealed).toBe(true)
-      expect(revealed.isActive).toBe(false)
-      expect(revealed.bids.size).toBe(4)
+      expect(result.revealedBids).toBe(true)
+      expect(result.bids['1']).toBe(20)
+      expect(result.bids['2']).toBe(25)
+      expect(result.bids['3']).toBe(30)
+      expect(result.bids['4']).toBe(15)
     })
 
-    it('determines highest bid and winner', () => {
-      const revealed = revealBids(auction)
+    it('prevents reveal before all players have bid', () => {
+      const partialAuction = createHiddenAuction(testCard, players[0], players)
+      const withOneBid = submitBid(partialAuction, '1', 20, players)
 
-      // Player 4 has highest bid (30)
-      expect(revealed.highestBid).toBe(30)
-      expect(revealed.winnerId).toBe('4')
-    })
-
-    it('handles tie-breaking by player order', () => {
-      // Create tie between players 1 and 3
-      auction = placeHiddenBid(auction, '1', 20)
-      auction = placeHiddenBid(auction, '3', 20) // Same bid as player 1
-
-      const revealed = revealBids(auction)
-
-      // Player 1 wins tie due to earlier in order
-      expect(revealed.highestBid).toBe(20)
-      expect(revealed.winnerId).toBe('1')
-    })
-
-    it('handles tie-breaking with auctioneer priority', () => {
-      // Create tie including auctioneer
-      auction = placeHiddenBid(auction, '1', 25) // Auctioneer
-      auction = placeHiddenBid(auction, '3', 25)
-
-      const revealed = revealBids(auction)
-
-      // Auctioneer (player 1) wins tie
-      expect(revealed.highestBid).toBe(25)
-      expect(revealed.winnerId).toBe('1')
-    })
-
-    it('handles 3-way tie', () => {
-      auction = placeHiddenBid(auction, '1', 15)
-      auction = placeHiddenBid(auction, '2', 15)
-      auction = placeHiddenBid(auction, '3', 15)
-
-      const revealed = revealBids(auction)
-
-      // Player 1 wins due to order
-      expect(revealed.highestBid).toBe(15)
-      expect(revealed.winnerId).toBe('1')
-    })
-
-    it('handles 4-way tie', () => {
-      auction = placeHiddenBid(auction, '1', 10)
-      auction = placeHiddenBid(auction, '2', 10)
-      auction = placeHiddenBid(auction, '3', 10)
-      auction = placeHiddenBid(auction, '4', 10)
-
-      const revealed = revealBids(auction)
-
-      // Player 1 wins due to being auctioneer
-      expect(revealed.highestBid).toBe(10)
-      expect(revealed.winnerId).toBe('1')
-    })
-  })
-
-  describe('determineWinner', () => {
-    it('correctly identifies winner with highest bid', () => {
-      auction = placeHiddenBid(auction, '1', 20)
-      auction = placeHiddenBid(auction, '2', 35)
-      auction = placeHiddenBid(auction, '3', 25)
-
-      const revealed = revealBids(auction)
-
-      expect(revealed.winnerId).toBe('2')
-      expect(revealed.highestBid).toBe(35)
-    })
-
-    it('handles no bids scenario', () => {
-      const revealed = revealBids(auction)
-
-      expect(revealed.highestBid).toBe(0)
-      expect(revealed.winnerId).toBe('1') // Auctioneer
-    })
-
-    it('handles single bid scenario', () => {
-      auction = placeHiddenBid(auction, '3', 30)
-
-      const revealed = revealBids(auction)
-
-      expect(revealed.winnerId).toBe('3')
-      expect(revealed.highestBid).toBe(30)
-    })
-  })
-
-  describe('handleTie', () => {
-    it('gives priority to auctioneer in ties', () => {
-      auction = placeHiddenBid(auction, '1', 20) // Auctioneer
-      auction = placeHiddenBid(auction, '3', 20)
-
-      const revealed = revealBids(auction)
-
-      expect(revealed.winnerId).toBe('1')
-    })
-
-    it('breaks ties by player order when auctioneer not involved', () => {
-      auction = placeHiddenBid(auction, '2', 25)
-      auction = placeHiddenBid(auction, '3', 25)
-      auction = placeHiddenBid(auction, '4', 25)
-
-      const revealed = revealBids(auction)
-
-      // Player 2 wins (earliest in order after auctioneer)
-      expect(revealed.winnerId).toBe('2')
+      expect(() => revealBids(withOneBid))
+        .toThrow('Not all players have submitted bids')
     })
   })
 
   describe('concludeAuction', () => {
-    beforeEach(() => {
-      auction = placeHiddenBid(auction, '1', 20)
-      auction = placeHiddenBid(auction, '2', 25)
-      auction = placeHiddenBid(auction, '3', 15)
-      auction = placeHiddenBid(auction, '4', 30)
-      auction = revealBids(auction)
-    })
+    it('determines winner by highest bid', () => {
+      let state = submitBid(auction, '1', 20, players)
+      state = submitBid(state, '2', 25, players)
+      state = submitBid(state, '3', 30, players)
+      state = submitBid(state, '4', 15, players)
+      state = revealBids(state)
 
-    it('concludes auction with winner paying their bid', () => {
-      const result = concludeAuction(auction, players)
+      const result = concludeAuction(state, players)
 
-      expect(result.winnerId).toBe('4') // Highest bidder
+      expect(result.winnerId).toBe('3') // Carol bid highest
       expect(result.salePrice).toBe(30)
-      expect(result.profit).toBe(30) // Auctioneer gets the money
-      expect(result.type).toBe('hidden')
     })
 
-    it('auctioneer pays bank when they win', () => {
-      // Create scenario where auctioneer wins
-      const auctioneerWins = createHiddenBidAuction(auction.card, players[0], players)
-      auctioneerWins = placeHiddenBid(auctioneerWins, '1', 40)
-      auctioneerWins = placeHiddenBid(auctioneerWins, '2', 20)
-      auctioneerWins = revealBids(auctioneerWins)
+    it('breaks ties using tie-break order (auctioneer first)', () => {
+      // Auctioneer and player 2 tie with highest bid
+      let state = submitBid(auction, '1', 30, players)
+      state = submitBid(state, '2', 30, players)
+      state = submitBid(state, '3', 20, players)
+      state = submitBid(state, '4', 15, players)
+      state = revealBids(state)
 
-      const result = concludeAuction(auctioneerWins, players)
+      const result = concludeAuction(state, players)
 
-      expect(result.winnerId).toBe('1')
-      expect(result.salePrice).toBe(40)
-      expect(result.profit).toBe(0) // No profit, pays bank
+      expect(result.winnerId).toBe('1') // Auctioneer wins tie
+      expect(result.salePrice).toBe(30)
     })
 
-    it('throws error when bids not revealed', () => {
-      const notRevealed = createHiddenBidAuction(auction.card, players[0], players)
-      notRevealed = placeHiddenBid(notRevealed, '1', 20)
+    it('breaks ties using clockwise order when auctioneer not tied', () => {
+      // Players 2 and 3 tie
+      let state = submitBid(auction, '1', 20, players)
+      state = submitBid(state, '2', 30, players)
+      state = submitBid(state, '3', 30, players)
+      state = submitBid(state, '4', 15, players)
+      state = revealBids(state)
 
-      expect(() => concludeAuction(notRevealed, players))
-        .toThrow('Bids must be revealed before concluding auction')
+      const result = concludeAuction(state, players)
+
+      expect(result.winnerId).toBe('2') // Player 2 is closer clockwise from auctioneer
+      expect(result.salePrice).toBe(30)
     })
 
-    it('handles auction with no bids', () => {
-      const noBidsAuction = createHiddenBidAuction(auction.card, players[0], players)
-      const revealed = revealBids(noBidsAuction)
+    it('awards card free to auctioneer when all bid zero', () => {
+      let state = submitBid(auction, '1', 0, players)
+      state = submitBid(state, '2', 0, players)
+      state = submitBid(state, '3', 0, players)
+      state = submitBid(state, '4', 0, players)
+      state = revealBids(state)
 
-      const result = concludeAuction(revealed, players)
+      const result = concludeAuction(state, players)
 
-      expect(result.winnerId).toBe('1') // Auctioneer
+      expect(result.winnerId).toBe('1') // Auctioneer gets it free
       expect(result.salePrice).toBe(0)
       expect(result.profit).toBe(0)
+    })
+
+    it('sets profit to 0 when auctioneer wins', () => {
+      let state = submitBid(auction, '1', 50, players)
+      state = submitBid(state, '2', 30, players)
+      state = submitBid(state, '3', 20, players)
+      state = submitBid(state, '4', 10, players)
+      state = revealBids(state)
+
+      const result = concludeAuction(state, players)
+
+      expect(result.winnerId).toBe('1')
+      expect(result.profit).toBe(0) // Auctioneer pays bank
+    })
+
+    it('sets profit to sale price when another player wins', () => {
+      let state = submitBid(auction, '1', 20, players)
+      state = submitBid(state, '2', 50, players)
+      state = submitBid(state, '3', 30, players)
+      state = submitBid(state, '4', 10, players)
+      state = revealBids(state)
+
+      const result = concludeAuction(state, players)
+
+      expect(result.winnerId).toBe('2')
+      expect(result.profit).toBe(50) // Auctioneer gets sale price
+    })
+
+    it('includes auctioneerId in result', () => {
+      let state = submitBid(auction, '1', 20, players)
+      state = submitBid(state, '2', 50, players)
+      state = submitBid(state, '3', 30, players)
+      state = submitBid(state, '4', 10, players)
+      state = revealBids(state)
+
+      const result = concludeAuction(state, players)
+
+      expect(result.auctioneerId).toBe('1')
+    })
+
+    it('prevents concluding before reveal', () => {
+      const state = submitBid(auction, '1', 20, players)
+
+      expect(() => concludeAuction(state, players))
+        .toThrow('Cannot conclude auction before revealing bids')
     })
   })
 })

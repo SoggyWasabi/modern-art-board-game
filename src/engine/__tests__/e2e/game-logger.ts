@@ -1,5 +1,5 @@
-import type { GameState, GameEvent, Player, Card, Painting, Artist } from '../../types/game'
-import { ARTISTS } from '../constants'
+import type { GameState, Player, Card, Painting } from '../../../types/game'
+import { ARTISTS } from '../../constants'
 
 /**
  * Game Logger for E2E Testing
@@ -135,7 +135,7 @@ export class GameLogger {
         .filter(r => r.value > 0)
         .forEach((result, index) => {
           const ordinal = this.getOrdinal(index + 1)
-          this.log(`  ${ordinal}. ${result.artist}: ${result.cardsPlayed} cards → $${result.value} each`)
+          this.log(`  ${ordinal}. ${result.artist}: ${result.cardCount} cards → $${result.value} each`)
         })
 
       this.log('\nBank Sales:')
@@ -209,10 +209,13 @@ export class GameLogger {
 
   /**
    * Save logs to file (for debugging)
+   * Note: Logs to console since file system may not be available
    */
-  saveLogs(filename: string): void {
-    const fs = require('fs')
-    fs.writeFileSync(filename, this.logs.join('\n\n'))
+  saveLogs(_filename: string): void {
+    // In test environment, just log to console
+    console.log('=== SAVED LOGS ===')
+    console.log(this.logs.join('\n\n'))
+    console.log('=== END LOGS ===')
   }
 
   // Helper methods

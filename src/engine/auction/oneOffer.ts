@@ -4,11 +4,14 @@ import type { OneOfferAuctionState, AuctionResult } from '../../types/auction'
 /**
  * One Offer Auction Engine
  *
- * Rules:
- * - Turn order: left of auctioneer → clockwise → auctioneer last
+ * Rules (matching official Modern Art game):
+ * - Turn order: left of auctioneer → clockwise → auctioneer LAST
  * - Each player gets one chance to bid or pass
- * - Must bid higher than current
- * - No bids → auctioneer gets free
+ * - Must bid higher than current bid
+ * - After all others act, auctioneer enters decision phase:
+ *   - Accept highest bid (gets paid by winner)
+ *   - OR outbid to keep painting (pays bank)
+ * - No bids → auctioneer gets painting FREE
  */
 
 export function createOneOfferAuction(
@@ -16,15 +19,18 @@ export function createOneOfferAuction(
   auctioneer: Player,
   players: Player[]
 ): OneOfferAuctionState {
-  // Determine turn order (left of auctioneer first, auctioneer last)
+  // Determine turn order (left of auctioneer first, auctioneer LAST)
   const auctioneerIndex = players.findIndex(p => p.id === auctioneer.id)
   const turnOrder: string[] = []
 
-  // Add players to the left (clockwise)
+  // Add players to the left (clockwise), excluding auctioneer
   for (let i = 1; i < players.length; i++) {
     const index = (auctioneerIndex + i) % players.length
     turnOrder.push(players[index].id)
   }
+
+  // Add auctioneer LAST
+  turnOrder.push(auctioneer.id)
 
   return {
     type: 'one_offer',
@@ -36,6 +42,7 @@ export function createOneOfferAuction(
     turnOrder,
     currentTurnIndex: 0,
     completedTurns: new Set<string>(),
+    phase: 'bidding',
   }
 }
 
@@ -48,6 +55,11 @@ export function makeOffer(
   // Validate auction is active
   if (!state.isActive) {
     throw new Error('Auction is not active')
+  }
+
+  // Check phase - regular bidding only in 'bidding' phase
+  if (state.phase !== 'bidding') {
+    throw new Error('Bidding phase has ended')
   }
 
   // Check if it's this player's turn
@@ -83,12 +95,17 @@ export function makeOffer(
   // Move to next turn
   const nextTurnIndex = state.currentTurnIndex + 1
 
+  // Check if we've reached the auctioneer (last in turn order)
+  const isAuctioneerNext = nextTurnIndex === state.turnOrder.length - 1
+
   return {
     ...state,
     currentBid: bidAmount,
     currentBidderId: playerId,
     currentTurnIndex: nextTurnIndex,
     completedTurns,
+    // If auctioneer is next, switch to decision phase
+    phase: isAuctioneerNext ? 'auctioneer_decision' : 'bidding',
   }
 }
 
@@ -99,6 +116,11 @@ export function pass(
   // Validate auction is active
   if (!state.isActive) {
     throw new Error('Auction is not active')
+  }
+
+  // Check phase - passing only in 'bidding' phase
+  if (state.phase !== 'bidding') {
+    throw new Error('Cannot pass during auctioneer decision phase')
   }
 
   // Check if it's this player's turn
@@ -118,14 +140,128 @@ export function pass(
   // Move to next turn
   const nextTurnIndex = state.currentTurnIndex + 1
 
-  // Check if all players have taken their turn
-  const isAuctionComplete = nextTurnIndex >= state.turnOrder.length
+  // Check if we've reached the auctioneer (last in turn order)
+  const isAuctioneerNext = nextTurnIndex === state.turnOrder.length - 1
 
   return {
     ...state,
     currentTurnIndex: nextTurnIndex,
     completedTurns,
-    isActive: !isAuctionComplete,
+    // If auctioneer is next, switch to decision phase
+    phase: isAuctioneerNext ? 'auctioneer_decision' : 'bidding',
+  }
+}
+
+/**
+ * Auctioneer accepts the highest bid
+ * The highest bidder wins and pays the auctioneer
+ */
+export function acceptHighestBid(
+  state: OneOfferAuctionState
+): OneOfferAuctionState {
+  // Validate auction is active
+  if (!state.isActive) {
+    throw new Error('Auction is not active')
+  }
+
+  // Must be in auctioneer decision phase
+  if (state.phase !== 'auctioneer_decision') {
+    throw new Error('Can only accept bid during auctioneer decision phase')
+  }
+
+  // Must have a bid to accept
+  if (state.currentBid === 0 || !state.currentBidderId) {
+    throw new Error('No bid to accept')
+  }
+
+  // Mark auctioneer's turn as completed
+  const completedTurns = new Set(state.completedTurns)
+  completedTurns.add(state.auctioneerId)
+
+  return {
+    ...state,
+    isActive: false,
+    completedTurns,
+  }
+}
+
+/**
+ * Auctioneer outbids to keep the painting (pays bank)
+ */
+export function auctioneerOutbid(
+  state: OneOfferAuctionState,
+  bidAmount: number,
+  players: Player[]
+): OneOfferAuctionState {
+  // Validate auction is active
+  if (!state.isActive) {
+    throw new Error('Auction is not active')
+  }
+
+  // Must be in auctioneer decision phase
+  if (state.phase !== 'auctioneer_decision') {
+    throw new Error('Can only outbid during auctioneer decision phase')
+  }
+
+  // Find the auctioneer
+  const auctioneer = players.find(p => p.id === state.auctioneerId)
+  if (!auctioneer) {
+    throw new Error('Auctioneer not found')
+  }
+
+  // Must bid higher than current bid
+  if (bidAmount <= state.currentBid) {
+    throw new Error(`Bid must be higher than current bid of ${state.currentBid}`)
+  }
+
+  // Check if auctioneer has enough money
+  if (bidAmount > auctioneer.money) {
+    throw new Error(`Auctioneer only has ${auctioneer.money}, cannot bid ${bidAmount}`)
+  }
+
+  // Mark auctioneer's turn as completed
+  const completedTurns = new Set(state.completedTurns)
+  completedTurns.add(state.auctioneerId)
+
+  return {
+    ...state,
+    currentBid: bidAmount,
+    currentBidderId: state.auctioneerId,
+    isActive: false,
+    completedTurns,
+  }
+}
+
+/**
+ * Auctioneer takes the painting for free (when no one bid)
+ */
+export function auctioneerTakesFree(
+  state: OneOfferAuctionState
+): OneOfferAuctionState {
+  // Validate auction is active
+  if (!state.isActive) {
+    throw new Error('Auction is not active')
+  }
+
+  // Must be in auctioneer decision phase
+  if (state.phase !== 'auctioneer_decision') {
+    throw new Error('Can only take free during auctioneer decision phase')
+  }
+
+  // Can only take free if no one bid
+  if (state.currentBid > 0 || state.currentBidderId) {
+    throw new Error('Cannot take free when there are bids')
+  }
+
+  // Mark auctioneer's turn as completed
+  const completedTurns = new Set(state.completedTurns)
+  completedTurns.add(state.auctioneerId)
+
+  return {
+    ...state,
+    currentBidderId: state.auctioneerId,
+    isActive: false,
+    completedTurns,
   }
 }
 
@@ -137,16 +273,11 @@ export function concludeAuction(
     throw new Error('Cannot conclude active auction')
   }
 
-  // No one bid (currentBid is 0 and no currentBidder)
-  if (state.currentBid === 0 || !state.currentBidderId) {
-    // Auctioneer gets card for free
-    const auctioneer = players.find(p => p.id === state.auctioneerId)
-    if (!auctioneer) {
-      throw new Error('Auctioneer not found')
-    }
-
+  // No one bid - auctioneer gets card for free
+  if (state.currentBid === 0 && state.currentBidderId === state.auctioneerId) {
     return {
       winnerId: state.auctioneerId,
+      auctioneerId: state.auctioneerId,
       salePrice: 0,
       card: state.card,
       profit: 0,
@@ -162,10 +293,11 @@ export function concludeAuction(
     throw new Error('Winner or auctioneer not found')
   }
 
-  // If auctioneer wins, they pay the bank
+  // If auctioneer wins (outbid everyone), they pay the bank
   if (winner.id === auctioneer.id) {
     return {
       winnerId: winner.id,
+      auctioneerId: state.auctioneerId,
       salePrice: state.currentBid,
       card: state.card,
       profit: 0, // No profit when buying from bank
@@ -176,6 +308,7 @@ export function concludeAuction(
   // Another player won - auctioneer gets the money
   return {
     winnerId: winner.id,
+    auctioneerId: state.auctioneerId,
     salePrice: state.currentBid,
     card: state.card,
     profit: state.currentBid,
@@ -187,7 +320,10 @@ export function concludeAuction(
  * Get the current player whose turn it is
  */
 export function getCurrentPlayer(state: OneOfferAuctionState): string | null {
-  if (!state.isActive || state.currentTurnIndex >= state.turnOrder.length) {
+  if (!state.isActive) {
+    return null
+  }
+  if (state.currentTurnIndex >= state.turnOrder.length) {
     return null
   }
   return state.turnOrder[state.currentTurnIndex]
@@ -201,6 +337,13 @@ export function isPlayerTurn(state: OneOfferAuctionState, playerId: string): boo
 }
 
 /**
+ * Check if it's the auctioneer's decision phase
+ */
+export function isAuctioneerDecisionPhase(state: OneOfferAuctionState): boolean {
+  return state.isActive && state.phase === 'auctioneer_decision'
+}
+
+/**
  * Check if a bid is valid in the current auction state
  */
 export function isValidBid(
@@ -210,7 +353,11 @@ export function isValidBid(
   players: Player[]
 ): boolean {
   try {
-    makeOffer(state, playerId, bidAmount, players)
+    if (state.phase === 'auctioneer_decision' && playerId === state.auctioneerId) {
+      auctioneerOutbid(state, bidAmount, players)
+    } else {
+      makeOffer(state, playerId, bidAmount, players)
+    }
     return true
   } catch {
     return false
@@ -224,8 +371,8 @@ export function getValidActions(
   state: OneOfferAuctionState,
   playerId: string,
   players: Player[]
-): Array<{ type: 'bid' | 'pass'; amount?: number }> {
-  const actions: Array<{ type: 'bid' | 'pass'; amount?: number }> = []
+): Array<{ type: 'bid' | 'pass' | 'accept' | 'take_free'; amount?: number }> {
+  const actions: Array<{ type: 'bid' | 'pass' | 'accept' | 'take_free'; amount?: number }> = []
 
   // Can't act if auction is not active
   if (!state.isActive) {
@@ -242,19 +389,44 @@ export function getValidActions(
     return actions
   }
 
-  // Can always pass
-  actions.push({ type: 'pass' })
-
-  // Can bid if have enough money
   const player = players.find(p => p.id === playerId)
-  if (player && player.money > state.currentBid) {
-    // Minimum valid bid is currentBid + 1
-    const minBid = state.currentBid + 1
-    const maxBid = player.money
+  if (!player) {
+    return actions
+  }
 
-    // Common bid amounts (for UI suggestions)
-    for (let amount = minBid; amount <= maxBid && amount <= minBid + 20; amount += 5) {
-      actions.push({ type: 'bid' as const, amount })
+  // Auctioneer decision phase
+  if (state.phase === 'auctioneer_decision' && playerId === state.auctioneerId) {
+    // If there are bids, can accept
+    if (state.currentBid > 0 && state.currentBidderId) {
+      actions.push({ type: 'accept' })
+
+      // Can also outbid if has enough money
+      if (player.money > state.currentBid) {
+        const minBid = state.currentBid + 1
+        const maxBid = player.money
+        for (let amount = minBid; amount <= maxBid && amount <= minBid + 20; amount += 5) {
+          actions.push({ type: 'bid', amount })
+        }
+      }
+    } else {
+      // No bids - can only take free
+      actions.push({ type: 'take_free' })
+    }
+    return actions
+  }
+
+  // Regular bidding phase
+  if (state.phase === 'bidding') {
+    // Can always pass
+    actions.push({ type: 'pass' })
+
+    // Can bid if have enough money
+    if (player.money > state.currentBid) {
+      const minBid = state.currentBid + 1
+      const maxBid = player.money
+      for (let amount = minBid; amount <= maxBid && amount <= minBid + 20; amount += 5) {
+        actions.push({ type: 'bid', amount })
+      }
     }
   }
 
@@ -268,10 +440,16 @@ export function getAuctionStatus(state: OneOfferAuctionState): {
   currentPlayer: string | null
   remainingPlayers: number
   completedPlayers: number
+  phase: 'bidding' | 'auctioneer_decision'
+  highestBid: number
+  highestBidder: string | null
 } {
   return {
     currentPlayer: getCurrentPlayer(state),
     remainingPlayers: state.turnOrder.length - state.currentTurnIndex,
     completedPlayers: state.completedTurns.size,
+    phase: state.phase,
+    highestBid: state.currentBid,
+    highestBidder: state.currentBidderId,
   }
 }
