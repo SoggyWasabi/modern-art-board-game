@@ -1919,12 +1919,13 @@ describe('Complete Game E2E', () => {
           card('Sigrid Thaler', 'double', 'carol_sigrid_r2_1')
         )
 
-        // Dave gets 4 new cards
+        // Dave gets 5 new cards (one extra Rafael for Turn 13 to trigger 5th card rule)
         game.state.players[game.playerIndex('Dave')].hand.push(
           card('Ramon Martins', 'open', 'dave_ramon_r2_1'),
           card('Manuel Carvalho', 'one_offer', 'dave_manuel_r2_1'),
           card('Daniel Melim', 'double', 'dave_daniel_r2_1'),
-          card('Rafael Silveira', 'hidden', 'dave_rafael_r2_1')
+          card('Rafael Silveira', 'hidden', 'dave_rafael_r2_1'),
+          card('Rafael Silveira', 'fixed_price', 'dave_rafael_r2_2')  // 5th Rafael for Turn 13
         )
 
         // Transition to Round 2 manually (since we control the deck)
@@ -1974,7 +1975,7 @@ describe('Complete Game E2E', () => {
         expect(game.player('Alice').hand).toHaveLength(11) // 7 + 4
         expect(game.player('Bob').hand).toHaveLength(11)    // 7 + 4
         expect(game.player('Carol').hand).toHaveLength(11) // 7 + 4
-        expect(game.player('Dave').hand).toHaveLength(10)  // 6 + 4
+        expect(game.player('Dave').hand).toHaveLength(11)  // 6 + 5 (extra Rafael for Turn 13)
 
         // Verify money unchanged during setup
         expect(game.player('Alice').money).toBe(139)
@@ -2035,7 +2036,7 @@ describe('Complete Game E2E', () => {
         expect(game.player('Alice').hand).toHaveLength(11) // 7 + 4
         expect(game.player('Bob').hand).toHaveLength(11)    // 7 + 4
         expect(game.player('Carol').hand).toHaveLength(11) // 7 + 4
-        expect(game.player('Dave').hand).toHaveLength(10)  // 6 + 4
+        expect(game.player('Dave').hand).toHaveLength(11)  // 6 + 5 (extra Rafael for Turn 13)
 
         // Verify Round 1 board values preserved
         expect(game.state.board.artistValues['Manuel Carvalho'][0]).toBe(30)
@@ -2438,7 +2439,7 @@ describe('Complete Game E2E', () => {
         expect(game.player('Carol').money).toBe(152)    // unchanged
 
         // Verify card moved to Bob's purchasedThisRound
-        expect(game.player('Dave').hand).toHaveLength(9) // Started with 10, played 1
+        expect(game.player('Dave').hand).toHaveLength(10) // Started with 11, played 1
         expect(game.player('Bob').purchasedThisRound).toHaveLength(2) // Manuel + Rafael
         expect(game.player('Bob').purchasedThisRound[1].artist).toBe('Rafael Silveira')
         expect(game.player('Bob').purchasedThisRound[1].purchasePrice).toBe(12)
@@ -2883,7 +2884,7 @@ describe('Complete Game E2E', () => {
         expect(game.player('Carol').money).toBe(112)   // unchanged
 
         // Verify card moved to Alice's purchasedThisRound
-        expect(game.player('Dave').hand).toHaveLength(8) // Started with 9, played 1
+        expect(game.player('Dave').hand).toHaveLength(9) // Started with 10 (after Turn 4), played 1
         expect(game.player('Alice').purchasedThisRound).toHaveLength(1) // Ramon
         expect(game.player('Alice').purchasedThisRound[0].artist).toBe('Ramon Martins')
 
@@ -3367,7 +3368,7 @@ describe('Complete Game E2E', () => {
         expect(game.cardsPlayedThisRound['Daniel Melim']).toBe(1)     // From Turn 1
         expect(game.cardsPlayedThisRound['Manuel Carvalho']).toBe(2)   // Turns 2-3
         expect(game.cardsPlayedThisRound['Rafael Silveira']).toBe(4)   // Turns 4-6, 11
-        expect(game.cardsPlayedThisRound['Sigrid Thaler']).toBe(4)     // Turns 1-7, 12
+        expect(game.cardsPlayedThisRound['Sigrid Thaler']).toBe(2)     // Turn 7 (Carol plays) + Turn 12 (Bob plays)
         expect(game.cardsPlayedThisRound['Ramon Martins']).toBe(3)     // Turns 8-10
 
         // Dave plays Rafael Silveira (5th card!)
@@ -3376,7 +3377,7 @@ describe('Complete Game E2E', () => {
         const bob = game.player('Bob')
         const carol = game.player('Carol')
         const daveIndex = game.playerIndex('Dave')
-        const cardToPlayIndex = dave.hand.findIndex(c => c.id === 'dave_rafael_r2_1')!
+        const cardToPlayIndex = dave.hand.findIndex(c => c.id === 'dave_rafael_r2_2')!
         const cardToPlay = dave.hand[cardToPlayIndex]
 
         // Verify Dave has the card
@@ -3392,11 +3393,11 @@ describe('Complete Game E2E', () => {
         // The round ends immediately with this card counting toward Rafael's total
 
         // Verify cards played tracking (final counts)
-        expect(game.state.round.cardsPlayedPerArtist['daniel_melim']).toBe(1)     // 5th place
-        expect(game.state.round.cardsPlayedPerArtist['manuel_carvalho']).toBe(2)   // 4th place
-        expect(game.state.round.cardsPlayedPerArtist['ramon_martins']).toBe(3)     // 3rd place
-        expect(game.state.round.cardsPlayedPerArtist['sigrid_thaler']).toBe(4)     // 2nd place
-        expect(game.state.round.cardsPlayedPerArtist['rafael_silveira']).toBe(5)   // 1st place - ROUND ENDS!
+        expect(game.state.round.cardsPlayedPerArtist['Daniel Melim']).toBe(1)     // 5th place
+        expect(game.state.round.cardsPlayedPerArtist['Manuel Carvalho']).toBe(2)   // 4th place
+        expect(game.state.round.cardsPlayedPerArtist['Ramon Martins']).toBe(3)     // 3rd place
+        expect(game.state.round.cardsPlayedPerArtist['Sigrid Thaler']).toBe(2)     // Tied 4th place with Manuel
+        expect(game.state.round.cardsPlayedPerArtist['Rafael Silveira']).toBe(5)   // 1st place - ROUND ENDS!
 
         // Verify round is ending
         expect(game.state.round.phase.type).toBe('round_ending')
@@ -3465,68 +3466,68 @@ describe('Complete Game E2E', () => {
           expect(results).toHaveLength(5)
 
           // 1st place: Rafael (5 cards) - $30
-          const rafael = results.find((r: any) => r.artist === 'rafael_silveira')
+          const rafael = results.find((r: any) => r.artist === 'Rafael Silveira')
           expect(rafael).toBeDefined()
           expect(rafael!.value).toBe(30)
 
-          // 2nd place: Sigrid (4 cards) - $20
-          const sigrid = results.find((r: any) => r.artist === 'sigrid_thaler')
-          expect(sigrid).toBeDefined()
-          expect(sigrid!.value).toBe(20)
-
-          // 3rd place: Ramon (3 cards) - $10
-          const ramon = results.find((r: any) => r.artist === 'ramon_martins')
+          // 2nd place: Ramon (3 cards) - $20
+          const ramon = results.find((r: any) => r.artist === 'Ramon Martins')
           expect(ramon).toBeDefined()
-          expect(ramon!.value).toBe(10)
+          expect(ramon!.value).toBe(20)
 
-          // 4th place: Manuel (2 cards) - $0
-          const manuel = results.find((r: any) => r.artist === 'manuel_carvalho')
+          // 3rd place: Manuel (2 cards, wins tiebreaker) - $10
+          const manuel = results.find((r: any) => r.artist === 'Manuel Carvalho')
           expect(manuel).toBeDefined()
-          expect(manuel!.value).toBe(0)
+          expect(manuel!.value).toBe(10)
+
+          // 4th place: Sigrid (2 cards, loses tiebreaker) - $0
+          const sigrid = results.find((r: any) => r.artist === 'Sigrid Thaler')
+          expect(sigrid).toBeDefined()
+          expect(sigrid!.value).toBe(0)
 
           // 5th place: Daniel (1 card) - $0
-          const daniel = results.find((r: any) => r.artist === 'daniel_melim')
+          const daniel = results.find((r: any) => r.artist === 'Daniel Melim')
           expect(daniel).toBeDefined()
           expect(daniel!.value).toBe(0)
 
           // Verify board updated with Round 2 values
-          expect(game.state.board.artistValues['rafael_silveira'][1]).toBe(30)  // Round 2 value
-          expect(game.state.board.artistValues['sigrid_thaler'][1]).toBe(20)     // Round 2 value
-          expect(game.state.board.artistValues['ramon_martins'][1]).toBe(10)     // Round 2 value
-          expect(game.state.board.artistValues['manuel_carvalho'][1]).toBe(0)    // Round 2 value
-          expect(game.state.board.artistValues['daniel_melim'][1]).toBe(0)       // Round 2 value
+          expect(game.state.board.artistValues['Rafael Silveira'][1]).toBe(30)  // Round 2 value
+          expect(game.state.board.artistValues['Ramon Martins'][1]).toBe(20)     // Round 2 value
+          expect(game.state.board.artistValues['Manuel Carvalho'][1]).toBe(10)   // Round 2 value (3rd, wins tiebreaker)
+          expect(game.state.board.artistValues['Sigrid Thaler'][1]).toBe(0)      // Round 2 value (4th, loses tiebreaker)
+          expect(game.state.board.artistValues['Daniel Melim'][1]).toBe(0)       // Round 2 value
 
           // Calculate and verify CUMULATIVE values
           game.log('CUMULATIVE VALUES AFTER ROUND 2:')
 
-          // Manuel: $30 (R1) + $0 (R2) = $30 per painting
-          expect(game.state.board.artistValues['manuel_carvalho'][0]).toBe(30)  // Round 1
-          expect(game.state.board.artistValues['manuel_carvalho'][1]).toBe(0)   // Round 2
-          expect(game.state.board.artistValues['manuel_carvalho'][0] + game.state.board.artistValues['manuel_carvalho'][1]).toBe(30)
-          game.log('  Manuel: $30 (R1) + $0 (R2) = $30 per painting')
+          // Manuel: $30 (R1) + $10 (R2) = $40 per painting
+          expect(game.state.board.artistValues['Manuel Carvalho'][0]).toBe(30)  // Round 1
+          expect(game.state.board.artistValues['Manuel Carvalho'][1]).toBe(10)  // Round 2
+          expect(game.state.board.artistValues['Manuel Carvalho'][0] + game.state.board.artistValues['Manuel Carvalho'][1]).toBe(40)
+          game.log('  Manuel: $30 (R1) + $10 (R2) = $40 per painting')
 
-          // Sigrid: $20 (R1) + $20 (R2) = $40 per painting
-          expect(game.state.board.artistValues['sigrid_thaler'][0]).toBe(20)    // Round 1
-          expect(game.state.board.artistValues['sigrid_thaler'][1]).toBe(20)    // Round 2
-          expect(game.state.board.artistValues['sigrid_thaler'][0] + game.state.board.artistValues['sigrid_thaler'][1]).toBe(40)
-          game.log('  Sigrid: $20 (R1) + $20 (R2) = $40 per painting')
+          // Sigrid: $20 (R1) + $0 (R2) = $20 per painting
+          expect(game.state.board.artistValues['Sigrid Thaler'][0]).toBe(20)    // Round 1
+          expect(game.state.board.artistValues['Sigrid Thaler'][1]).toBe(0)     // Round 2
+          expect(game.state.board.artistValues['Sigrid Thaler'][0] + game.state.board.artistValues['Sigrid Thaler'][1]).toBe(20)
+          game.log('  Sigrid: $20 (R1) + $0 (R2) = $20 per painting')
 
           // Daniel: $10 (R1) + $0 (R2) = $10 per painting (decreased!)
-          expect(game.state.board.artistValues['daniel_melim'][0]).toBe(10)     // Round 1
-          expect(game.state.board.artistValues['daniel_melim'][1]).toBe(0)      // Round 2
-          expect(game.state.board.artistValues['daniel_melim'][0] + game.state.board.artistValues['daniel_melim'][1]).toBe(10)
+          expect(game.state.board.artistValues['Daniel Melim'][0]).toBe(10)     // Round 1
+          expect(game.state.board.artistValues['Daniel Melim'][1]).toBe(0)      // Round 2
+          expect(game.state.board.artistValues['Daniel Melim'][0] + game.state.board.artistValues['Daniel Melim'][1]).toBe(10)
           game.log('  Daniel: $10 (R1) + $0 (R2) = $10 per painting (decreased!)')
 
-          // Ramon: $0 (R1) + $10 (R2) = $10 per painting
-          expect(game.state.board.artistValues['ramon_martins'][0]).toBe(0)     // Round 1
-          expect(game.state.board.artistValues['ramon_martins'][1]).toBe(10)    // Round 2
-          expect(game.state.board.artistValues['ramon_martins'][0] + game.state.board.artistValues['ramon_martins'][1]).toBe(10)
-          game.log('  Ramon: $0 (R1) + $10 (R2) = $10 per painting')
+          // Ramon: $0 (R1) + $20 (R2) = $20 per painting
+          expect(game.state.board.artistValues['Ramon Martins'][0]).toBe(0)     // Round 1
+          expect(game.state.board.artistValues['Ramon Martins'][1]).toBe(20)    // Round 2
+          expect(game.state.board.artistValues['Ramon Martins'][0] + game.state.board.artistValues['Ramon Martins'][1]).toBe(20)
+          game.log('  Ramon: $0 (R1) + $20 (R2) = $20 per painting')
 
           // Rafael: $0 (R1) + $30 (R2) = $30 per painting (big comeback!)
-          expect(game.state.board.artistValues['rafael_silveira'][0]).toBe(0)    // Round 1
-          expect(game.state.board.artistValues['rafael_silveira'][1]).toBe(30)   // Round 2
-          expect(game.state.board.artistValues['rafael_silveira'][0] + game.state.board.artistValues['rafael_silveira'][1]).toBe(30)
+          expect(game.state.board.artistValues['Rafael Silveira'][0]).toBe(0)    // Round 1
+          expect(game.state.board.artistValues['Rafael Silveira'][1]).toBe(30)   // Round 2
+          expect(game.state.board.artistValues['Rafael Silveira'][0] + game.state.board.artistValues['Rafael Silveira'][1]).toBe(30)
           game.log('  Rafael: $0 (R1) + $30 (R2) = $30 per painting (big comeback!)')
         }
 
@@ -3619,15 +3620,15 @@ describe('Complete Game E2E', () => {
 
         // Verify specific board values using correct Artist type
         expect(game.state.board.artistValues['Manuel Carvalho'][0]).toBe(30)  // Round 1
-        expect(game.state.board.artistValues['Manuel Carvalho'][1]).toBe(0)   // Round 2
+        expect(game.state.board.artistValues['Manuel Carvalho'][1]).toBe(10)  // Round 2 (3rd place, wins tiebreaker)
         expect(game.state.board.artistValues['Sigrid Thaler'][0]).toBe(20)    // Round 1
-        expect(game.state.board.artistValues['Sigrid Thaler'][1]).toBe(20)    // Round 2
+        expect(game.state.board.artistValues['Sigrid Thaler'][1]).toBe(0)     // Round 2 (4th place, loses tiebreaker)
         expect(game.state.board.artistValues['Daniel Melim'][0]).toBe(10)     // Round 1
-        expect(game.state.board.artistValues['Daniel Melim'][1]).toBe(0)      // Round 2
+        expect(game.state.board.artistValues['Daniel Melim'][1]).toBe(0)      // Round 2 (5th place)
         expect(game.state.board.artistValues['Ramon Martins'][0]).toBe(0)     // Round 1
-        expect(game.state.board.artistValues['Ramon Martins'][1]).toBe(10)    // Round 2
+        expect(game.state.board.artistValues['Ramon Martins'][1]).toBe(20)    // Round 2 (2nd place)
         expect(game.state.board.artistValues['Rafael Silveira'][0]).toBe(0)    // Round 1
-        expect(game.state.board.artistValues['Rafael Silveira'][1]).toBe(30)   // Round 2
+        expect(game.state.board.artistValues['Rafael Silveira'][1]).toBe(30)   // Round 2 (1st place)
 
         // Log board values
         const artists: (keyof typeof game.state.board.artistValues)[] = ['Manuel Carvalho', 'Sigrid Thaler', 'Daniel Melim', 'Ramon Martins', 'Rafael Silveira']
@@ -3666,25 +3667,24 @@ describe('Complete Game E2E', () => {
         expect(dave.money).toBeGreaterThan(startingMoney.Dave)
         // Bob might have earned depending on his paintings
 
-        // CARD VERIFICATION
-        // Players should have cards remaining in hand (Round 2 dealt 4 new cards each)
-        // Alice: started with 9 from R1 end, played 2, purchased 3 = 10 cards
-        // Bob: started with 8 from R1 end, played 2, purchased 0 = 8 cards
-        // Carol: started with 8 from R1 end, played 2, purchased 4 = 10 cards
-        // Dave: started with 9 from R1 end, played 2, purchased 2 = 9 cards
+        // CARD VERIFICATION - Hand sizes only (not purchased paintings)
+        // Alice: started R2 with 11 (7+4), played 3 (turns 2,5,10) = 8 cards
+        // Bob: started R2 with 11 (7+4), played 4 (turns 1,6,9,12) = 7 cards
+        // Carol: started R2 with 11 (7+4), played 3 (turns 3,7,11) = 8 cards
+        // Dave: started R2 with 11 (6+5), played 3 (turns 4,8,13) = 8 cards
         game.log('')
         game.log('HAND SIZES AFTER ROUND 2:')
-        expect(alice.hand?.length || 0).toBe(10)
-        expect(bob.hand?.length || 0).toBe(8)
-        expect(carol.hand?.length || 0).toBe(10)
-        expect(dave.hand?.length || 0).toBe(9)
-        game.log('Hand sizes verified: Alice=10, Bob=8, Carol=10, Dave=9')
+        expect(alice.hand?.length || 0).toBe(8)
+        expect(bob.hand?.length || 0).toBe(7)
+        expect(carol.hand?.length || 0).toBe(8)
+        expect(dave.hand?.length || 0).toBe(8)
+        game.log('Hand sizes verified: Alice=8, Bob=7, Carol=8, Dave=8')
 
         // Verify round number
         expect(game.state.round.roundNumber).toBe(2)
 
-        // Verify current auctioneer position (should rotate to Alice for Round 3)
-        expect(game.state.round.currentAuctioneerIndex).toBe(0) // Alice will be auctioneer for Round 3
+        // Verify current auctioneer position (should rotate to Bob for Round 3)
+        expect(game.state.round.currentAuctioneerIndex).toBe(1) // Bob will be auctioneer for Round 3
 
         // Summary of Round 2
         game.log('')
