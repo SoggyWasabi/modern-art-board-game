@@ -221,40 +221,43 @@ function PlaceholderArt({ artistIndex, cardIndex }: { artistIndex: number; cardI
 // GAME CARD COMPONENT
 // ============================================================================
 
+// Responsive card sizes based on viewport
+const CARD_WIDTH = 'clamp(120px, 12vw, 200px)'
+const CARD_HEIGHT = 'clamp(168px, 16.8vw, 280px)'
+const HEADER_HEIGHT = 'clamp(24px, 2.4vw, 36px)'
+
 function GameCard({ card }: { card: CardData }) {
   const artist = ARTISTS[card.artistIndex]
-  const width = 100
-  const height = 140
 
   return (
     <div
       style={{
-        width,
-        height,
+        width: CARD_WIDTH,
+        height: CARD_HEIGHT,
         backgroundColor: '#1a1a1a',
-        borderRadius: 6,
+        borderRadius: 8,
         overflow: 'hidden',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
         flexShrink: 0,
       }}
     >
       {/* Header */}
       <div
         style={{
-          height: 22,
+          height: HEADER_HEIGHT,
           backgroundColor: artist.color,
           display: 'flex',
           alignItems: 'center',
-          gap: 4,
-          paddingLeft: 6,
-          paddingRight: 6,
+          gap: 6,
+          paddingLeft: 8,
+          paddingRight: 8,
         }}
       >
         <AuctionIcon type={card.auctionType} color={artist.textColor} />
         <span
           style={{
             color: artist.textColor,
-            fontSize: 7,
+            fontSize: 'clamp(8px, 0.8vw, 12px)',
             fontWeight: 700,
             textTransform: 'uppercase',
             letterSpacing: '0.5px',
@@ -268,7 +271,7 @@ function GameCard({ card }: { card: CardData }) {
       </div>
 
       {/* Artwork */}
-      <div style={{ height: height - 22 }}>
+      <div style={{ height: `calc(${CARD_HEIGHT} - ${HEADER_HEIGHT})` }}>
         <PlaceholderArt artistIndex={card.artistIndex} cardIndex={card.cardIndex} />
       </div>
     </div>
@@ -276,18 +279,21 @@ function GameCard({ card }: { card: CardData }) {
 }
 
 // ============================================================================
-// FLOATING CARDS BACKGROUND
+// FLOATING CARDS BACKGROUND (CSS animations for performance)
 // ============================================================================
 
 function FloatingCardsBackground() {
-  // Split cards into 5 rows for better distribution
+  // Split cards into 4 rows (fewer rows, bigger cards)
   const rows = useMemo(() => {
-    const rowCount = 5
+    const rowCount = 4
     const cardsPerRow = Math.ceil(ALL_CARDS.length / rowCount)
     return Array.from({ length: rowCount }, (_, i) =>
       ALL_CARDS.slice(i * cardsPerRow, (i + 1) * cardsPerRow)
     )
   }, [])
+
+  // Row height responsive to viewport
+  const rowHeight = 'clamp(180px, 18vw, 300px)'
 
   return (
     <div
@@ -299,44 +305,49 @@ function FloatingCardsBackground() {
         zIndex: 0,
       }}
     >
+      {/* CSS Keyframes for smooth scrolling */}
+      <style>{`
+        @keyframes scroll-left {
+          from { transform: translateX(0); }
+          to { transform: translateX(-33.333%); }
+        }
+        @keyframes scroll-right {
+          from { transform: translateX(-33.333%); }
+          to { transform: translateX(0); }
+        }
+      `}</style>
+
       {rows.map((rowCards, rowIndex) => {
         const isReverse = rowIndex % 2 === 1
-        const duration = 80 + rowIndex * 20
-        const yPosition = rowIndex * 160 - 40
+        const duration = 60 + rowIndex * 15
+        const yOffset = `calc(${rowIndex} * ${rowHeight})`
 
         return (
-          <motion.div
+          <div
             key={rowIndex}
             style={{
               position: 'absolute',
-              top: yPosition,
+              top: yOffset,
               left: 0,
               display: 'flex',
-              gap: 16,
-            }}
-            initial={{ x: isReverse ? '-33.33%' : '0%' }}
-            animate={{ x: isReverse ? '0%' : '-33.33%' }}
-            transition={{
-              duration,
-              ease: 'linear',
-              repeat: Infinity,
+              gap: 'clamp(12px, 1.5vw, 24px)',
+              animation: `${isReverse ? 'scroll-right' : 'scroll-left'} ${duration}s linear infinite`,
+              willChange: 'transform',
             }}
           >
             {/* Triple the cards for seamless loop */}
             {[...rowCards, ...rowCards, ...rowCards].map((card, idx) => (
-              <motion.div
+              <div
                 key={`${card.id}-${idx}`}
                 style={{
-                  opacity: 0.35,
-                  transform: `rotate(${((idx % 7) - 3) * 2}deg)`,
+                  opacity: 0.4,
+                  transform: `rotate(${((idx % 5) - 2) * 1.5}deg)`,
                 }}
-                whileHover={{ opacity: 0.7, scale: 1.05 }}
-                transition={{ duration: 0.3 }}
               >
                 <GameCard card={card} />
-              </motion.div>
+              </div>
             ))}
-          </motion.div>
+          </div>
         )
       })}
 
@@ -346,7 +357,7 @@ function FloatingCardsBackground() {
           position: 'absolute',
           inset: 0,
           background:
-            'linear-gradient(to bottom, rgba(10,10,10,0.7) 0%, rgba(10,10,10,0.4) 50%, rgba(10,10,10,0.8) 100%)',
+            'linear-gradient(to bottom, rgba(10,10,10,0.6) 0%, rgba(10,10,10,0.3) 50%, rgba(10,10,10,0.7) 100%)',
           pointerEvents: 'none',
         }}
       />
@@ -357,7 +368,7 @@ function FloatingCardsBackground() {
           position: 'absolute',
           inset: 0,
           background:
-            'radial-gradient(ellipse at center, transparent 20%, rgba(10,10,10,0.8) 100%)',
+            'radial-gradient(ellipse at center, transparent 30%, rgba(10,10,10,0.7) 100%)',
           pointerEvents: 'none',
         }}
       />
@@ -439,31 +450,40 @@ function LandingPage({ onPlay }: { onPlay: () => void }) {
           </p>
         </motion.div>
 
-        {/* Play button */}
-        <motion.button
+        {/* Play button - using CSS for snappy interactions */}
+        <button
           onClick={onPlay}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.3, ease: 'easeOut' }}
-          whileHover={{ scale: 1.05, boxShadow: '0 0 40px rgba(201,162,39,0.3)' }}
-          whileTap={{ scale: 0.98 }}
           style={{
-            padding: '18px 48px',
-            fontSize: '1rem',
+            padding: '20px 56px',
+            fontSize: '1.1rem',
             fontWeight: 500,
             letterSpacing: '0.2em',
             textTransform: 'uppercase',
             color: '#0a0a0a',
             background: 'linear-gradient(135deg, #C9A227 0%, #E5C158 50%, #C9A227 100%)',
             border: 'none',
-            borderRadius: 4,
+            borderRadius: 6,
             cursor: 'pointer',
-            boxShadow: '0 4px 30px rgba(201,162,39,0.2)',
-            transition: 'all 0.3s ease',
+            boxShadow: '0 4px 30px rgba(201,162,39,0.25)',
+            transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'scale(1.05)'
+            e.currentTarget.style.boxShadow = '0 8px 40px rgba(201,162,39,0.4)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1)'
+            e.currentTarget.style.boxShadow = '0 4px 30px rgba(201,162,39,0.25)'
+          }}
+          onMouseDown={(e) => {
+            e.currentTarget.style.transform = 'scale(0.98)'
+          }}
+          onMouseUp={(e) => {
+            e.currentTarget.style.transform = 'scale(1.05)'
           }}
         >
           Play Offline
-        </motion.button>
+        </button>
 
         {/* Footer */}
         <motion.div
@@ -513,10 +533,7 @@ function PlayerCountSelection({
           padding: '0 24px',
         }}
       >
-        <motion.h2
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
+        <h2
           style={{
             fontSize: 'clamp(1.5rem, 4vw, 2.5rem)',
             fontWeight: 200,
@@ -526,48 +543,51 @@ function PlayerCountSelection({
           }}
         >
           Select Players
-        </motion.h2>
+        </h2>
 
-        <div style={{ display: 'flex', gap: 20, marginBottom: 48 }}>
-          {[3, 4, 5].map((count, index) => (
-            <motion.button
+        <div style={{ display: 'flex', gap: 24, marginBottom: 48 }}>
+          {[3, 4, 5].map((count) => (
+            <button
               key={count}
               onClick={() => onSelect(count)}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
-              whileHover={{
-                scale: 1.08,
-                borderColor: 'rgba(201,162,39,0.8)',
-                boxShadow: '0 0 30px rgba(201,162,39,0.2)',
-              }}
-              whileTap={{ scale: 0.95 }}
               style={{
-                width: 100,
-                height: 100,
+                width: 120,
+                height: 120,
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
                 backgroundColor: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.2)',
-                borderRadius: 8,
+                border: '2px solid rgba(255,255,255,0.2)',
+                borderRadius: 12,
                 color: '#FFFFFF',
                 cursor: 'pointer',
-                transition: 'all 0.3s ease',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'scale(1.08)'
+                e.currentTarget.style.borderColor = 'rgba(201,162,39,0.8)'
+                e.currentTarget.style.boxShadow = '0 0 30px rgba(201,162,39,0.25)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'scale(1)'
+                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'
+                e.currentTarget.style.boxShadow = 'none'
+              }}
+              onMouseDown={(e) => {
+                e.currentTarget.style.transform = 'scale(0.95)'
+              }}
+              onMouseUp={(e) => {
+                e.currentTarget.style.transform = 'scale(1.08)'
               }}
             >
-              <span style={{ fontSize: '2.5rem', fontWeight: 200 }}>{count}</span>
-            </motion.button>
+              <span style={{ fontSize: '3rem', fontWeight: 200 }}>{count}</span>
+            </button>
           ))}
         </div>
 
-        <motion.button
+        <button
           onClick={onBack}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
-          whileHover={{ color: 'rgba(255,255,255,0.8)' }}
           style={{
             background: 'none',
             border: 'none',
@@ -575,12 +595,18 @@ function PlayerCountSelection({
             fontSize: '0.875rem',
             letterSpacing: '0.1em',
             cursor: 'pointer',
-            padding: 8,
-            transition: 'color 0.3s ease',
+            padding: 12,
+            transition: 'color 0.15s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = 'rgba(255,255,255,0.8)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = 'rgba(255,255,255,0.4)'
           }}
         >
           Back
-        </motion.button>
+        </button>
       </div>
     </div>
   )
