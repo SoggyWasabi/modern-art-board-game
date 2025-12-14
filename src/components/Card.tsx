@@ -30,32 +30,54 @@ function AuctionIcon({ type, color, size = 16 }: { type: AuctionType; color: str
 
   switch (type) {
     case 'open':
+      // Eye icon (simple, elegant)
       return (
         <svg {...iconStyle} viewBox="0 0 24 24" fill="none">
           <path
-            d="M12 3L14.5 8.5L20.5 9.3L16.3 13.4L17.3 19.3L12 16.5L6.7 19.3L7.7 13.4L3.5 9.3L9.5 8.5L12 3Z"
-            fill={color}
-          />
-        </svg>
-      )
-    case 'one_offer':
-      return (
-        <svg {...iconStyle} viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="12" r="9" stroke={color} strokeWidth="2" />
-          <circle cx="12" cy="12" r="4" fill={color} />
-        </svg>
-      )
-    case 'hidden':
-      return (
-        <svg {...iconStyle} viewBox="0 0 24 24" fill="none">
-          <path
-            d="M3 12C3 12 7 5 12 5C17 5 21 12 21 12C21 12 17 19 12 19C7 19 3 12 3 12Z"
+            d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5z"
             stroke={color}
             strokeWidth="2"
             fill="none"
           />
           <circle cx="12" cy="12" r="3" fill={color} />
-          <line x1="4" y1="20" x2="20" y2="4" stroke={color} strokeWidth="2" />
+        </svg>
+      )
+    case 'one_offer':
+      // Star with "1" inside
+      return (
+        <svg {...iconStyle} viewBox="0 0 24 24" fill="none">
+          <path
+            d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+            stroke={color}
+            strokeWidth="2"
+            fill="none"
+          />
+          <text
+            x="12"
+            y="16"
+            textAnchor="middle"
+            fontSize="10"
+            fontWeight="bold"
+            fill={color}
+          >
+            1
+          </text>
+        </svg>
+      )
+    case 'hidden':
+      // Padlock icon
+      return (
+        <svg {...iconStyle} viewBox="0 0 24 24" fill="none">
+          <rect x="5" y="11" width="14" height="10" rx="2" stroke={color} strokeWidth="2" fill="none" />
+          <path
+            d="M7 11V7a5 5 0 0110 0v4"
+            stroke={color}
+            strokeWidth="2"
+            fill="none"
+            strokeLinecap="round"
+          />
+          <circle cx="12" cy="16" r="1.5" fill={color} />
+          <path d="M12 17.5v1" stroke={color} strokeWidth="2" strokeLinecap="round" />
         </svg>
       )
     case 'fixed_price':
@@ -75,16 +97,37 @@ function AuctionIcon({ type, color, size = 16 }: { type: AuctionType; color: str
         </svg>
       )
     case 'double':
+      // Gavel with hammer head and x2 text
       return (
         <svg {...iconStyle} viewBox="0 0 24 24" fill="none">
-          <rect x="3" y="6" width="18" height="12" rx="2" fill={color} />
+          {/* Gavel handle at 45 degrees - moved slightly left */}
+          <line
+            x1="5"
+            y1="18"
+            x2="15"
+            y2="8"
+            stroke={color}
+            strokeWidth="3"
+            strokeLinecap="round"
+          />
+          {/* Hammer head - rounded rectangle at top of handle, tilted 45 degrees - doubled in width - moved left */}
+          <rect
+            x="9"
+            y="4"
+            width="16"
+            height="5"
+            rx="2.5"
+            fill={color}
+            transform="rotate(45 17 6.5)"
+          />
+          {/* x2 text - moved left */}
           <text
-            x="12"
-            y="15"
+            x="16"
+            y="21"
             textAnchor="middle"
-            fontSize="9"
+            fontSize="6"
             fontWeight="bold"
-            fill={color === '#000000' ? '#FFFFFF' : '#000000'}
+            fill={color}
           >
             x2
           </text>
