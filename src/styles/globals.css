@@ -37,6 +37,148 @@ body {
   }
 }
 
+/* Game Start Sequence - Card Dealing Animation */
+@keyframes deal-card {
+  0% {
+    transform: translate(0, 0) scale(0.8) rotate(0deg);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1) rotate(0deg);
+  }
+  100% {
+    transform: translate(var(--deal-x, 0), var(--deal-y, 0)) scale(1) rotate(var(--deal-rotate, 0deg));
+    opacity: 1;
+  }
+}
+
+/* Player Selection - Slow Pulse (initial) */
+@keyframes player-pulse-slow {
+  0%, 100% {
+    box-shadow: 0 0 10px var(--player-color, #fbbf24);
+    opacity: 0.4;
+  }
+  50% {
+    box-shadow: 0 0 25px var(--player-color, #fbbf24);
+    opacity: 0.7;
+  }
+}
+
+/* Player Selection - Medium Pulse */
+@keyframes player-pulse-medium {
+  0%, 100% {
+    box-shadow: 0 0 15px var(--player-color, #fbbf24);
+    opacity: 0.5;
+  }
+  50% {
+    box-shadow: 0 0 35px var(--player-color, #fbbf24);
+    opacity: 0.85;
+  }
+}
+
+/* Player Selection - Fast Pulse (accelerating) */
+@keyframes player-pulse-fast {
+  0%, 100% {
+    box-shadow: 0 0 20px var(--player-color, #fbbf24);
+    opacity: 0.6;
+  }
+  50% {
+    box-shadow: 0 0 50px var(--player-color, #fbbf24);
+    opacity: 1;
+  }
+}
+
+/* Player Selection - Winner Celebration */
+@keyframes player-selected {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 30px var(--player-color, #fbbf24);
+  }
+  25% {
+    transform: scale(1.15);
+    box-shadow: 0 0 60px var(--player-color, #fbbf24);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 80px var(--player-color, #fbbf24);
+  }
+  75% {
+    transform: scale(1.1);
+    box-shadow: 0 0 50px var(--player-color, #fbbf24);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 40px var(--player-color, #fbbf24);
+  }
+}
+
+/* Card Hover Lift Effect */
+@keyframes card-lift {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-12px);
+  }
+}
+
+/* Card Selection Glow */
+@keyframes card-selected-glow {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(251, 191, 36, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(251, 191, 36, 0.9);
+  }
+}
+
+/* Deck Shuffle Animation */
+@keyframes deck-shuffle {
+  0%, 100% {
+    transform: rotate(-1deg);
+  }
+  50% {
+    transform: rotate(1deg);
+  }
+}
+
+/* Fade In Up */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Scale In */
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Active Player Turn Indicator */
+@keyframes active-turn-pulse {
+  0%, 100% {
+    border-color: rgba(251, 191, 36, 0.5);
+    box-shadow: 0 0 10px rgba(251, 191, 36, 0.3);
+  }
+  50% {
+    border-color: rgba(251, 191, 36, 1);
+    box-shadow: 0 0 25px rgba(251, 191, 36, 0.6);
+  }
+}
+
 /* Utility classes */
 .backdrop-blur-xl {
   backdrop-filter: blur(24px);

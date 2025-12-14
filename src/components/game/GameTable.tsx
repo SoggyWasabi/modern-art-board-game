@@ -1,6 +1,6 @@
 import React from 'react'
 import { motion } from 'framer-motion'
-import { PaintingCard } from './PaintingCard'
+import { Card as GameCardComponent } from '../Card'
 import { useGameStore, useCurrentPlayer } from '../../store/gameStore'
 import { Brush, Users, TrendingUp } from 'lucide-react'
 
@@ -77,7 +77,7 @@ const GameTable: React.FC = () => {
 
               {/* Artist Value Trackers */}
               <div className="space-y-4">
-                {['Manuel Carvalho', 'Sigrid Thaler', 'Daniel Melim', 'Ramon Martins', 'Rafael Silveira'].map((artist, index) => (
+                {['Manuel Carvalho', 'Sigrid Thaler', 'Daniel Melim', 'Ramon Martins', 'Rafael Silveira'].map((artist) => (
                   <div key={artist} className="bg-white/10 rounded-lg p-3">
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-white text-sm font-medium">{artist.split(' ')[0]}</span>
@@ -165,11 +165,15 @@ const GameTable: React.FC = () => {
                           key={card.id}
                           className="flex-shrink-0 w-12 h-16 bg-white/10 rounded border border-white/20"
                         >
-                          <PaintingCard
-                            card={card}
+                          <GameCardComponent
+                            card={{
+                              id: card.id,
+                              artist: card.artist,
+                              artistIndex: ['Manuel Carvalho', 'Daniel Melim', 'Sigrid Thaler', 'Ramon Martins', 'Rafael Silveira'].indexOf(card.artist),
+                              cardIndex: 0,
+                              auctionType: card.auctionType
+                            }}
                             size="sm"
-                            showAuctionType={false}
-                            interactive={false}
                           />
                         </div>
                       ))}
@@ -213,11 +217,15 @@ const GameTable: React.FC = () => {
                     transformOrigin: 'bottom center',
                   }}
                 >
-                  <PaintingCard
-                    card={card}
+                  <GameCardComponent
+                    card={{
+                      id: card.id,
+                      artist: card.artist,
+                      artistIndex: ['Manuel Carvalho', 'Daniel Melim', 'Sigrid Thaler', 'Ramon Martins', 'Rafael Silveira'].indexOf(card.artist),
+                      cardIndex: 0,
+                      auctionType: card.auctionType
+                    }}
                     size="md"
-                    showAuctionType={true}
-                    interactive={true}
                   />
                 </div>
               ))}

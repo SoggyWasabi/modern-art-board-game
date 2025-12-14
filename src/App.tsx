@@ -1,5 +1,7 @@
 import { useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
+import { useGameStore } from './store/gameStore'
+import MainGameplay from './components/game/MainGameplay'
 
 // ============================================================================
 // TYPES
@@ -613,61 +615,10 @@ function PlayerCountSelection({
 }
 
 // ============================================================================
-// GAME SCREEN (PLACEHOLDER)
+// GAME SCREEN (Now using actual gameplay components)
 // ============================================================================
 
-function GameScreen({ playerCount, onBack }: { playerCount: number; onBack: () => void }) {
-  return (
-    <div
-      style={{
-        minHeight: '100vh',
-        backgroundColor: '#0a0a0a',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 24,
-      }}
-    >
-      <h2
-        style={{
-          fontSize: '2rem',
-          fontWeight: 200,
-          color: '#FFFFFF',
-          marginBottom: 16,
-          letterSpacing: '0.1em',
-        }}
-      >
-        Game Starting...
-      </h2>
-      <p style={{ color: 'rgba(255,255,255,0.5)', marginBottom: 32 }}>
-        {playerCount} players ready
-      </p>
-      <button
-        onClick={onBack}
-        style={{
-          padding: '12px 32px',
-          backgroundColor: 'rgba(255,255,255,0.1)',
-          border: '1px solid rgba(255,255,255,0.2)',
-          borderRadius: 4,
-          color: '#FFFFFF',
-          fontSize: '0.875rem',
-          letterSpacing: '0.1em',
-          cursor: 'pointer',
-          transition: 'all 0.3s ease',
-        }}
-        onMouseOver={(e) => {
-          e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)'
-        }}
-        onMouseOut={(e) => {
-          e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'
-        }}
-      >
-        Back to Menu
-      </button>
-    </div>
-  )
-}
+// GameScreen placeholder removed - now using GameStartSequence and MainGameplay
 
 // ============================================================================
 // MAIN APP COMPONENT
@@ -677,7 +628,22 @@ type Screen = 'menu' | 'playerCount' | 'game'
 
 function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('menu')
-  const [playerCount, setPlayerCount] = useState<number>(3)
+  const [_playerCount, setPlayerCount] = useState<number>(3)
+  const { startGameFromSetup, setPlayerCount: storeSetPlayerCount, resetGame } = useGameStore()
+
+  // Handle player count selection - setup the game and go directly to main gameplay
+  const handlePlayerCountSelect = (count: number) => {
+    setPlayerCount(count)
+    storeSetPlayerCount(count as 3 | 4 | 5)
+    startGameFromSetup() // Creates the game state with mock players
+    setCurrentScreen('game') // Skip GameStartSequence, go directly to game
+  }
+
+  // Handle returning to menu
+  const handleReturnToMenu = () => {
+    resetGame()
+    setCurrentScreen('menu')
+  }
 
   if (currentScreen === 'menu') {
     return <LandingPage onPlay={() => setCurrentScreen('playerCount')} />
@@ -686,17 +652,14 @@ function App() {
   if (currentScreen === 'playerCount') {
     return (
       <PlayerCountSelection
-        onSelect={(count) => {
-          setPlayerCount(count)
-          setCurrentScreen('game')
-        }}
+        onSelect={handlePlayerCountSelect}
         onBack={() => setCurrentScreen('menu')}
       />
     )
   }
 
   if (currentScreen === 'game') {
-    return <GameScreen playerCount={playerCount} onBack={() => setCurrentScreen('menu')} />
+    return <MainGameplay onExitToMenu={handleReturnToMenu} />
   }
 
   return null
