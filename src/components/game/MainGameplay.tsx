@@ -111,10 +111,11 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
 
       {/* Main content area */}
       <div
+        className="main-gameplay-grid"
         style={{
           flex: 1,
           display: 'grid',
-          gridTemplateColumns: '280px 1fr 280px',
+          gridTemplateColumns: '320px 1fr 280px',
           gap: '16px',
           padding: '16px',
           minHeight: 0,
@@ -123,6 +124,7 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
       >
         {/* Left column: Artist Board */}
         <div
+          className="left-column"
           style={{
             display: 'flex',
             flexDirection: 'column',
@@ -256,6 +258,7 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
 
         {/* Right column: Opponents */}
         <div
+          className="right-column"
           style={{
             overflowY: 'auto',
           }}
@@ -281,22 +284,46 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
       </div>
 
       {/* Bottom: Player Hand */}
-      <PlayerHand
-        cards={currentPlayer.hand}
-        selectedCardId={selectedCardId}
-        onSelectCard={handleSelectCard}
-        money={currentPlayer.money}
-        disabled={!isPlayerTurn || round.phase.type === 'auction'}
-      />
+      <div className="player-hand">
+        <PlayerHand
+          cards={currentPlayer.hand}
+          selectedCardId={selectedCardId}
+          onSelectCard={handleSelectCard}
+          money={currentPlayer.money}
+          disabled={!isPlayerTurn || round.phase.type === 'auction'}
+        />
+      </div>
 
       {/* Mobile responsive styles (using CSS media queries via style tag) */}
       <style>{`
         @media (max-width: 1024px) {
           /* Switch to stacked layout on tablets */
+          .main-gameplay-grid {
+            gridTemplateColumns: '1fr !important';
+            gridTemplateRows: 'auto 1fr auto !important';
+          }
+          .left-column {
+            overflow: visible !important;
+            margin-bottom: 16px;
+          }
+          .right-column {
+            overflow: visible !important;
+          }
+          .player-hand {
+            position: relative !important;
+          }
         }
 
         @media (max-width: 768px) {
           /* Mobile layout */
+          .main-gameplay-grid {
+            padding: 8px !important;
+            gap: 8px !important;
+          }
+          .left-column {
+            margin-bottom: 12px;
+          }
+        }
         }
       `}</style>
     </div>

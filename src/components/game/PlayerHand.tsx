@@ -20,6 +20,16 @@ const PlayerHand: React.FC<PlayerHandProps> = ({
 }) => {
   const [hoveredCard, setHoveredCard] = useState<string | null>(null)
 
+  // Sort cards by artist for better organization
+  const sortedCards = React.useMemo(() => {
+    const artistOrder = ['Manuel Carvalho', 'Sigrid Thaler', 'Daniel Melim', 'Ramon Martins', 'Rafael Silveira']
+    return [...cards].sort((a, b) => {
+      const aIndex = artistOrder.indexOf(a.artist)
+      const bIndex = artistOrder.indexOf(b.artist)
+      return aIndex - bIndex
+    })
+  }, [cards])
+
   // Calculate fan layout for desktop
   const getFanStyle = (index: number, total: number) => {
     const maxAngle = Math.min(30, total * 4) // Cap at 30 degrees total spread
@@ -45,170 +55,170 @@ const PlayerHand: React.FC<PlayerHandProps> = ({
         borderRadius: '16px 16px 0 0',
         border: '1px solid rgba(255, 255, 255, 0.1)',
         borderBottom: 'none',
-        padding: '16px 24px 24px',
+        padding: '12px 24px 16px',
       }}
     >
-      {/* Header */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: '16px',
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-          }}
-        >
-          <span
-            style={{
-              fontSize: '14px',
-              fontWeight: 600,
-              color: 'white',
-              textTransform: 'uppercase',
-              letterSpacing: '0.1em',
-            }}
-          >
-            Your Hand
-          </span>
-          <span
-            style={{
-              fontSize: '12px',
-              color: 'rgba(255, 255, 255, 0.5)',
-            }}
-          >
-            {cards.length} {cards.length === 1 ? 'card' : 'cards'}
-          </span>
-        </div>
-
-        {/* Money display */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '8px 16px',
-            background: 'rgba(251, 191, 36, 0.15)',
-            border: '1px solid rgba(251, 191, 36, 0.3)',
-            borderRadius: '20px',
-          }}
-        >
-          <span style={{ fontSize: '14px' }}>💰</span>
-          <span
-            style={{
-              fontSize: '16px',
-              fontWeight: 700,
-              color: colors.accent.gold,
-            }}
-          >
-            ${money}k
-          </span>
-        </div>
-      </div>
-
-      {/* Cards */}
+      {/* Cards - No header, more compact */}
       {cards.length > 0 ? (
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'flex-end',
-            minHeight: '180px',
-            paddingTop: '20px',
-            // For mobile: horizontal scroll
-            overflowX: 'auto',
-            overflowY: 'visible',
-          }}
-        >
+        <>
           <div
             style={{
               display: 'flex',
+              justifyContent: 'center',
               alignItems: 'flex-end',
-              position: 'relative',
-              paddingBottom: '10px',
+              minHeight: '140px',
+              paddingTop: '8px',
+              // For mobile: horizontal scroll
+              overflowX: 'auto',
+              overflowY: 'visible',
             }}
           >
-            {cards.map((card, index) => {
-              const fanStyle = getFanStyle(index, cards.length)
-              const isSelected = selectedCardId === card.id
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'flex-end',
+                position: 'relative',
+                paddingBottom: '8px',
+              }}
+            >
+              {sortedCards.map((card, index) => {
+                const fanStyle = getFanStyle(index, sortedCards.length)
+                const isSelected = selectedCardId === card.id
 
-              return (
-                <div
-                  key={card.id}
-                  style={{
-                    marginLeft: index === 0 ? 0 : '-30px', // Overlap cards
-                    cursor: disabled ? 'not-allowed' : 'pointer',
-                    ...fanStyle,
-                  }}
-                  onMouseEnter={() => !disabled && setHoveredCard(card.id)}
-                  onMouseLeave={() => setHoveredCard(null)}
-                  onClick={() => !disabled && onSelectCard(card.id)}
-                >
+                return (
                   <div
+                    key={card.id}
                     style={{
-                      borderRadius: '8px',
-                      boxShadow: isSelected
-                        ? `0 0 20px ${colors.accent.gold}, 0 8px 24px rgba(0,0,0,0.4)`
-                        : '0 4px 12px rgba(0,0,0,0.3)',
-                      border: isSelected ? `3px solid ${colors.accent.gold}` : 'none',
-                      animation: isSelected ? 'card-selected-glow 2s ease-in-out infinite' : 'none',
-                      opacity: disabled ? 0.5 : 1,
+                      marginLeft: index === 0 ? 0 : '-30px', // Overlap cards
+                      cursor: disabled ? 'not-allowed' : 'pointer',
+                      ...fanStyle,
                     }}
+                    onMouseEnter={() => !disabled && setHoveredCard(card.id)}
+                    onMouseLeave={() => setHoveredCard(null)}
+                    onClick={() => !disabled && onSelectCard(card.id)}
                   >
-                    <GameCardComponent
-                      card={{
-                        id: card.id,
-                        artist: card.artist,
-                        artistIndex: ['Manuel Carvalho', 'Daniel Melim', 'Sigrid Thaler', 'Ramon Martins', 'Rafael Silveira'].indexOf(card.artist),
-                        cardIndex: parseInt(card.id.split('_')[1]) || 0,
-                        auctionType: card.auctionType
+                    <div
+                      style={{
+                        borderRadius: '8px',
+                        boxShadow: isSelected
+                          ? `0 0 20px ${colors.accent.gold}, 0 8px 24px rgba(0,0,0,0.4)`
+                          : '0 4px 12px rgba(0,0,0,0.3)',
+                        border: isSelected ? `3px solid ${colors.accent.gold}` : 'none',
+                        animation: isSelected ? 'card-selected-glow 2s ease-in-out infinite' : 'none',
+                        opacity: disabled ? 0.5 : 1,
                       }}
-                      size="lg"
-                    />
+                    >
+                      <GameCardComponent
+                        card={{
+                          id: card.id,
+                          artist: card.artist,
+                          artistIndex: ['Manuel Carvalho', 'Daniel Melim', 'Sigrid Thaler', 'Ramon Martins', 'Rafael Silveira'].indexOf(card.artist),
+                          cardIndex: parseInt(card.id.split('_')[1]) || 0,
+                          auctionType: card.auctionType
+                        }}
+                        size="lg"
+                      />
+                    </div>
                   </div>
-                </div>
-              )
-            })}
+                )
+              })}
+            </div>
           </div>
-        </div>
+
+          {/* Compact info bar below cards */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginTop: '8px',
+            }}
+          >
+            <span
+              style={{
+                fontSize: '11px',
+                color: 'rgba(255, 255, 255, 0.5)',
+              }}
+            >
+              {cards.length} {cards.length === 1 ? 'card' : 'cards'}
+            </span>
+
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '4px 12px',
+                background: 'rgba(251, 191, 36, 0.15)',
+                border: '1px solid rgba(251, 191, 36, 0.3)',
+                borderRadius: '16px',
+              }}
+            >
+              <span style={{ fontSize: '12px' }}>💰</span>
+              <span
+                style={{
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  color: colors.accent.gold,
+                }}
+              >
+                ${money}k
+              </span>
+            </div>
+
+            {/* Selected card hint - inline */}
+            {selectedCardId && !disabled && (
+              <span
+                style={{
+                  fontSize: '11px',
+                  color: colors.accent.gold,
+                  fontWeight: 500,
+                }}
+              >
+                Card selected - Click "Play Card"
+              </span>
+            )}
+          </div>
+        </>
       ) : (
         <div
           style={{
             display: 'flex',
+            flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            minHeight: '180px',
+            minHeight: '140px',
             color: 'rgba(255, 255, 255, 0.3)',
             fontSize: '14px',
             fontStyle: 'italic',
+            gap: '12px',
           }}
         >
           No cards in hand
-        </div>
-      )}
-
-      {/* Selected card action hint */}
-      {selectedCardId && !disabled && (
-        <div
-          style={{
-            textAlign: 'center',
-            marginTop: '12px',
-            animation: 'fade-in-up 0.3s ease-out',
-          }}
-        >
-          <span
-            style={{
-              fontSize: '12px',
-              color: colors.accent.gold,
-              fontWeight: 500,
-            }}
-          >
-            Card selected - Click "Play Card" to start auction
-          </span>
+          {money > 0 && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '4px 12px',
+                background: 'rgba(251, 191, 36, 0.15)',
+                border: '1px solid rgba(251, 191, 36, 0.3)',
+                borderRadius: '16px',
+              }}
+            >
+              <span style={{ fontSize: '12px' }}>💰</span>
+              <span
+                style={{
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  color: colors.accent.gold,
+                }}
+              >
+                ${money}k
+              </span>
+            </div>
+          )}
         </div>
       )}
     </div>

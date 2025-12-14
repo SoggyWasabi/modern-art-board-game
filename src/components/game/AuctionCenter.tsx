@@ -148,11 +148,15 @@ const AuctionCenter: React.FC<AuctionCenterProps> = ({
         {/* Selected card preview */}
         <div
           style={{
-            marginBottom: '24px',
+            marginBottom: '16px',
             animation: 'scale-in 0.3s ease-out',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            minHeight: '200px',
           }}
         >
-          <div style={{ transform: 'scale(1.2)' }}>
+          <div style={{ transform: 'scale(1.1)' }}>
             <GameCardComponent
               card={{
                 id: selectedCard.id,

@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
 import type { GameState, SetupState, AuctionState, PlayerSlotConfig, Artist } from '../types'
+import { validateAndCreateGame } from '../types/setup'
+import { startGame } from '../engine/game'
 
 const PLAYER_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6']
 
@@ -62,62 +64,7 @@ const initialSetupState: SetupState = {
   validationErrors: [],
 }
 
-// Card distribution per player based on player count
-const CARDS_PER_ROUND: Record<number, [number, number, number, number]> = {
-  3: [10, 6, 6, 0], // 3 players: 10, 6, 6, 0 cards per round
-  4: [9, 4, 4, 0], // 4 players: 9, 4, 4, 0 cards per round
-  5: [8, 3, 3, 0], // 5 players: 8, 3, 3, 0 cards per round
-}
 
-// Mock game state for testing
-const createMockGameState = (playerCount: number): GameState => {
-  const artists: Artist[] = ['Manuel Carvalho', 'Sigrid Thaler', 'Daniel Melim', 'Ramon Martins', 'Rafael Silveira']
-  const cardsPerPlayer = CARDS_PER_ROUND[playerCount]?.[0] || 10 // Default to 10 for round 1
-
-  return {
-    players: Array.from({ length: playerCount }, (_, i) => ({
-      id: `player_${i}`,
-      name: i === 0 ? 'You' : `AI Player ${i}`,
-      money: 100,
-      hand: Array.from({ length: cardsPerPlayer }, (_, j) => ({
-        id: `card_${i}_${j}`,
-        artist: artists[j % 5],
-        auctionType: ['open', 'one_offer', 'hidden', 'fixed_price', 'double'][j % 5] as any,
-        artworkId: `art_${j}`,
-      })),
-      purchases: [],
-      purchasedThisRound: [],
-      isAI: i !== 0,
-      aiDifficulty: i !== 0 ? 'medium' as const : undefined,
-    })),
-    deck: [],
-    discardPile: [],
-    board: {
-      artistValues: {
-        'Manuel Carvalho': [0, 0, 0, 0],
-        'Sigrid Thaler': [0, 0, 0, 0],
-        'Daniel Melim': [0, 0, 0, 0],
-        'Ramon Martins': [0, 0, 0, 0],
-        'Rafael Silveira': [0, 0, 0, 0],
-      },
-    },
-    round: {
-      roundNumber: 1,
-      cardsPlayedPerArtist: {
-        'Manuel Carvalho': 0,
-        'Sigrid Thaler': 0,
-        'Daniel Melim': 0,
-        'Ramon Martins': 0,
-        'Rafael Silveira': 0,
-      },
-      currentAuctioneerIndex: 0,
-      phase: { type: 'awaiting_card_play', activePlayerIndex: 0 },
-    },
-    gamePhase: 'playing',
-    winner: null,
-    eventLog: [],
-  }
-}
 
 export const useGameStore = create<GameStore>()(
   devtools(
@@ -175,31 +122,58 @@ export const useGameStore = create<GameStore>()(
         const { setupState } = get()
         const { gameSetup } = setupState
 
-        // Create mock game for now
-        const playerCount = gameSetup.playerCount || 3
-        const gameState = createMockGameState(playerCount)
+        console.log('startGameFromSetup: setupState:', setupState)
+        console.log('startGameFromSetup: gameSetup:', gameSetup)
 
-        // Randomly select first player
-        const firstPlayerIndex = Math.floor(Math.random() * playerCount)
+        // Get player count from setup
+        const playerCount = (gameSetup as any)?.playerCount || 3
+        console.log('Player count:', playerCount)
 
-        // Update the game state with first player
-        gameState.round.currentAuctioneerIndex = firstPlayerIndex
-        if (gameState.round.phase.type === 'awaiting_card_play') {
-          (gameState.round.phase as any).activePlayerIndex = firstPlayerIndex
+        // Get player slots from setup
+        const playerSlots = (gameSetup as any)?.playerSlots || []
+        console.log('Player slots:', playerSlots)
+
+        // Create engine setup based on the actual player selection
+        const players = []
+
+        // Always add human player first
+        players.push({
+          id: 'player_0',
+          name: 'You',
+          type: 'human' as const
+        })
+
+        // Add AI players based on player count
+        for (let i = 1; i < playerCount; i++) {
+          players.push({
+            id: `player_${i}`,
+            name: `AI Player ${i}`,
+            type: 'ai' as const,
+            aiDifficulty: 'medium' as const
+          })
         }
 
-        console.log('startGameFromSetup: Creating game state', {
-          playerCount,
-          firstPlayerIndex: firstPlayerIndex,
-          firstPlayerName: gameState.players[firstPlayerIndex]?.name,
-          players: gameState.players
+        const engineSetup = {
+          players
+        }
+
+        console.log('Using engine setup:', engineSetup)
+
+        // Use engine to create proper game state
+        const gameState = startGame(engineSetup)
+
+        console.log('Game state created:', {
+          playerCount: gameState.players.length,
+          deckSize: gameState.deck.length,
+          handsDealt: gameState.players.map(p => p.hand.length),
+          sampleCards: gameState.players[0]?.hand.slice(0, 3).map(c => ({ artist: c.artist, auctionType: c.auctionType }))
         })
 
         set(
           {
             gameState,
             isGameStarted: true,
-            firstPlayerIndex,
+            firstPlayerIndex: 0,
             setupState: {
               ...setupState,
               step: 'ready_to_start',

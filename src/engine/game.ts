@@ -10,7 +10,7 @@ import type {
   Player
 } from '../types/game'
 import { startRound, shouldRoundEnd, endRound, getNextAuctioneerIndex } from './round'
-import { createDeck } from './deck'
+import { createDeck, shuffleDeck } from './deck'
 import { createInitialBoard } from './valuation'
 import { ARTISTS } from './constants'
 
@@ -41,7 +41,7 @@ export function startGame(setup: GameSetup): GameState {
   }))
 
   // Create and shuffle deck
-  const deck = createDeck()
+  const deck = shuffleDeck(createDeck())
 
   // Initialize game state
   const gameState: GameState = {

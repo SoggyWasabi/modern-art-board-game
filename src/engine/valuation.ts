@@ -1,4 +1,4 @@
-import type { Artist, GameBoard, ArtistRoundResult } from '../types/game'
+import type { Artist, Card, GameBoard, ArtistRoundResult } from '../types/game'
 import { ARTISTS } from './constants'
 
 // ===================
@@ -131,12 +131,15 @@ export function updateBoardWithRoundResults(
  */
 export function createInitialBoard(): GameBoard {
   const artistValues = {} as Record<Artist, [number, number, number, number]>
+  const playedCards = {} as Record<Artist, Card[]>
 
   for (const artist of ARTISTS) {
     artistValues[artist] = [0, 0, 0, 0]
+    playedCards[artist] = []
   }
 
   return {
     artistValues,
+    playedCards,
   }
 }

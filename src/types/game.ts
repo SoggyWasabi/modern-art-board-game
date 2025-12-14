@@ -43,6 +43,8 @@ export interface GameBoard {
   // Value tiles placed per round
   // artistValues[artist][roundIndex] = value earned that round (0, 10, 20, or 30)
   artistValues: Record<Artist, [number, number, number, number]>
+  // Cards currently played on the board, organized by artist
+  playedCards: Record<Artist, Card[]>
 }
 
 export interface ArtistRoundResult {
