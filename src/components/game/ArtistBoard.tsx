@@ -60,7 +60,7 @@ const ArtistBoard: React.FC<ArtistBoardProps> = ({ collapsed = false, onToggle }
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '12px 16px',
+          padding: '8px 12px',
           background: 'rgba(255, 255, 255, 0.05)',
           borderBottom: collapsed ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
           cursor: onToggle ? 'pointer' : 'default',
@@ -68,11 +68,11 @@ const ArtistBoard: React.FC<ArtistBoardProps> = ({ collapsed = false, onToggle }
       >
         <span
           style={{
-            fontSize: '14px',
+            fontSize: '12px',
             fontWeight: 600,
             color: 'white',
             textTransform: 'uppercase',
-            letterSpacing: '0.1em',
+            letterSpacing: '0.08em',
           }}
         >
           Artist Values
@@ -80,7 +80,7 @@ const ArtistBoard: React.FC<ArtistBoardProps> = ({ collapsed = false, onToggle }
         {onToggle && (
           <span
             style={{
-              fontSize: '12px',
+              fontSize: '10px',
               color: 'rgba(255, 255, 255, 0.5)',
               transform: collapsed ? 'rotate(180deg)' : 'none',
               transition: 'transform 0.2s ease',
@@ -93,15 +93,15 @@ const ArtistBoard: React.FC<ArtistBoardProps> = ({ collapsed = false, onToggle }
 
       {/* Artist rows */}
       {!collapsed && (
-        <div style={{ padding: '12px' }}>
+        <div style={{ padding: '8px', width: '100%', overflow: 'hidden' }}>
           {/* Round headers */}
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '1fr repeat(4, 36px) 48px',
+              gridTemplateColumns: '90px repeat(4, 32px) 40px',
               gap: '4px',
-              marginBottom: '8px',
-              paddingLeft: '4px',
+              marginBottom: '6px',
+              paddingLeft: '2px',
             }}
           >
             <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)' }}>Artist</span>
@@ -140,22 +140,22 @@ const ArtistBoard: React.FC<ArtistBoardProps> = ({ collapsed = false, onToggle }
                 key={artist}
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: '1fr repeat(4, 36px) 48px',
+                  gridTemplateColumns: '90px repeat(4, 32px) 40px',
                   gap: '4px',
                   alignItems: 'center',
-                  padding: '8px 4px',
-                  borderRadius: '6px',
+                  padding: '6px 2px',
+                  borderRadius: '4px',
                   background: cardsThisRound > 0 ? 'rgba(255,255,255,0.05)' : 'transparent',
-                  marginBottom: '4px',
+                  marginBottom: '2px',
                 }}
               >
                 {/* Artist name with color indicator */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <div
                     style={{
-                      width: '24px',
-                      height: '24px',
-                      borderRadius: '4px',
+                      width: '22px',
+                      height: '22px',
+                      borderRadius: '3px',
                       background: artistColors.gradient,
                       display: 'flex',
                       alignItems: 'center',
@@ -164,17 +164,21 @@ const ArtistBoard: React.FC<ArtistBoardProps> = ({ collapsed = false, onToggle }
                       fontWeight: 700,
                       color: 'white',
                       textShadow: '0 1px 2px rgba(0,0,0,0.3)',
+                      flexShrink: 0,
                     }}
                   >
                     {ARTIST_INITIALS[artist]}
                   </div>
-                  <div>
+                  <div style={{ minWidth: 0, flex: 1 }}>
                     <div
                       style={{
-                        fontSize: '12px',
+                        fontSize: '11px',
                         fontWeight: 500,
                         color: 'white',
-                        lineHeight: 1.2,
+                        lineHeight: 1.1,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
                       }}
                     >
                       {artist.split(' ')[0]}
@@ -183,12 +187,13 @@ const ArtistBoard: React.FC<ArtistBoardProps> = ({ collapsed = false, onToggle }
                     {cardsThisRound > 0 && (
                       <div
                         style={{
-                          fontSize: '10px',
+                          fontSize: '9px',
                           color: cardsThisRound >= 4 ? colors.accent.gold : 'rgba(255,255,255,0.5)',
                           fontWeight: cardsThisRound >= 4 ? 600 : 400,
+                          lineHeight: 1,
                         }}
                       >
-                        {cardsThisRound}/5 cards
+                        {cardsThisRound}/5
                       </div>
                     )}
                   </div>
@@ -204,9 +209,9 @@ const ArtistBoard: React.FC<ArtistBoardProps> = ({ collapsed = false, onToggle }
                     <div
                       key={roundIdx}
                       style={{
-                        width: '32px',
-                        height: '32px',
-                        borderRadius: '4px',
+                        width: '28px',
+                        height: '26px',
+                        borderRadius: '3px',
                         background: isPastRound
                           ? value > 0
                             ? `${artistColors.primary}30`
@@ -220,7 +225,7 @@ const ArtistBoard: React.FC<ArtistBoardProps> = ({ collapsed = false, onToggle }
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        fontSize: '11px',
+                        fontSize: '10px',
                         fontWeight: value > 0 ? 600 : 400,
                         color: value > 0 ? artistColors.primary : 'rgba(255,255,255,0.2)',
                       }}
@@ -234,9 +239,10 @@ const ArtistBoard: React.FC<ArtistBoardProps> = ({ collapsed = false, onToggle }
                 <div
                   style={{
                     textAlign: 'right',
-                    fontSize: '14px',
+                    fontSize: '11px',
                     fontWeight: 700,
                     color: totalValue > 0 ? colors.accent.gold : 'rgba(255,255,255,0.3)',
+                    lineHeight: 1.1,
                   }}
                 >
                   ${totalValue}k
