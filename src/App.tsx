@@ -516,9 +516,10 @@ function PlayerCountSelection({
   onSelect,
   onBack,
 }: {
-  onSelect: (count: number) => void
+  onSelect: (count: number, playerStarts?: boolean) => void
   onBack: () => void
 }) {
+  const [playerStarts, setPlayerStarts] = useState(false)
   return (
     <div style={{ position: 'relative', minHeight: '100vh' }}>
       <FloatingCardsBackground />
@@ -547,11 +548,76 @@ function PlayerCountSelection({
           Select Players
         </h2>
 
+        {/* Who should start option */}
+        <div style={{ marginBottom: 40 }}>
+          <p style={{
+            color: 'rgba(255,255,255,0.7)',
+            fontSize: '0.9rem',
+            marginBottom: 16,
+            textAlign: 'center'
+          }}>
+            Who should start the game?
+          </p>
+          <div style={{ display: 'flex', gap: 16, justifyContent: 'center' }}>
+            <label style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              cursor: 'pointer',
+              padding: '8px 16px',
+              borderRadius: 8,
+              backgroundColor: playerStarts ? 'rgba(255,255,255,0.1)' : 'transparent',
+              border: playerStarts ? '1px solid rgba(255,255,255,0.3)' : '1px solid transparent',
+              transition: 'all 0.2s ease'
+            }}>
+              <input
+                type="radio"
+                name="whoStarts"
+                checked={playerStarts}
+                onChange={() => setPlayerStarts(true)}
+                style={{ margin: 0 }}
+              />
+              <span style={{
+                color: playerStarts ? '#FFFFFF' : 'rgba(255,255,255,0.5)',
+                fontSize: '0.9rem'
+              }}>
+                You go first
+              </span>
+            </label>
+
+            <label style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              cursor: 'pointer',
+              padding: '8px 16px',
+              borderRadius: 8,
+              backgroundColor: !playerStarts ? 'rgba(255,255,255,0.1)' : 'transparent',
+              border: !playerStarts ? '1px solid rgba(255,255,255,0.3)' : '1px solid transparent',
+              transition: 'all 0.2s ease'
+            }}>
+              <input
+                type="radio"
+                name="whoStarts"
+                checked={!playerStarts}
+                onChange={() => setPlayerStarts(false)}
+                style={{ margin: 0 }}
+              />
+              <span style={{
+                color: !playerStarts ? '#FFFFFF' : 'rgba(255,255,255,0.5)',
+                fontSize: '0.9rem'
+              }}>
+                Random
+              </span>
+            </label>
+          </div>
+        </div>
+
         <div style={{ display: 'flex', gap: 24, marginBottom: 48 }}>
           {[3, 4, 5].map((count) => (
             <button
               key={count}
-              onClick={() => onSelect(count)}
+              onClick={() => onSelect(count, playerStarts)}
               style={{
                 width: 120,
                 height: 120,
@@ -632,10 +698,22 @@ function App() {
   const { startGameFromSetup, setPlayerCount: storeSetPlayerCount, resetGame } = useGameStore()
 
   // Handle player count selection - setup the game and go directly to main gameplay
-  const handlePlayerCountSelect = (count: number) => {
+  const handlePlayerCountSelect = (count: number, playerStarts: boolean = false) => {
     setPlayerCount(count)
-    storeSetPlayerCount(count as 3 | 4 | 5)
-    startGameFromSetup() // Creates the game state with mock players
+    storeSetPlayerCount(count)
+
+    // Start the game - the mock game state will randomly select first player
+    startGameFromSetup()
+
+    // If player wants to start, we need to update the game state
+    if (playerStarts) {
+      const { gameState } = useGameStore.getState()
+      if (gameState) {
+        // Update the first player to be the human player (index 0)
+        useGameStore.getState().setFirstPlayerIndex(0)
+      }
+    }
+
     setCurrentScreen('game') // Skip GameStartSequence, go directly to game
   }
 
