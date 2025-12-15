@@ -36,8 +36,8 @@ const PlayerHand: React.FC<PlayerHandProps> = ({
     const angleStep = total > 1 ? maxAngle / (total - 1) : 0
     const angle = total > 1 ? -maxAngle / 2 + angleStep * index : 0
 
-    const isHovered = hoveredCard === cards[index]?.id
-    const isSelected = selectedCardId === cards[index]?.id
+    const isHovered = hoveredCard === sortedCards[index]?.id
+    const isSelected = selectedCardId === sortedCards[index]?.id
 
     return {
       transform: `rotate(${angle}deg) translateY(${isHovered || isSelected ? -16 : 0}px)`,
