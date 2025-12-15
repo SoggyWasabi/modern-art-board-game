@@ -147,6 +147,7 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
               border: '1px solid rgba(255, 255, 255, 0.1)',
             }}
           >
+  
             <div
               style={{
                 display: 'flex',
@@ -219,20 +220,14 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            justifyContent: 'center',
+            justifyContent: 'flex-start', // Changed from center to flex-start
+            marginTop: '12px', // Add some margin from top
           }}
         >
-          <AuctionCenter
-            selectedCard={selectedCard}
-            isPlayerTurn={isPlayerTurn}
-            onPlayCard={handlePlayCard}
-            onPass={handlePass}
-          />
-
           {/* Turn indicator */}
           <div
             style={{
-              marginTop: '16px',
+              marginBottom: '16px',
               padding: '8px 20px',
               background: isPlayerTurn
                 ? 'rgba(251, 191, 36, 0.2)'
@@ -254,6 +249,13 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
               {isPlayerTurn ? "It's Your Turn!" : `Waiting for ${players[activePlayerIndex]?.name || 'opponent'}...`}
             </span>
           </div>
+
+          <AuctionCenter
+            selectedCard={selectedCard}
+            isPlayerTurn={isPlayerTurn}
+            onPlayCard={handlePlayCard}
+            onPass={handlePass}
+          />
         </div>
 
         {/* Right column: Opponents */}
@@ -291,6 +293,7 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
           onSelectCard={handleSelectCard}
           money={currentPlayer.money}
           disabled={!isPlayerTurn || round.phase.type === 'auction'}
+          purchasedThisRound={currentPlayer.purchasedThisRound}
         />
       </div>
 
