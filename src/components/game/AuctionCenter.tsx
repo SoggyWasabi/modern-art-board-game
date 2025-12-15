@@ -75,9 +75,7 @@ const AuctionCenter: React.FC<AuctionCenterProps> = ({
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'center',
-          height: '100%',
-          padding: '32px',
+          padding: '32px', // Match card-selected state
           background: 'rgba(0, 0, 0, 0.3)',
           backdropFilter: 'blur(12px)',
           borderRadius: '16px',
@@ -87,15 +85,15 @@ const AuctionCenter: React.FC<AuctionCenterProps> = ({
         {/* Empty auction area */}
         <div
           style={{
-            width: '140px',
-            height: '196px',
+            width: '176px', // Match card selected state's scaled card width (160px * 1.1)
+            height: '246px', // Match card selected state's scaled card height (224px * 1.1)
             border: '2px dashed rgba(255, 255, 255, 0.2)',
             borderRadius: '12px',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            marginBottom: '24px',
+            marginBottom: '16px', // Match card selected state's marginBottom
           }}
         >
           <span style={{ fontSize: '48px', opacity: 0.3 }}>🎨</span>
