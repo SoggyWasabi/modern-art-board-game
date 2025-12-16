@@ -278,12 +278,21 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
             )}
           </div>
 
-          <AuctionCenter
-            selectedCard={selectedCard}
-            isPlayerTurn={isCurrentPlayerTurn && !isAIThinking}
-            onPlayCard={handlePlayCard}
-            onPass={handlePass}
-          />
+          <div
+            style={{
+              flex: 1,
+              minHeight: 0,
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            <AuctionCenter
+              selectedCard={selectedCard}
+              isPlayerTurn={isCurrentPlayerTurn && !isAIThinking}
+              onPlayCard={handlePlayCard}
+              onPass={handlePass}
+            />
+          </div>
         </div>
 
         {/* Right column: Opponents */}
