@@ -608,62 +608,213 @@ const AuctionCenter: React.FC<AuctionCenterProps> = ({
             <span style={{ color: 'rgba(255,255,255,0.6)' }}>k</span>
           </div>
 
-          {/* Bid buttons */}
-          <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
-            <button
-              onClick={() => isAuctionPlayerTurn && placeBid(bidAmount)}
-              disabled={!isAuctionPlayerTurn}
+          {/* One Offer Auctioneer Decision Phase */}
+          {currentAuction.type === 'one_offer' &&
+           currentAuction.phase === 'auctioneer_decision' &&
+           isAuctionPlayerTurn && (
+            <div
               style={{
-                flex: 1,
-                padding: '12px',
-                background: isAuctionPlayerTurn ? colors.accent.gold : 'rgba(255, 255, 255, 0.1)',
-                border: 'none',
+                width: '100%',
+                padding: '16px',
+                background: 'rgba(251, 191, 36, 0.1)',
                 borderRadius: '8px',
-                color: isAuctionPlayerTurn ? '#000' : 'rgba(255, 255, 255, 0.5)',
-                fontSize: '14px',
-                fontWeight: 700,
-                cursor: isAuctionPlayerTurn ? 'pointer' : 'not-allowed',
-                opacity: isAuctionPlayerTurn ? 1 : 0.5,
-                transition: 'transform 0.15s ease',
-              }}
-              onMouseEnter={(e) => {
-                if (isAuctionPlayerTurn) {
-                  e.currentTarget.style.transform = 'scale(1.02)'
-                }
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'scale(1)'
+                border: '1px solid rgba(251, 191, 36, 0.3)',
+                marginBottom: '12px',
               }}
             >
-              Place Bid
-            </button>
-            <button
-              onClick={() => isAuctionPlayerTurn && passBid()}
-              disabled={!isAuctionPlayerTurn}
-              style={{
-                padding: '12px 20px',
-                background: isAuctionPlayerTurn ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                borderRadius: '8px',
-                color: isAuctionPlayerTurn ? 'white' : 'rgba(255, 255, 255, 0.5)',
-                fontSize: '14px',
-                fontWeight: 600,
-                cursor: isAuctionPlayerTurn ? 'pointer' : 'not-allowed',
-                opacity: isAuctionPlayerTurn ? 1 : 0.5,
-                transition: 'background 0.15s ease',
-              }}
-              onMouseEnter={(e) => {
-                if (isAuctionPlayerTurn) {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'
-                }
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = isAuctionPlayerTurn ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)'
-              }}
-            >
-              Pass
-            </button>
-          </div>
+              <div
+                style={{
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  color: colors.accent.gold,
+                  marginBottom: '12px',
+                  textAlign: 'center',
+                }}
+              >
+                Auctioneer Decision
+              </div>
+
+              {currentAuction.currentBid > 0 ? (
+                <>
+                  <div
+                    style={{
+                      fontSize: '12px',
+                      color: 'rgba(255, 255, 255, 0.8)',
+                      marginBottom: '16px',
+                      textAlign: 'center',
+                    }}
+                  >
+                    Highest bid: <span style={{ color: colors.accent.gold, fontWeight: 700 }}>${currentAuction.currentBid}k</span>
+                    {' '}by {gameState!.players.find(p => p.id === currentAuction.currentBidderId)?.name}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+                    <button
+                      onClick={() => {
+                        // Accept the highest bid
+                        placeBid(-1) // Special value for accept
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: '12px',
+                        background: 'rgba(76, 175, 80, 0.2)',
+                        border: '1px solid rgba(76, 175, 80, 0.4)',
+                        borderRadius: '8px',
+                        color: '#4CAF50',
+                        fontSize: '14px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(76, 175, 80, 0.3)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'rgba(76, 175, 80, 0.2)'
+                      }}
+                    >
+                      Accept Bid
+                      <div style={{ fontSize: '10px', marginTop: '2px', opacity: 0.8 }}>
+                        Get paid ${currentAuction.currentBid}k
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        // Outbid by minimum (+1)
+                        placeBid(currentAuction.currentBid + 1)
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: '12px',
+                        background: 'rgba(251, 191, 36, 0.2)',
+                        border: '1px solid rgba(251, 191, 36, 0.4)',
+                        borderRadius: '8px',
+                        color: colors.accent.gold,
+                        fontSize: '14px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(251, 191, 36, 0.3)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'rgba(251, 191, 36, 0.2)'
+                      }}
+                    >
+                      Buy for +${currentAuction.currentBid + 1}k
+                      <div style={{ fontSize: '10px', marginTop: '2px', opacity: 0.8 }}>
+                        Keep the painting
+                      </div>
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div
+                    style={{
+                      fontSize: '12px',
+                      color: 'rgba(255, 255, 255, 0.8)',
+                      marginBottom: '16px',
+                      textAlign: 'center',
+                    }}
+                  >
+                    No bids were placed
+                  </div>
+                  <button
+                    onClick={() => {
+                      // Take the painting for free
+                      placeBid(-2) // Special value for take free
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      background: 'rgba(251, 191, 36, 0.2)',
+                      border: '1px solid rgba(251, 191, 36, 0.4)',
+                      borderRadius: '8px',
+                      color: colors.accent.gold,
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(251, 191, 36, 0.3)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'rgba(251, 191, 36, 0.2)'
+                    }}
+                  >
+                    Take Painting (Free)
+                    <div style={{ fontSize: '10px', marginTop: '2px', opacity: 0.8 }}>
+                      No bids were made
+                    </div>
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Regular bid controls (NOT for auctioneer decision phase) */}
+          {!(currentAuction.type === 'one_offer' &&
+            currentAuction.phase === 'auctioneer_decision') && (
+            <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+              <button
+                onClick={() => isAuctionPlayerTurn && placeBid(bidAmount)}
+                disabled={!isAuctionPlayerTurn}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  background: isAuctionPlayerTurn ? colors.accent.gold : 'rgba(255, 255, 255, 0.1)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: isAuctionPlayerTurn ? '#000' : 'rgba(255, 255, 255, 0.5)',
+                  fontSize: '14px',
+                  fontWeight: 700,
+                  cursor: isAuctionPlayerTurn ? 'pointer' : 'not-allowed',
+                  opacity: isAuctionPlayerTurn ? 1 : 0.5,
+                  transition: 'transform 0.15s ease',
+                }}
+                onMouseEnter={(e) => {
+                  if (isAuctionPlayerTurn) {
+                    e.currentTarget.style.transform = 'scale(1.02)'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'scale(1)'
+                }}
+              >
+                Place Bid
+              </button>
+              <button
+                onClick={() => isAuctionPlayerTurn && passBid()}
+                disabled={!isAuctionPlayerTurn}
+                style={{
+                  padding: '12px 20px',
+                  background: isAuctionPlayerTurn ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  borderRadius: '8px',
+                  color: isAuctionPlayerTurn ? 'white' : 'rgba(255, 255, 255, 0.5)',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  cursor: isAuctionPlayerTurn ? 'pointer' : 'not-allowed',
+                  opacity: isAuctionPlayerTurn ? 1 : 0.5,
+                  transition: 'background 0.15s ease',
+                }}
+                onMouseEnter={(e) => {
+                  if (isAuctionPlayerTurn) {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = isAuctionPlayerTurn ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)'
+                }}
+              >
+                Pass
+              </button>
+            </div>
+          )}
         </div>
       </div>
     )

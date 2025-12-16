@@ -368,8 +368,68 @@ export const useGameStore = create<GameStore>()(
             case 'one_offer':
               if (auction.phase === 'bidding') {
                 updatedAuction = makeOffer(auction, player.id, amount, gameState.players)
+              } else if (auction.phase === 'auctioneer_decision') {
+                // Auctioneer decision phase
+                const { acceptHighestBid, auctioneerOutbid, concludeAuction } = require('../engine/auction/oneOffer')
+                const { executeAuction } = require('../engine/auction/executor')
+
+                if (amount === -1) {
+                  // Special value for accepting highest bid
+                  updatedAuction = acceptHighestBid(auction)
+                  console.log('Auctioneer accepted highest bid')
+                } else if (amount === -2) {
+                  // Special value for taking painting for free
+                  const { auctioneerTakesFree } = require('../engine/auction/oneOffer')
+                  updatedAuction = auctioneerTakesFree(auction)
+                  console.log('Auctioneer takes painting for free')
+                } else {
+                  // Auctioneer is outbidding
+                  updatedAuction = auctioneerOutbid(auction, amount, gameState.players)
+                  console.log(`Auctioneer outbid with ${amount}k`)
+                }
+
+                // Conclude the auction immediately after auctioneer decision
+                if (!updatedAuction.isActive) {
+                  const auctionResult = concludeAuction(updatedAuction, gameState.players)
+                  console.log(`Auction concluded: ${auctionResult.winnerId} won for $${auctionResult.salePrice}k`)
+
+                  // Execute the auction (transfer money, card, etc.)
+                  const finalGameState = executeAuction(
+                    {
+                      ...gameState,
+                      round: {
+                        ...gameState.round,
+                        phase: {
+                          type: 'auction',
+                          auction: updatedAuction
+                        }
+                      }
+                    },
+                    auctionResult,
+                    updatedAuction.card
+                  )
+
+                  set(
+                    { gameState: finalGameState },
+                    false,
+                    'placeBid_auctioneer_concluded'
+                  )
+
+                  // Check if round should continue
+                  setTimeout(() => {
+                    const { gameState: newGameState } = get()
+                    if (newGameState && newGameState.round.phase.type === 'awaiting_card_play') {
+                      // Check if it's an AI's turn to play a card
+                      if (newGameState.round.phase.activePlayerIndex !== 0) {
+                        get().processAITurn()
+                      }
+                    }
+                  }, 1500)
+
+                  return // Exit early since auction is concluded
+                }
               } else {
-                console.error('Cannot bid during auctioneer decision phase')
+                console.error('Cannot bid in this phase')
                 return
               }
               break
