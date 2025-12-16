@@ -1,6 +1,7 @@
 import React from 'react'
 import CardBack from './CardBack'
 import { Card as GameCardComponent } from '../Card'
+import { AIStatusBadge, AIThinkingIndicator } from '../ai/AIThinkingIndicator'
 import type { Player, Card } from '../../types'
 import { colors } from '../../design/premiumTokens'
 
@@ -10,12 +11,14 @@ interface OpponentPanelProps {
   players: Player[]
   currentPlayerIndex: number // The human player index (to exclude)
   activePlayerIndex?: number // Whose turn it is
+  aiThinkingPlayers?: Set<number> // Set of AI player indices currently thinking
 }
 
 const OpponentPanel: React.FC<OpponentPanelProps> = ({
   players,
   currentPlayerIndex,
   activePlayerIndex,
+  aiThinkingPlayers = new Set(),
 }) => {
   // Filter out the current (human) player
   const opponents = players.filter((_, idx) => idx !== currentPlayerIndex)
@@ -91,19 +94,32 @@ const OpponentPanel: React.FC<OpponentPanelProps> = ({
                 >
                   {opponent.name}
                   {opponent.isAI && (
-                    <span
-                      style={{
-                        fontSize: '9px',
-                        padding: '2px 6px',
-                        background: 'rgba(139, 92, 246, 0.3)',
-                        color: '#a78bfa',
-                        borderRadius: '4px',
-                        textTransform: 'uppercase',
-                        fontWeight: 500,
-                      }}
-                    >
-                      {opponent.aiDifficulty}
-                    </span>
+                    <>
+                      <span
+                        style={{
+                          fontSize: '10px',
+                          padding: '2px 6px',
+                          background: 'rgba(139, 92, 246, 0.3)',
+                          color: '#a78bfa',
+                          borderRadius: '4px',
+                          textTransform: 'uppercase',
+                          fontWeight: 500,
+                        }}
+                      >
+                        {opponent.aiDifficulty}
+                      </span>
+                      {aiThinkingPlayers.has(playerIndex) && (
+                        <span
+                          style={{
+                            fontSize: '10px',
+                            color: '#fbbf24',
+                            animation: 'pulse 1.5s ease-in-out infinite',
+                          }}
+                        >
+                          ⚡
+                        </span>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -171,6 +187,22 @@ const OpponentPanel: React.FC<OpponentPanelProps> = ({
                 }}
               >
                 No purchases this round
+              </div>
+            )}
+
+            {/* AI Thinking Indicator */}
+            {opponent.isAI && aiThinkingPlayers.has(playerIndex) && (
+              <div style={{ marginTop: '8px' }}>
+                <div
+                  style={{
+                    fontSize: '10px',
+                    color: '#fbbf24',
+                    textAlign: 'center',
+                    animation: 'pulse 1.5s ease-in-out infinite',
+                  }}
+                >
+                  AI is thinking...
+                </div>
               </div>
             )}
           </div>

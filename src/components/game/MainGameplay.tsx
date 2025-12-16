@@ -1,10 +1,13 @@
 import React, { useState } from 'react'
 import { useGameStore, useCurrentPlayer, useIsCurrentPlayerTurn } from '../../store/gameStore'
+import { useTurnManagement } from '../../hooks/useTurnManagement'
 import GameHeader from './GameHeader'
 import ArtistBoard from './ArtistBoard'
 import AuctionCenter from './AuctionCenter'
 import OpponentPanel from './OpponentPanel'
 import PlayerHand from './PlayerHand'
+import AIThinkingIndicator from './AIThinkingIndicator'
+import DoubleAuctionPrompt from './DoubleAuctionPrompt'
 import { Card as GameCardComponent } from '../Card'
 import { colors } from '../../design/premiumTokens'
 import type { Card } from '../../types'
@@ -17,6 +20,7 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
   const { gameState, selectedCardId, selectCard, playCard, deselectCard } = useGameStore()
   const currentPlayer = useCurrentPlayer()
   const isPlayerTurn = useIsCurrentPlayerTurn()
+  const { turnIndicator, isPlayerTurn: isCurrentPlayerTurn, isAIThinking, turnMessage } = useTurnManagement()
   const [artistBoardCollapsed, setArtistBoardCollapsed] = useState(false)
 
   // Debug logging
@@ -24,7 +28,11 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
     gameState: !!gameState,
     currentPlayer: !!currentPlayer,
     players: gameState?.players,
-    playerId: currentPlayer?.id
+    playerId: currentPlayer?.id,
+    isCurrentPlayerTurn,
+    isAIThinking,
+    turnMessage,
+    turnIndicator
   })
 
   if (!gameState || !currentPlayer) {
@@ -71,10 +79,15 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
   }
 
   // Handle playing the selected card
-  const handlePlayCard = () => {
-    if (selectedCardId && isPlayerTurn) {
-      playCard(selectedCardId)
-      deselectCard()
+  const handlePlayCard = async () => {
+    if (selectedCardId && isCurrentPlayerTurn && !isAIThinking) {
+      try {
+        await playCard(selectedCardId)
+        // deselectCard() will be called automatically in the playCard action
+      } catch (error) {
+        console.error('Failed to play card:', error)
+        // Could show user feedback here
+      }
     }
   }
 
@@ -83,6 +96,17 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
     // For now, just deselect
     deselectCard()
     console.log('Pass turn')
+  }
+
+  // Handle Double auction second card
+  const handleOfferSecondCard = (cardId: string) => {
+    console.log('Offering second card:', cardId)
+    // TODO: Implement double auction second card logic
+  }
+
+  const handleDeclineSecondCard = () => {
+    console.log('Declining to offer second card')
+    // TODO: Implement double auction decline logic
   }
 
   return (
@@ -147,7 +171,6 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
               border: '1px solid rgba(255, 255, 255, 0.1)',
             }}
           >
-  
             <div
               style={{
                 display: 'flex',
@@ -220,39 +243,44 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            justifyContent: 'flex-start', // Changed from center to flex-start
-            marginTop: '12px', // Add some margin from top
+            justifyContent: 'flex-start',
+            marginTop: '12px',
           }}
         >
           {/* Turn indicator */}
-          <div
-            style={{
-              marginBottom: '16px',
-              padding: '8px 20px',
-              background: isPlayerTurn
-                ? 'rgba(251, 191, 36, 0.2)'
-                : 'rgba(255, 255, 255, 0.1)',
-              border: isPlayerTurn
-                ? `1px solid ${colors.accent.gold}`
-                : '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: '20px',
-              animation: isPlayerTurn ? 'active-turn-pulse 2s ease-in-out infinite' : 'none',
-            }}
-          >
-            <span
-              style={{
-                fontSize: '13px',
-                fontWeight: 600,
-                color: isPlayerTurn ? colors.accent.gold : 'rgba(255, 255, 255, 0.6)',
-              }}
-            >
-              {isPlayerTurn ? "It's Your Turn!" : `Waiting for ${players[activePlayerIndex]?.name || 'opponent'}...`}
-            </span>
+          <div style={{ marginBottom: '16px' }}>
+            {isAIThinking ? (
+              <AIThinkingIndicator turnIndicator={turnIndicator} />
+            ) : (
+              <div
+                style={{
+                  padding: '8px 20px',
+                  background: isCurrentPlayerTurn
+                    ? 'rgba(251, 191, 36, 0.2)'
+                    : 'rgba(255, 255, 255, 0.1)',
+                  border: isCurrentPlayerTurn
+                    ? `1px solid ${colors.accent.gold}`
+                    : '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '20px',
+                  animation: isCurrentPlayerTurn ? 'active-turn-pulse 2s ease-in-out infinite' : 'none',
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    color: isCurrentPlayerTurn ? colors.accent.gold : 'rgba(255, 255, 255, 0.6)',
+                  }}
+                >
+                  {turnMessage || (isCurrentPlayerTurn ? "It's Your Turn!" : `Waiting for ${players[activePlayerIndex]?.name || 'opponent'}...`)}
+                </span>
+              </div>
+            )}
           </div>
 
           <AuctionCenter
             selectedCard={selectedCard}
-            isPlayerTurn={isPlayerTurn}
+            isPlayerTurn={isCurrentPlayerTurn && !isAIThinking}
             onPlayCard={handlePlayCard}
             onPass={handlePass}
           />
@@ -292,43 +320,20 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
           selectedCardId={selectedCardId}
           onSelectCard={handleSelectCard}
           money={currentPlayer.money}
-          disabled={!isPlayerTurn || round.phase.type === 'auction'}
+          disabled={!isCurrentPlayerTurn || isAIThinking || round.phase.type === 'auction'}
           purchasedThisRound={currentPlayer.purchasedThisRound}
         />
       </div>
 
-      {/* Mobile responsive styles (using CSS media queries via style tag) */}
-      <style>{`
-        @media (max-width: 1024px) {
-          /* Switch to stacked layout on tablets */
-          .main-gameplay-grid {
-            gridTemplateColumns: '1fr !important';
-            gridTemplateRows: 'auto 1fr auto !important';
-          }
-          .left-column {
-            overflow: visible !important;
-            margin-bottom: 16px;
-          }
-          .right-column {
-            overflow: visible !important;
-          }
-          .player-hand {
-            position: relative !important;
-          }
-        }
-
-        @media (max-width: 768px) {
-          /* Mobile layout */
-          .main-gameplay-grid {
-            padding: 8px !important;
-            gap: 8px !important;
-          }
-          .left-column {
-            margin-bottom: 12px;
-          }
-        }
-        }
-      `}</style>
+      {/* Double Auction Prompt */}
+      {gameState.round.phase.type === 'auction' &&
+       gameState.round.phase.auction.type === 'double' && (
+        <DoubleAuctionPrompt
+          auction={gameState.round.phase.auction}
+          onOfferCard={handleOfferSecondCard}
+          onDecline={handleDeclineSecondCard}
+        />
+      )}
     </div>
   )
 }

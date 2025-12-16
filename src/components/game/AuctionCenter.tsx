@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Card as GameCardComponent } from '../Card'
 import { useGameStore } from '../../store/gameStore'
+import { isHumanPlayerTurn, getCurrentAuctionPlayer, getOneOfferTurnOrder } from '../../utils/auctionTurnDetection'
 import type { Card, AuctionType } from '../../types'
 import type { AuctionState } from '../../types/auction'
 import { colors } from '../../design/premiumTokens'
@@ -60,11 +61,17 @@ const AuctionCenter: React.FC<AuctionCenterProps> = ({
   onPlayCard,
   onPass,
 }) => {
-  const { gameState } = useGameStore()
+  const { gameState, placeBid, passBid } = useGameStore()
   const [bidAmount, setBidAmount] = useState<number>(0)
 
   const currentAuction = gameState?.round.phase.type === 'auction'
     ? (gameState.round.phase as { type: 'auction'; auction: AuctionState }).auction
+    : null
+
+  // Check if it's the human player's turn in the current auction
+  const isAuctionPlayerTurn = gameState ? isHumanPlayerTurn(gameState) : false
+  const currentPlayerInAuction = currentAuction && gameState
+    ? getCurrentAuctionPlayer(currentAuction, gameState.players)
     : null
 
   // Render waiting state (no card played yet)
@@ -390,7 +397,159 @@ const AuctionCenter: React.FC<AuctionCenterProps> = ({
           </div>
         )}
 
-        {/* Bid controls (simplified for now) */}
+        {/* One Offer Auction - Turn Order Display */}
+        {currentAuction.type === 'one_offer' && (
+          <div
+            style={{
+              width: '100%',
+              maxWidth: '500px',
+              marginBottom: '20px',
+            }}
+          >
+            <div
+              style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: colors.accent.gold,
+                textTransform: 'uppercase',
+                marginBottom: '8px',
+                textAlign: 'center',
+              }}
+            >
+              Bidding Progress
+            </div>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '6px',
+              }}
+            >
+              {getOneOfferTurnOrder(currentAuction, gameState!.players).map((turn, index) => {
+                // Get bid information for this player
+                const playerBid = currentAuction.currentBidderId === turn.player.id ? currentAuction.currentBid : null
+
+                return (
+                  <div
+                    key={turn.player.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '8px 12px',
+                      background: turn.status === 'current'
+                        ? 'rgba(251, 191, 36, 0.2)'
+                        : turn.status === 'completed'
+                        ? 'rgba(255, 255, 255, 0.05)'
+                        : 'rgba(255, 255, 255, 0.1)',
+                      borderRadius: '6px',
+                      border: turn.status === 'current'
+                        ? '1px solid rgba(251, 191, 36, 0.4)'
+                        : '1px solid rgba(255, 255, 255, 0.1)',
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        background: turn.status === 'current'
+                          ? colors.accent.gold
+                          : turn.status === 'completed'
+                          ? 'rgba(255, 255, 255, 0.5)'
+                          : 'rgba(255, 255, 255, 0.2)',
+                      }}
+                    />
+                    <span
+                      style={{
+                        fontSize: '12px',
+                        color: 'white',
+                        flex: 1,
+                      }}
+                    >
+                      {turn.player.name}
+                      {turn.player.id === currentAuction.auctioneerId && ' (Auctioneer)'}
+                    </span>
+                    {playerBid && (
+                      <span
+                        style={{
+                          fontSize: '11px',
+                          color: colors.accent.gold,
+                          fontWeight: 600,
+                          marginRight: '8px',
+                        }}
+                      >
+                        Bid: ${playerBid}k
+                      </span>
+                    )}
+                    {turn.status === 'current' && (
+                      <span
+                        style={{
+                          fontSize: '10px',
+                          color: colors.accent.gold,
+                          fontWeight: 600,
+                        }}
+                      >
+                        YOUR TURN
+                      </span>
+                    )}
+                    {turn.status === 'completed' && !playerBid && (
+                      <span
+                        style={{
+                          fontSize: '10px',
+                          color: 'rgba(255, 255, 255, 0.5)',
+                        }}
+                      >
+                        PASSED
+                      </span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+            {/* Current highest bid display */}
+            {currentAuction.currentBid > 0 && (
+              <div
+                style={{
+                  marginTop: '12px',
+                  padding: '8px 12px',
+                  background: 'rgba(251, 191, 36, 0.1)',
+                  borderRadius: '6px',
+                  textAlign: 'center',
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: '12px',
+                    color: 'rgba(255, 255, 255, 0.7)',
+                  }}
+                >
+                  Current Highest:{' '}
+                </span>
+                <span
+                  style={{
+                    fontSize: '14px',
+                    color: colors.accent.gold,
+                    fontWeight: 700,
+                  }}
+                >
+                  ${currentAuction.currentBid}k
+                </span>
+                <span
+                  style={{
+                    fontSize: '12px',
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    marginLeft: '4px',
+                  }}
+                >
+                  by {gameState!.players.find(p => p.id === currentAuction.currentBidderId)?.name}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Bid controls */}
         <div
           style={{
             display: 'flex',
@@ -401,6 +560,20 @@ const AuctionCenter: React.FC<AuctionCenterProps> = ({
             maxWidth: '280px',
           }}
         >
+          {/* Current turn indicator */}
+          {!isAuctionPlayerTurn && currentPlayerInAuction && (
+            <div
+              style={{
+                fontSize: '12px',
+                color: 'rgba(255, 255, 255, 0.6)',
+                textAlign: 'center',
+                fontStyle: 'italic',
+              }}
+            >
+              Waiting for {currentPlayerInAuction.name} to act...
+            </div>
+          )}
+
           {/* Bid input */}
           <div
             style={{
@@ -414,17 +587,21 @@ const AuctionCenter: React.FC<AuctionCenterProps> = ({
               type="number"
               value={bidAmount}
               onChange={(e) => setBidAmount(Math.max(0, parseInt(e.target.value) || 0))}
+              disabled={!isAuctionPlayerTurn}
               style={{
                 flex: 1,
                 padding: '12px 16px',
-                background: 'rgba(255, 255, 255, 0.1)',
+                background: isAuctionPlayerTurn
+                  ? 'rgba(255, 255, 255, 0.1)'
+                  : 'rgba(255, 255, 255, 0.05)',
                 border: '1px solid rgba(255, 255, 255, 0.2)',
                 borderRadius: '8px',
-                color: 'white',
+                color: isAuctionPlayerTurn ? 'white' : 'rgba(255, 255, 255, 0.5)',
                 fontSize: '16px',
                 fontWeight: 600,
                 textAlign: 'center',
                 outline: 'none',
+                opacity: isAuctionPlayerTurn ? 1 : 0.6,
               }}
               placeholder="Enter bid..."
             />
@@ -434,20 +611,25 @@ const AuctionCenter: React.FC<AuctionCenterProps> = ({
           {/* Bid buttons */}
           <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
             <button
+              onClick={() => isAuctionPlayerTurn && placeBid(bidAmount)}
+              disabled={!isAuctionPlayerTurn}
               style={{
                 flex: 1,
                 padding: '12px',
-                background: colors.accent.gold,
+                background: isAuctionPlayerTurn ? colors.accent.gold : 'rgba(255, 255, 255, 0.1)',
                 border: 'none',
                 borderRadius: '8px',
-                color: '#000',
+                color: isAuctionPlayerTurn ? '#000' : 'rgba(255, 255, 255, 0.5)',
                 fontSize: '14px',
                 fontWeight: 700,
-                cursor: 'pointer',
+                cursor: isAuctionPlayerTurn ? 'pointer' : 'not-allowed',
+                opacity: isAuctionPlayerTurn ? 1 : 0.5,
                 transition: 'transform 0.15s ease',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'scale(1.02)'
+                if (isAuctionPlayerTurn) {
+                  e.currentTarget.style.transform = 'scale(1.02)'
+                }
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = 'scale(1)'
@@ -456,22 +638,27 @@ const AuctionCenter: React.FC<AuctionCenterProps> = ({
               Place Bid
             </button>
             <button
+              onClick={() => isAuctionPlayerTurn && passBid()}
+              disabled={!isAuctionPlayerTurn}
               style={{
                 padding: '12px 20px',
-                background: 'rgba(255, 255, 255, 0.1)',
+                background: isAuctionPlayerTurn ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)',
                 border: '1px solid rgba(255, 255, 255, 0.2)',
                 borderRadius: '8px',
-                color: 'white',
+                color: isAuctionPlayerTurn ? 'white' : 'rgba(255, 255, 255, 0.5)',
                 fontSize: '14px',
                 fontWeight: 600,
-                cursor: 'pointer',
+                cursor: isAuctionPlayerTurn ? 'pointer' : 'not-allowed',
+                opacity: isAuctionPlayerTurn ? 1 : 0.5,
                 transition: 'background 0.15s ease',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'
+                if (isAuctionPlayerTurn) {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'
+                }
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
+                e.currentTarget.style.background = isAuctionPlayerTurn ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)'
               }}
             >
               Pass

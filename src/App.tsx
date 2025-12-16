@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { useGameStore } from './store/gameStore'
 import MainGameplay from './components/game/MainGameplay'
+import { ErrorBoundary } from './components/game/ErrorBoundary'
 
 // ============================================================================
 // TYPES
@@ -737,7 +738,11 @@ function App() {
   }
 
   if (currentScreen === 'game') {
-    return <MainGameplay onExitToMenu={handleReturnToMenu} />
+    return (
+      <ErrorBoundary>
+        <MainGameplay onExitToMenu={handleReturnToMenu} />
+      </ErrorBoundary>
+    )
   }
 
   return null

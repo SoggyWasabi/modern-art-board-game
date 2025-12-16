@@ -9,4 +9,7 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/engine/__tests__/setup.ts'],
   },
+  esbuild: {
+    target: 'es2015'
+  }
 })

@@ -9,6 +9,11 @@ import type {
 import { dealCards } from './deck'
 import { rankArtists } from './valuation'
 import { ARTISTS } from './constants'
+import { createOpenAuction } from './auction/open'
+import { createOneOfferAuction } from './auction/oneOffer'
+import { createHiddenAuction } from './auction/hidden'
+import { createFixedPriceAuction } from './auction/fixedPrice'
+import { createDoubleAuction } from './auction/double'
 
 /**
  * Round Management Engine
@@ -118,17 +123,33 @@ export function playCard(
     // The card is not auctioned, just counted for ranking
     newPhase = { type: 'round_ending', unsoldCards: [card] }
   } else {
-    // Start auction for the card
-    // Note: Actual auction creation would happen in game.ts
-    // For now, we'll just update the phase
+    // Start auction for the card using proper auction creation
+    const currentPlayer = gameState.players[playerIndex]
+    let auction
+
+    switch (card.auctionType) {
+      case 'open':
+        auction = createOpenAuction(card, currentPlayer, gameState.players)
+        break
+      case 'one_offer':
+        auction = createOneOfferAuction(card, currentPlayer, gameState.players)
+        break
+      case 'hidden':
+        auction = createHiddenAuction(card, currentPlayer, gameState.players)
+        break
+      case 'fixed_price':
+        auction = createFixedPriceAuction(card, currentPlayer, gameState.players, 10) // Default price
+        break
+      case 'double':
+        auction = createDoubleAuction(card, currentPlayer, gameState.players)
+        break
+      default:
+        throw new Error(`Unknown auction type: ${card.auctionType}`)
+    }
+
     newPhase = {
       type: 'auction',
-      auction: {
-        // This would be created by the specific auction engine
-        type: card.auctionType,
-        card,
-        // ... other auction state
-      } as any
+      auction
     }
   }
 
