@@ -8,7 +8,7 @@ import { createDoubleAuction, offerSecondCard, declineToOffer } from '../engine/
 import { placeBid as placeOpenBid, pass as passOpenBid } from '../engine/auction/open'
 import { makeOffer, pass as passOneOffer, acceptHighestBid, auctioneerOutbid, auctioneerTakesFree, concludeAuction } from '../engine/auction/oneOffer'
 import { submitBid, revealBids } from '../engine/auction/hidden'
-import { buyAtPrice, pass as passFixedPrice } from '../engine/auction/fixedPrice'
+import { buyAtPrice, pass as passFixedPrice, setPrice as setFixedPrice } from '../engine/auction/fixedPrice'
 import { executeAuction } from '../engine/auction/executor'
 
 /**
@@ -475,7 +475,21 @@ export class AuctionAIOrchestrator {
     const player = gameState.players[playerIndex]
 
     if (decision.type === 'bid') {
-      if (decision.action === 'buy') {
+      if (decision.action === 'set_price' && decision.amount) {
+        // AI auctioneer setting the price
+        const updatedAuction = setFixedPrice(auction, player.id, decision.amount, gameState.players)
+
+        return {
+          ...gameState,
+          round: {
+            ...gameState.round,
+            phase: {
+              type: 'auction',
+              auction: updatedAuction
+            }
+          }
+        }
+      } else if (decision.action === 'buy') {
         const updatedAuction = buyAtPrice(auction, player.id, gameState.players)
 
         return {

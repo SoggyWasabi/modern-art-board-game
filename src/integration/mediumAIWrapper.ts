@@ -82,7 +82,7 @@ export class MediumAIWrapper {
           return this.adaptHiddenAuctionDecision(hiddenDecision, player, auction)
 
         case 'fixed_price':
-          decisionType = 'bid'
+          decisionType = 'fixed_price'
           const fixedDecision = await strategy.makeDecision(decisionType as any, minimalContext, { auction })
           return this.adaptFixedPriceDecision(fixedDecision, player, auction)
 
@@ -224,7 +224,16 @@ export class MediumAIWrapper {
    * Adapt fixed price decision
    */
   private adaptFixedPriceDecision(decision: any, player: Player, auction: any): AIDecision | null {
-    if (decision.action === 'buy') {
+    // Handle price setting (from strategy)
+    if (decision.action === 'set_price' || decision.price !== undefined) {
+      return {
+        type: 'bid',
+        action: 'set_price',
+        amount: decision.price || decision.amount
+      }
+    }
+    // Handle buy/pass decisions (from strategy)
+    else if (decision.action === 'buy') {
       return {
         type: 'bid',
         action: 'buy'
@@ -383,6 +392,47 @@ export class MediumAIWrapper {
         type: 'bid',
         action: 'bid',
         amount: bidAmount
+      }
+    } else if (auction.type === 'fixed_price') {
+      // Fixed price fallback logic
+      console.log(`Fixed price auction fallback for ${player.name}: money=$${player.money}k, price=$${auction.price}k`)
+
+      if (auction.price === 0) {
+        // Price setting phase - auctioneer sets price
+        if (player.id === auction.auctioneerId) {
+          // Set price between 10-30% of money, but at least 5k
+          const minPrice = Math.min(5, Math.max(1, Math.floor(player.money * 0.1)))
+          const maxPrice = Math.min(30, Math.floor(player.money * 0.3))
+          const setPrice = Math.floor(Math.random() * (maxPrice - minPrice + 1)) + minPrice
+
+          console.log(`  Auctioneer setting price: $${setPrice}k`)
+          return {
+            type: 'bid',
+            action: 'set_price',
+            amount: setPrice
+          }
+        }
+      } else {
+        // Buying phase - player decides to buy or pass
+        if (auction.turnOrder[auction.currentTurnIndex] === player.id) {
+          // Evaluate if price is good value (simple heuristic)
+          const cardValue = this.estimateCardValue(auction.card, player)
+          const priceReasonable = auction.price <= player.money * 0.4 && auction.price <= cardValue * 1.5
+
+          if (priceReasonable && Math.random() < 0.6) {
+            console.log(`  Buying at $${auction.price}k (card value: ${cardValue.toFixed(1)})`)
+            return {
+              type: 'bid',
+              action: 'buy'
+            }
+          } else {
+            console.log(`  Passing on $${auction.price}k`)
+            return {
+              type: 'bid',
+              action: 'pass'
+            }
+          }
+        }
       }
     }
     return null
