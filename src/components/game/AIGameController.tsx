@@ -21,7 +21,7 @@ interface AIGameControllerProps {
  * - Handles game flow between human and AI players
  */
 export const AIGameController: React.FC<AIGameControllerProps> = ({ children }) => {
-  const { gameState, isAITurn, isProcessingAITurn, processAITurns } = useAIGame()
+  const { gameState, isAITurn, isProcessingAITurn } = useAIGame()
   const [isAIThinking, setIsAIThinking] = useState(false)
   const processingRef = useRef(false)
 
@@ -60,7 +60,7 @@ export const AIGameController: React.FC<AIGameControllerProps> = ({ children }) 
       processingRef.current = false
       setIsAIThinking(false)
     }
-  }, [gameState, isAITurn, processAITurns])
+  }, [gameState, isAITurn])
 
   // Auto-progress auction if all humans have passed
   useEffect(() => {
@@ -74,16 +74,16 @@ export const AIGameController: React.FC<AIGameControllerProps> = ({ children }) 
     if (auction && 'isActive' in auction && !auction.isActive) {
       // Conclude the auction and proceed to next turn
       const auctionResult = {
-        winnerId: auction.currentBidderId || auction.auctioneerId,
-        auctioneerId: auction.auctioneerId,
-        salePrice: auction.currentBid || 0,
-        card: auction.card,
-        profit: auction.currentBid || 0,
+        winnerId: (auction as any).currentBidderId || (auction as any).auctioneerId,
+        auctioneerId: (auction as any).auctioneerId,
+        salePrice: (auction as any).currentBid || 0,
+        card: (auction as any).card,
+        profit: (auction as any).currentBid || 0,
         type: auction.type
       }
 
       // Apply auction result
-      const newState = executeAuction(gameState, auctionResult, auction.card)
+      const newState = executeAuction(gameState, auctionResult, (auction as any).card)
 
       // Update store state
       // This would need to be integrated with the store

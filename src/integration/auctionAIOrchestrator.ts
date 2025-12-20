@@ -35,6 +35,11 @@ export class AuctionAIOrchestrator {
     const auction = gameState.round.phase.auction
     console.log('Processing AI for auction type:', auction.type)
 
+    // Special handling for hidden auctions - process ALL AI players simultaneously
+    if (auction.type === 'hidden') {
+      return await this.processHiddenAuctionAI(gameState)
+    }
+
     // Find which AI player's turn it is (if any)
     const currentPlayerId = this.getCurrentPlayerId(auction)
     if (!currentPlayerId) {
@@ -83,6 +88,106 @@ export class AuctionAIOrchestrator {
       console.error(`Failed to apply AI decision for player ${currentPlayer.id}:`, error)
       return null
     }
+  }
+
+  /**
+   * Process all AI players for hidden auction (simultaneous bidding)
+   */
+  private async processHiddenAuctionAI(gameState: GameState): Promise<GameState | null> {
+    let currentAuction = gameState.round.phase.auction
+    if (currentAuction.type !== 'hidden') {
+      return null
+    }
+
+    console.log('Processing hidden auction AI for all AI players')
+
+    // Get all AI players who haven't submitted bids yet
+    const aiPlayers = gameState.players.filter(player =>
+      player.isAI &&
+      !currentAuction.bids[player.id] &&
+      !currentAuction.revealedBids
+    )
+
+    if (aiPlayers.length === 0) {
+      console.log('No AI players need to bid')
+      return null
+    }
+
+    console.log(`Found ${aiPlayers.length} AI players who need to bid`)
+
+    // Process all AI players simultaneously
+    let updatedGameState = gameState
+
+    for (const player of aiPlayers) {
+      // Get the current auction state from the updated game state
+      currentAuction = updatedGameState.round.phase.auction
+
+      console.log(`Processing ${player.name}'s hidden bid`)
+
+      // Check if this AI should act (use current auction state)
+      if (!(await this.shouldAIAct(currentAuction, player, updatedGameState))) {
+        console.log(`${player.name} should not act`)
+        continue
+      }
+
+      // Get AI decision (use current auction state)
+      const decision = await this.getAIDecision(player, currentAuction, updatedGameState)
+      if (!decision) {
+        console.log(`${player.name} returned no decision`)
+        continue
+      }
+
+      console.log(`${player.name} decision:`, decision)
+
+      try {
+        // Apply the decision
+        updatedGameState = await this.applyHiddenAuctionDecision(updatedGameState, player, decision)
+        console.log(`Successfully applied ${player.name}'s decision`)
+      } catch (error) {
+        console.error(`Failed to apply ${player.name}'s decision:`, error)
+      }
+    }
+
+    return updatedGameState
+  }
+
+  /**
+   * Apply hidden auction decision for a specific player
+   */
+  private async applyHiddenAuctionDecision(gameState: GameState, player: Player, decision: AIDecision): Promise<GameState> {
+    const auction = gameState.round.phase.auction
+
+    if (decision.type === 'bid') {
+      if (decision.action === 'bid' && decision.amount !== undefined) {
+        const updatedAuction = submitBid(auction, player.id, decision.amount, gameState.players)
+
+        return {
+          ...gameState,
+          round: {
+            ...gameState.round,
+            phase: {
+              type: 'auction',
+              auction: updatedAuction
+            }
+          }
+        }
+      } else if (decision.action === 'pass') {
+        const updatedAuction = submitBid(auction, player.id, 0, gameState.players)
+
+        return {
+          ...gameState,
+          round: {
+            ...gameState.round,
+            phase: {
+              type: 'auction',
+              auction: updatedAuction
+            }
+          }
+        }
+      }
+    }
+
+    return gameState
   }
 
   /**
@@ -188,8 +293,6 @@ export class AuctionAIOrchestrator {
       return await this.applyOpenAuctionDecision(gameState, playerIndex, decision)
     } else if (auction.type === 'one_offer') {
       return await this.applyOneOfferAuctionDecision(gameState, playerIndex, decision)
-    } else if (auction.type === 'hidden') {
-      return await this.applyHiddenAuctionDecision(gameState, playerIndex, decision)
     } else if (auction.type === 'fixed_price') {
       return await this.applyFixedPriceAuctionDecision(gameState, playerIndex, decision)
     }
@@ -357,31 +460,7 @@ export class AuctionAIOrchestrator {
     return gameState
   }
 
-  /**
-   * Apply decisions for Hidden auction
-   */
-  private async applyHiddenAuctionDecision(gameState: GameState, playerIndex: number, decision: AIDecision): Promise<GameState> {
-    const auction = gameState.round.phase.auction
-    const player = gameState.players[playerIndex]
-
-    if (decision.type === 'bid' && decision.action === 'bid' && decision.amount) {
-      const updatedAuction = submitBid(auction, player.id, decision.amount)
-
-      return {
-        ...gameState,
-        round: {
-          ...gameState.round,
-          phase: {
-            type: 'auction',
-            auction: updatedAuction
-          }
-        }
-      }
-    }
-
-    return gameState
-  }
-
+  
   /**
    * Apply decisions for Fixed Price auction
    */

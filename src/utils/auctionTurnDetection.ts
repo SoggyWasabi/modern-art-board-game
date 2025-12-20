@@ -14,24 +14,27 @@ export function isHumanPlayerTurn(gameState: GameState): boolean {
 
   switch (auction.type) {
     case 'one_offer':
-      return isOneOfferPlayerTurn(auction, humanPlayer.id)
+      return isOneOfferPlayerTurn(auction as OneOfferAuctionState, humanPlayer.id)
 
     case 'fixed_price':
-      return isFixedPricePlayerTurn(auction, humanPlayer.id)
+      return isFixedPricePlayerTurn(auction as FixedPriceAuctionState, humanPlayer.id)
 
     case 'open':
       // Open auctions are free-for-all - human can bid anytime
       return true
 
-    case 'hidden':
+    case 'hidden': {
+      const hiddenAuction = auction as any
       // Hidden auctions - human can submit bid if not already submitted
-      return !auction.bids[humanPlayer.id]
+      return !hiddenAuction.bids?.[humanPlayer.id]
+    }
 
-    case 'double':
+    case 'double': {
+      const doubleAuction = auction as any
       // Double auction - handle based on phase
-      if (!auction.secondCard) {
+      if (!doubleAuction.secondCard) {
         // Offering phase
-        return auction.currentAuctioneerId === humanPlayer.id
+        return doubleAuction.currentAuctioneerId === humanPlayer.id
       } else {
         // Use second card's auction type
         return isHumanPlayerTurn({
@@ -41,13 +44,14 @@ export function isHumanPlayerTurn(gameState: GameState): boolean {
             phase: {
               type: 'auction',
               auction: {
-                ...auction,
-                type: auction.auctionType
+                ...doubleAuction,
+                type: doubleAuction.auctionType
               }
             }
           }
         })
       }
+    }
 
     default:
       return false
@@ -58,6 +62,11 @@ export function isHumanPlayerTurn(gameState: GameState): boolean {
  * Check if it's a specific player's turn in a One Offer auction
  */
 export function isOneOfferPlayerTurn(auction: OneOfferAuctionState, playerId: string): boolean {
+  // In auctioneer decision phase, it's the auctioneer's turn
+  if (auction.phase === 'auctioneer_decision') {
+    return auction.auctioneerId === playerId
+  }
+
   // Check if it's the bidding phase
   if (auction.phase !== 'bidding') {
     return false
@@ -108,14 +117,16 @@ export function getCurrentAuctionPlayer(auction: AuctionState, players: Player[]
       const currentPlayerId = auction.turnOrder[auction.currentTurnIndex]
       return players.find(p => p.id === currentPlayerId) || null
 
-    case 'double':
-      if (!auction.secondCard) {
+    case 'double': {
+      const doubleAuction = auction as any
+      if (!doubleAuction.secondCard) {
         // Offering phase
-        const currentPlayerId = auction.currentAuctioneerId
+        const currentPlayerId = doubleAuction.currentAuctioneerId
         return players.find(p => p.id === currentPlayerId) || null
       }
       // Use second card's auction type logic
       return null
+    }
 
     default:
       return null // Open, Hidden auctions don't have turn order
@@ -146,9 +157,9 @@ export function getOneOfferTurnOrder(auction: OneOfferAuctionState, players: Pla
       player,
       isCurrentTurn,
       hasActed,
-      status: isCurrentTurn ? 'current' : hasActed ? 'completed' : 'waiting'
+      status: isCurrentTurn ? 'current' : hasActed ? 'completed' : 'waiting' as 'waiting' | 'current' | 'completed'
     }
-  }).filter(Boolean)
+  }).filter((item): item is NonNullable<typeof item> => Boolean(item))
 }
 
 /**

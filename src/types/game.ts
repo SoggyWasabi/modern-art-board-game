@@ -6,11 +6,7 @@ export type Artist = 'Manuel Carvalho' | 'Sigrid Thaler' | 'Daniel Melim' | 'Ram
 
 export type AuctionType = 'open' | 'one_offer' | 'hidden' | 'fixed_price' | 'double'
 
-// Forward declaration for auction state to avoid circular import
-export interface AuctionState {
-  type: 'open' | 'one_offer' | 'hidden' | 'fixed_price' | 'double'
-  // Additional properties will be defined in auction.ts
-}
+export type { AuctionState } from './auction'
 
 export interface Card {
   id: string

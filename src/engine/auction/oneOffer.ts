@@ -43,6 +43,7 @@ export function createOneOfferAuction(
     currentTurnIndex: 0,
     completedTurns: new Set<string>(),
     phase: 'bidding',
+    bidHistory: {},
   }
 }
 
@@ -92,6 +93,9 @@ export function makeOffer(
   const completedTurns = new Set(state.completedTurns)
   completedTurns.add(playerId)
 
+  // Track the bid in history
+  const bidHistory = { ...state.bidHistory, [playerId]: bidAmount }
+
   // Move to next turn
   const nextTurnIndex = state.currentTurnIndex + 1
 
@@ -104,6 +108,7 @@ export function makeOffer(
     currentBidderId: playerId,
     currentTurnIndex: nextTurnIndex,
     completedTurns,
+    bidHistory,
     // If auctioneer is next, switch to decision phase
     phase: isAuctioneerNext ? 'auctioneer_decision' : 'bidding',
   }
@@ -137,6 +142,9 @@ export function pass(
   const completedTurns = new Set(state.completedTurns)
   completedTurns.add(playerId)
 
+  // Track the pass in history (bid amount of 0)
+  const bidHistory = { ...state.bidHistory, [playerId]: 0 }
+
   // Move to next turn
   const nextTurnIndex = state.currentTurnIndex + 1
 
@@ -147,6 +155,7 @@ export function pass(
     ...state,
     currentTurnIndex: nextTurnIndex,
     completedTurns,
+    bidHistory,
     // If auctioneer is next, switch to decision phase
     phase: isAuctioneerNext ? 'auctioneer_decision' : 'bidding',
   }
@@ -182,6 +191,7 @@ export function acceptHighestBid(
     ...state,
     isActive: false,
     completedTurns,
+    bidHistory: state.bidHistory,
   }
 }
 
@@ -229,6 +239,7 @@ export function auctioneerOutbid(
     currentBidderId: state.auctioneerId,
     isActive: false,
     completedTurns,
+    bidHistory: { ...state.bidHistory, [state.auctioneerId]: bidAmount },
   }
 }
 
@@ -262,6 +273,7 @@ export function auctioneerTakesFree(
     currentBidderId: state.auctioneerId,
     isActive: false,
     completedTurns,
+    bidHistory: state.bidHistory,
   }
 }
 
@@ -271,6 +283,18 @@ export function concludeAuction(
 ): AuctionResult {
   if (state.isActive) {
     throw new Error('Cannot conclude active auction')
+  }
+
+  // No winner (auctioneer passed on sale)
+  if (state.currentBidderId === null && state.currentBid === 0) {
+    return {
+      winnerId: null, // No one gets the card
+      auctioneerId: state.auctioneerId,
+      salePrice: 0,
+      card: state.card,
+      profit: 0,
+      type: 'one_offer',
+    }
   }
 
   // No one bid - auctioneer gets card for free

@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useGameStore, useCurrentPlayer, useIsCurrentPlayerTurn } from '../../store/gameStore'
 import { useTurnManagement } from '../../hooks/useTurnManagement'
+import { isHumanPlayerTurn } from '../../utils/auctionTurnDetection'
 import GameHeader from './GameHeader'
 import ArtistBoard from './ArtistBoard'
 import AuctionCenter from './AuctionCenter'
@@ -17,7 +18,7 @@ interface MainGameplayProps {
 }
 
 const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
-  const { gameState, selectedCardId, selectCard, playCard, deselectCard } = useGameStore()
+  const { gameState, selectedCardId, selectCard, playCard, deselectCard, placeBid, passBid } = useGameStore()
   const currentPlayer = useCurrentPlayer()
   const isPlayerTurn = useIsCurrentPlayerTurn()
   const { turnIndicator, isPlayerTurn: isCurrentPlayerTurn, isAIThinking, turnMessage } = useTurnManagement()
@@ -284,11 +285,13 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
               minHeight: 0,
               display: 'flex',
               flexDirection: 'column',
+              width: '100%',
+              maxWidth: '650px',
             }}
           >
             <AuctionCenter
               selectedCard={selectedCard}
-              isPlayerTurn={isCurrentPlayerTurn && !isAIThinking}
+              isPlayerTurn={isCurrentPlayerTurn}
               onPlayCard={handlePlayCard}
               onPass={handlePass}
             />
@@ -338,7 +341,7 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
       {gameState.round.phase.type === 'auction' &&
        gameState.round.phase.auction.type === 'double' && (
         <DoubleAuctionPrompt
-          auction={gameState.round.phase.auction}
+          auction={gameState.round.phase.auction as any}
           onOfferCard={handleOfferSecondCard}
           onDecline={handleDeclineSecondCard}
         />

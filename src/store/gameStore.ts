@@ -7,6 +7,13 @@ import { playCard } from '../engine/round'
 import { getGameController, GameActionHandler } from '../integration/gameIntegration'
 import { getAuctionAIOrchestrator } from '../integration/auctionAIOrchestrator'
 
+// Import all auction engine functions
+import { placeBid as placeOpenBid, pass as passOpenBid } from '../engine/auction/open'
+import { makeOffer, pass as passOneOffer, acceptHighestBid, auctioneerOutbid, auctioneerTakesFree, concludeAuction } from '../engine/auction/oneOffer'
+import { submitBid, revealBids, concludeAuction as concludeHiddenAuction } from '../engine/auction/hidden'
+import { buyAtPrice, pass as passFixedPrice } from '../engine/auction/fixedPrice'
+import { executeAuction } from '../engine/auction/executor'
+
 const PLAYER_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6']
 
 type GameStartPhase = 'idle' | 'dealing' | 'selecting_first_player' | 'ready'
@@ -314,11 +321,137 @@ export const useGameStore = create<GameStore>()(
 
         if (updatedGameState) {
           console.log('AI actions processed, updating game state')
+
+          // For hidden auctions, merge with current state to preserve human bids
+          // that may have been submitted while AI was processing
+          const { gameState: currentState } = get()
+          if (currentState &&
+              currentState.round.phase.type === 'auction' &&
+              currentState.round.phase.auction.type === 'hidden' &&
+              updatedGameState.round.phase.type === 'auction' &&
+              updatedGameState.round.phase.auction.type === 'hidden') {
+            const currentAuction = currentState.round.phase.auction
+            const aiAuction = updatedGameState.round.phase.auction
+
+            // Merge bids - keep any bids from current state that AI state doesn't have
+            const mergedBids = { ...aiAuction.bids }
+            for (const [playerId, bid] of Object.entries(currentAuction.bids)) {
+              if (mergedBids[playerId] === undefined) {
+                mergedBids[playerId] = bid
+                console.log(`Preserved human bid from ${playerId}: ${bid}`)
+              }
+            }
+
+            // Update readyToReveal based on merged bids
+            const allPlayersCount = currentState.players.length
+            const submittedBidsCount = Object.keys(mergedBids).length
+            const readyToReveal = submittedBidsCount >= allPlayersCount
+
+            updatedGameState = {
+              ...updatedGameState,
+              round: {
+                ...updatedGameState.round,
+                phase: {
+                  type: 'auction',
+                  auction: {
+                    ...aiAuction,
+                    bids: mergedBids,
+                    readyToReveal
+                  }
+                }
+              }
+            }
+          }
+
           set(
             { gameState: updatedGameState },
             false,
             'ai_actions_processed'
           )
+
+          // For hidden auctions, check if all bids are in and trigger reveal
+          if (updatedGameState.round.phase.type === 'auction' &&
+              updatedGameState.round.phase.auction.type === 'hidden') {
+            const hiddenAuction = updatedGameState.round.phase.auction
+            if (hiddenAuction.readyToReveal && !hiddenAuction.revealedBids) {
+              console.log('All hidden bids submitted, triggering reveal...')
+              setTimeout(() => {
+                const { gameState: currentGameState } = get()
+                if (currentGameState && currentGameState.round.phase.type === 'auction') {
+                  const currentAuction = currentGameState.round.phase.auction
+                  if (currentAuction.type === 'hidden' && currentAuction.readyToReveal && !currentAuction.revealedBids) {
+                    // Reveal the bids
+                    const revealedAuction = revealBids(currentAuction)
+
+                    // Update with revealed bids
+                    set(
+                      {
+                        gameState: {
+                          ...currentGameState,
+                          round: {
+                            ...currentGameState.round,
+                            phase: {
+                              type: 'auction',
+                              auction: revealedAuction
+                            }
+                          }
+                        }
+                      },
+                      false,
+                      'revealHiddenBids_fromAI'
+                    )
+
+                    // After revealing, conclude the auction and execute it
+                    setTimeout(() => {
+                      const { gameState: newGameState } = get()
+                      if (newGameState && newGameState.round.phase.type === 'auction') {
+                        const finalAuction = newGameState.round.phase.auction
+                        if (finalAuction.type === 'hidden' && finalAuction.revealedBids) {
+                          // Conclude the auction
+                          const auctionResult = concludeHiddenAuction(finalAuction, newGameState.players)
+                          console.log(`Hidden auction concluded: ${auctionResult.winnerId} won for $${auctionResult.salePrice}k`)
+
+                          // Execute the auction (transfer money, card, etc.)
+                          const finalGameState = executeAuction(
+                            {
+                              ...newGameState,
+                              round: {
+                                ...newGameState.round,
+                                phase: {
+                                  type: 'auction',
+                                  auction: finalAuction
+                                }
+                              }
+                            },
+                            auctionResult,
+                            finalAuction.card
+                          )
+
+                          set(
+                            { gameState: finalGameState },
+                            false,
+                            'hiddenAuction_concluded_fromAI'
+                          )
+
+                          // Check if round should continue
+                          setTimeout(() => {
+                            const { gameState: nextGameState } = get()
+                            if (nextGameState && nextGameState.round.phase.type === 'awaiting_card_play') {
+                              // Check if it's an AI's turn to play a card
+                              if (nextGameState.round.phase.activePlayerIndex !== 0) {
+                                get().processAITurn()
+                              }
+                            }
+                          }, 2000)
+                        }
+                      }
+                    }, 1500)
+                  }
+                }
+              }, 1000)
+              return // Don't continue to check for more AI turns
+            }
+          }
 
           // Check if we should continue processing AI turns
           // Add a small delay before checking for next AI turn
@@ -352,11 +485,7 @@ export const useGameStore = create<GameStore>()(
           const player = gameState.players[0]
           const auction = gameState.round.phase.auction
 
-          // Import auction functions dynamically
-          const { placeBid: placeOpenBid, pass: passOpenBid } = require('../engine/auction/open')
-          const { makeOffer, pass: passOneOffer } = require('../engine/auction/oneOffer')
-          const { submitBid } = require('../engine/auction/hidden')
-          const { buyAtPrice, pass: passFixedPrice } = require('../engine/auction/fixedPrice')
+          // Auction functions now imported at top of file
 
           let updatedAuction
 
@@ -370,8 +499,8 @@ export const useGameStore = create<GameStore>()(
                 updatedAuction = makeOffer(auction, player.id, amount, gameState.players)
               } else if (auction.phase === 'auctioneer_decision') {
                 // Auctioneer decision phase
-                const { acceptHighestBid, auctioneerOutbid, concludeAuction } = require('../engine/auction/oneOffer')
-                const { executeAuction } = require('../engine/auction/executor')
+                // acceptHighestBid, auctioneerOutbid, concludeAuction now imported at top
+                // executeAuction now imported at top
 
                 if (amount === -1) {
                   // Special value for accepting highest bid
@@ -379,7 +508,7 @@ export const useGameStore = create<GameStore>()(
                   console.log('Auctioneer accepted highest bid')
                 } else if (amount === -2) {
                   // Special value for taking painting for free
-                  const { auctioneerTakesFree } = require('../engine/auction/oneOffer')
+                  // auctioneerTakesFree now imported at top
                   updatedAuction = auctioneerTakesFree(auction)
                   console.log('Auctioneer takes painting for free')
                 } else {
@@ -474,10 +603,10 @@ export const useGameStore = create<GameStore>()(
           if (auction.type === 'one_offer' &&
               updatedAuction.completedTurns.size === updatedAuction.turnOrder.length - 1) {
             // All non-auctioneer players have acted, now it's auctioneer decision time
-            const { isAuctioneerDecisionPhase } = require('../engine/auction/oneOffer')
+            // isAuctioneerDecisionPhase now imported at top
 
             // The engine automatically transitions to auctioneer decision phase when all others have acted
-            if (isAuctioneerDecisionPhase(updatedAuction)) {
+            if (updatedAuction.phase === 'auctioneer_decision') {
               console.log('Moving to auctioneer decision phase')
 
               // If human is the auctioneer, show decision interface
@@ -514,10 +643,7 @@ export const useGameStore = create<GameStore>()(
           const player = gameState.players[0]
           const auction = gameState.round.phase.auction
 
-          // Import auction functions dynamically
-          const { placeBid: placeOpenBid, pass: passOpenBid } = require('../engine/auction/open')
-          const { makeOffer, pass: passOneOffer } = require('../engine/auction/oneOffer')
-          const { pass: passFixedPrice } = require('../engine/auction/fixedPrice')
+          // Auction functions now imported at top of file
 
           let updatedAuction
 
@@ -584,8 +710,130 @@ export const useGameStore = create<GameStore>()(
         }
       },
 
-      submitHiddenBid: (amount: number) => {
+      submitHiddenBid: async (amount: number) => {
+        const { gameState } = get()
+        if (!gameState) {
+          console.error('No game state available')
+          return
+        }
+
+        if (gameState.round.phase.type !== 'auction') {
+          console.error('Not in auction phase')
+          return
+        }
+
+        const auction = gameState.round.phase.auction
+        if (auction.type !== 'hidden') {
+          console.error('Not a hidden auction')
+          return
+        }
+
         console.log('Submitting hidden bid:', amount)
+
+        try {
+          const player = gameState.players[0]
+          const updatedAuction = submitBid(auction, player.id, amount, gameState.players)
+
+          // Update game state
+          set(
+            {
+              gameState: {
+                ...gameState,
+                round: {
+                  ...gameState.round,
+                  phase: {
+                    type: 'auction',
+                    auction: updatedAuction
+                  }
+                }
+              }
+            },
+            false,
+            'submitHiddenBid'
+          )
+
+          // If all bids submitted, reveal them after a short delay
+          if (updatedAuction.readyToReveal && !updatedAuction.revealedBids) {
+            setTimeout(() => {
+              const { gameState: currentGameState } = get()
+              if (currentGameState && currentGameState.round.phase.type === 'auction') {
+                const currentAuction = currentGameState.round.phase.auction
+                if (currentAuction.type === 'hidden' && currentAuction.readyToReveal) {
+                  // Reveal the bids
+                  const revealedAuction = revealBids(currentAuction)
+
+                  // Update with revealed bids
+                  set(
+                    {
+                      gameState: {
+                        ...currentGameState,
+                        round: {
+                          ...currentGameState.round,
+                          phase: {
+                            type: 'auction',
+                            auction: revealedAuction
+                          }
+                        }
+                      }
+                    },
+                    false,
+                    'revealHiddenBids'
+                  )
+
+                  // After revealing, conclude the auction and execute it
+                  setTimeout(() => {
+                    const { gameState: newGameState } = get()
+                    if (newGameState && newGameState.round.phase.type === 'auction') {
+                      const finalAuction = newGameState.round.phase.auction
+                      if (finalAuction.type === 'hidden' && finalAuction.revealedBids) {
+                        // Conclude the auction
+                        const auctionResult = concludeHiddenAuction(finalAuction, newGameState.players)
+                        console.log(`Hidden auction concluded: ${auctionResult.winnerId} won for $${auctionResult.salePrice}k`)
+
+                        // Execute the auction (transfer money, card, etc.)
+                        const finalGameState = executeAuction(
+                          {
+                            ...newGameState,
+                            round: {
+                              ...newGameState.round,
+                              phase: {
+                                type: 'auction',
+                                auction: finalAuction
+                              }
+                            }
+                          },
+                          auctionResult,
+                          finalAuction.card
+                        )
+
+                        set(
+                          { gameState: finalGameState },
+                          false,
+                          'hiddenAuction_concluded'
+                        )
+
+                        // Check if round should continue
+                        setTimeout(() => {
+                          const { gameState: newGameState } = get()
+                          if (newGameState && newGameState.round.phase.type === 'awaiting_card_play') {
+                            // Check if it's an AI's turn to play a card
+                            if (newGameState.round.phase.activePlayerIndex !== 0) {
+                              get().processAITurn()
+                            }
+                          }
+                        }, 2000)
+                      }
+                    }
+                  }, 1500)
+                }
+              }
+            }, 1000)
+          }
+
+        } catch (error) {
+          console.error('Error submitting hidden bid:', error)
+          alert(`Error submitting bid: ${error.message}`)
+        }
       },
 
       setFixedPrice: (price: number) => {

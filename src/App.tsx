@@ -701,7 +701,7 @@ function App() {
   // Handle player count selection - setup the game and go directly to main gameplay
   const handlePlayerCountSelect = (count: number, playerStarts: boolean = false) => {
     setPlayerCount(count)
-    storeSetPlayerCount(count)
+    storeSetPlayerCount(count as 3 | 4 | 5)
 
     // Start the game - the mock game state will randomly select first player
     startGameFromSetup()

@@ -28,43 +28,37 @@ export function executeAuction(
   let newPlayers = [...gameState.players]
 
   // Handle money transfers
-  if (winnerId === auctioneerId) {
+  if (winnerId === auctioneerId && winnerId !== null) {
     // Auctioneer wins their own auction - pays to bank
     newPlayers = payToBank(winnerId, salePrice, newPlayers)
-  } else if (salePrice > 0) {
+  } else if (winnerId !== null && salePrice > 0) {
     // Player-to-player transfer
     newPlayers = transferMoney(winnerId, auctioneerId, salePrice, newPlayers)
   }
 
-  // Move the painting to winner's current round purchases
-  newPlayers = newPlayers.map(player => {
-    if (player.id === winnerId) {
-      return {
-        ...player,
-        purchasedThisRound: [
-          ...(player.purchasedThisRound || []),
-          {
-            card: auctionCard,
-            artist: auctionCard.artist,
-            purchasePrice: salePrice,
-            purchasedRound: gameState.round.roundNumber
-          }
-        ]
+  // Move the painting to winner's current round purchases (if there's a winner)
+  if (winnerId !== null) {
+    newPlayers = newPlayers.map(player => {
+      if (player.id === winnerId) {
+        return {
+          ...player,
+          purchasedThisRound: [
+            ...(player.purchasedThisRound || []),
+            auctionCard  // Just add the card itself, not the painting object
+          ]
+        }
       }
-    }
-    return player
-  })
+      return player
+    })
+  }
 
   // Add auction event to event log
+  const winnerIndex = newPlayers.findIndex(p => p.id === winnerId)
   const auctionEvent = {
-    type: 'auction_completed' as const,
-    winnerId,
-    auctioneerId,
-    salePrice,
-    cardId: auctionCard.id,
-    artist: auctionCard.artist,
-    auctionType: auctionCard.auctionType,
-    round: gameState.round.roundNumber
+    type: 'auction_won' as const,
+    winnerIndex,
+    amount: salePrice,
+    cards: [auctionCard]
   }
 
   return {

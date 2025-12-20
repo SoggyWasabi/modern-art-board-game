@@ -4,6 +4,7 @@ import { useGameStore } from '../../../store/gameStore'
 import type { Card, AuctionType } from '../../../types'
 import type { AuctionState } from '../../../types/auction'
 import { colors } from '../../../design/premiumTokens'
+import HiddenAuction from './HiddenAuction'
 
 interface ActiveAuctionProps {
   currentAuction: AuctionState
@@ -68,6 +69,18 @@ const ActiveAuction: React.FC<ActiveAuctionProps> = ({
 
   // Get bidding players (excluding human player "You")
   const biddingPlayers = gameState?.players.filter((p: any) => p.name !== 'You') || []
+
+  // Render Hidden Auction component if it's a hidden auction
+  if (currentAuction.type === 'hidden') {
+    return (
+      <HiddenAuction
+        currentAuction={currentAuction}
+        isAuctionPlayerTurn={isAuctionPlayerTurn}
+        currentPlayerInAuction={currentPlayerInAuction}
+        gameState={gameState}
+      />
+    )
+  }
 
   return (
     <div
@@ -276,7 +289,10 @@ const ActiveAuction: React.FC<ActiveAuctionProps> = ({
                       transition: 'all 0.15s ease',
                     }}
                   >
-                    Sell ${currentBid}k
+                    <div>Sell ${currentBid}k</div>
+                    <div style={{ fontSize: '12px', opacity: 0.8, fontWeight: 400, marginTop: '2px' }}>
+                      to {gameState?.players.find((p: any) => p.id === highestBidder)?.name || 'highest bidder'}
+                    </div>
                   </button>
                   <button
                     onClick={() => placeBid(currentBid + 1)}
@@ -293,7 +309,10 @@ const ActiveAuction: React.FC<ActiveAuctionProps> = ({
                       transition: 'all 0.15s ease',
                     }}
                   >
-                    Keep ${currentBid + 1}k
+                    <div>Buy ${currentBid + 1}k</div>
+                    <div style={{ fontSize: '12px', opacity: 0.8, fontWeight: 400, marginTop: '2px' }}>
+                      keep the card
+                    </div>
                   </button>
                 </>
               ) : (

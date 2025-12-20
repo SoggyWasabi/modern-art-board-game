@@ -5,7 +5,7 @@ import type { Card } from './game'
 // ===================
 
 export interface AuctionResult {
-  winnerId: string
+  winnerId: string | null // null if no one gets the card
   auctioneerId: string
   salePrice: number
   card: Card
@@ -59,6 +59,7 @@ export interface OneOfferAuctionState {
   currentTurnIndex: number
   completedTurns: Set<string> // Players who have taken their turn
   phase: 'bidding' | 'auctioneer_decision' // Phase of the auction
+  bidHistory: Record<string, number> // playerId -> bid amount (0 if passed)
 }
 
 // -----------------------

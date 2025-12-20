@@ -190,10 +190,27 @@ export class MediumAIWrapper {
    * Adapt hidden auction decision
    */
   private adaptHiddenAuctionDecision(decision: any, player: Player, auction: any): AIDecision | null {
-    if (decision.action === 'bid' && decision.amount) {
+    // Hidden bid decisions have 'amount' directly (no 'action' field)
+    // The type is 'hidden_bid' from the strategy
+    if (decision.amount !== undefined && decision.amount >= 0) {
       return {
-        type: 'hidden_bid',
+        type: 'bid',
+        action: 'bid',
         amount: decision.amount
+      }
+    } else if (decision.action === 'bid' && decision.amount !== undefined) {
+      // Also handle cases where action is explicitly set
+      return {
+        type: 'bid',
+        action: 'bid',
+        amount: decision.amount
+      }
+    } else if (decision.action === 'pass') {
+      // Pass = bid 0 in hidden auctions
+      return {
+        type: 'bid',
+        action: 'bid',
+        amount: 0
       }
     }
     return null
@@ -263,6 +280,15 @@ export class MediumAIWrapper {
           type: 'bid',
           action: 'pass'
         }
+      }
+    } else if (auction.type === 'hidden') {
+      // Hidden auction fallback - bid a random amount between 0 and 30% of money
+      const maxBid = Math.floor(player.money * 0.3)
+      const bidAmount = Math.floor(Math.random() * (maxBid + 1))
+      return {
+        type: 'bid',
+        action: 'bid',
+        amount: bidAmount
       }
     }
     return null
