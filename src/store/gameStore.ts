@@ -12,7 +12,7 @@ import { getOpenAuctionAIManager } from '../integration/openAuctionAIManager'
 import { placeBid as placeOpenBid, pass as passOpenBid, checkTimerExpiration, endAuctionByTimer, concludeAuction as concludeOpenAuction } from '../engine/auction/open'
 import { makeOffer, pass as passOneOffer, acceptHighestBid, auctioneerOutbid, auctioneerTakesFree, concludeAuction } from '../engine/auction/oneOffer'
 import { submitBid, revealBids, concludeAuction as concludeHiddenAuction } from '../engine/auction/hidden'
-import { buyAtPrice, pass as passFixedPrice } from '../engine/auction/fixedPrice'
+import { buyAtPrice, pass as passFixedPrice, setPrice as setFixedPrice, concludeAuction as concludeFixedPriceAuction } from '../engine/auction/fixedPrice'
 import { executeAuction } from '../engine/auction/executor'
 
 const PLAYER_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6']
@@ -600,11 +600,24 @@ export const useGameStore = create<GameStore>()(
               break
 
             case 'fixed_price':
-              if (amount === auction.price) {
-                updatedAuction = buyAtPrice(auction, player.id, gameState.players)
+              // Check if we're in price setting phase (price = 0)
+              if (auction.price === 0) {
+                // Auctioneer setting the price
+                if (player.id === auction.auctioneerId && amount > 0) {
+                  updatedAuction = setFixedPrice(auction, player.id, amount, gameState.players)
+                } else {
+                  console.error('Only auctioneer can set price')
+                  return
+                }
               } else {
-                console.error('Must bid exactly the fixed price')
-                return
+                // Buying phase - player buying at fixed price
+                if (amount === -1) {
+                  // Special signal for "buy at fixed price"
+                  updatedAuction = buyAtPrice(auction, player.id, gameState.players)
+                } else {
+                  console.error('Use buy action to purchase at fixed price')
+                  return
+                }
               }
               break
 
@@ -630,6 +643,48 @@ export const useGameStore = create<GameStore>()(
             false,
             'placeBid'
           )
+
+          // Check if fixed price auction has ended (someone bought or everyone passed)
+          if (auction.type === 'fixed_price' && !updatedAuction.isActive) {
+            const auctionResult = concludeFixedPriceAuction(updatedAuction, gameState.players)
+            console.log(`Fixed price auction concluded: ${auctionResult.winnerId} won for $${auctionResult.salePrice}k`)
+
+            // Execute the auction (transfer money, card, etc.)
+            const finalGameState = executeAuction(
+              {
+                ...gameState,
+                round: {
+                  ...gameState.round,
+                  phase: {
+                    type: 'auction',
+                    auction: updatedAuction
+                  }
+                }
+              },
+              auctionResult,
+              updatedAuction.card
+            )
+
+            console.log('Fixed price auction executed successfully')
+
+            // Update with final state
+            set(
+              { gameState: finalGameState },
+              false,
+              'fixed_price_auction_executed'
+            )
+
+            // Check if we should transition to next turn
+            if (finalGameState && finalGameState.round.phase.type === 'awaiting_card_play') {
+              setTimeout(() => {
+                if (finalGameState.round.phase.activePlayerIndex !== 0) {
+                  get().processAITurn()
+                }
+              }, 1500)
+            }
+
+            return // Exit early since auction is concluded
+          }
 
           // If all players have acted in One Offer, move to auctioneer decision phase
           if (auction.type === 'one_offer' &&
@@ -719,6 +774,48 @@ export const useGameStore = create<GameStore>()(
             false,
             'passBid'
           )
+
+          // Check if fixed price auction has ended (everyone passed, auctioneer forced to buy)
+          if (auction.type === 'fixed_price' && !updatedAuction.isActive) {
+            const auctionResult = concludeFixedPriceAuction(updatedAuction, gameState.players)
+            console.log(`Fixed price auction concluded: ${auctionResult.winnerId} won for $${auctionResult.salePrice}k`)
+
+            // Execute the auction (transfer money, card, etc.)
+            const finalGameState = executeAuction(
+              {
+                ...gameState,
+                round: {
+                  ...gameState.round,
+                  phase: {
+                    type: 'auction',
+                    auction: updatedAuction
+                  }
+                }
+              },
+              auctionResult,
+              updatedAuction.card
+            )
+
+            console.log('Fixed price auction executed successfully')
+
+            // Update with final state
+            set(
+              { gameState: finalGameState },
+              false,
+              'fixed_price_auction_executed'
+            )
+
+            // Check if we should transition to next turn
+            if (finalGameState && finalGameState.round.phase.type === 'awaiting_card_play') {
+              setTimeout(() => {
+                if (finalGameState.round.phase.activePlayerIndex !== 0) {
+                  get().processAITurn()
+                }
+              }, 1500)
+            }
+
+            return // Exit early since auction is concluded
+          }
 
           // If all players have acted in One Offer, move to auctioneer decision
           if (auction.type === 'one_offer' &&
@@ -869,15 +966,18 @@ export const useGameStore = create<GameStore>()(
       },
 
       setFixedPrice: (price: number) => {
-        console.log('Setting fixed price:', price)
+        // Delegate to placeBid with price amount (placeBid handles setting the price)
+        get().placeBid(price)
       },
 
       buyAtFixedPrice: () => {
-        console.log('Buying at fixed price')
+        // Delegate to placeBid with -1 (special signal for buying at fixed price)
+        get().placeBid(-1)
       },
 
       passFixedPrice: () => {
-        console.log('Passing fixed price')
+        // Delegate to passBid (passBid handles fixed price passing)
+        get().passBid()
       },
 
       offerSecondCardForDouble: (cardId: string) => {

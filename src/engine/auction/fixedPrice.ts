@@ -261,8 +261,50 @@ export function getAuctionStatus(state: FixedPriceAuctionState): {
 }
 
 /**
+ * Set the price for a fixed price auction (only callable by auctioneer)
+ */
+export function setPrice(
+  state: FixedPriceAuctionState,
+  auctioneerId: string,
+  price: number,
+  players: Player[]
+): FixedPriceAuctionState {
+  // Validate auctioneer
+  if (auctioneerId !== state.auctioneerId) {
+    throw new Error('Only the auctioneer can set the price')
+  }
+
+  // Validate price
+  if (price <= 0) {
+    throw new Error('Price must be greater than 0')
+  }
+
+  // Check if auctioneer can afford the price (might need to buy it themselves)
+  const auctioneer = players.find(p => p.id === auctioneerId)
+  if (!auctioneer) {
+    throw new Error('Auctioneer not found')
+  }
+
+  if (price > auctioneer.money) {
+    throw new Error(`Auctioneer only has ${auctioneer.money}, cannot set price ${price}`)
+  }
+
+  return {
+    ...state,
+    price,
+  }
+}
+
+/**
  * Check if auctioneer will be forced to buy (all others passed)
  */
 export function isAuctioneerForcedToBuy(state: FixedPriceAuctionState): boolean {
   return state.currentTurnIndex >= state.turnOrder.length && !state.sold
+}
+
+/**
+ * Check if auction is in price setting phase
+ */
+export function isPriceSettingPhase(state: FixedPriceAuctionState): boolean {
+  return state.price === 0 && !state.sold
 }

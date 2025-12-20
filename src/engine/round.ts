@@ -138,7 +138,7 @@ export function playCard(
         auction = createHiddenAuction(card, currentPlayer, gameState.players)
         break
       case 'fixed_price':
-        auction = createFixedPriceAuction(card, currentPlayer, gameState.players, 10) // Default price
+        auction = createFixedPriceAuction(card, currentPlayer, gameState.players, 0) // Price to be set by auctioneer
         break
       case 'double':
         auction = createDoubleAuction(card, currentPlayer, gameState.players)

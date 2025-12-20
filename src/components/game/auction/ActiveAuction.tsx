@@ -4,6 +4,7 @@ import { useGameStore } from '../../../store/gameStore'
 import type { Card, AuctionType } from '../../../types'
 import type { AuctionState } from '../../../types/auction'
 import { colors } from '../../../design/premiumTokens'
+import FixedPriceAuction from './FixedPriceAuction'
 import HiddenAuction from './HiddenAuction'
 import OpenAuction from './OpenAuction'
 
@@ -83,6 +84,17 @@ const ActiveAuction: React.FC<ActiveAuctionProps> = ({
   const biddingPlayers = gameState?.players.filter((p: any) => p.name !== 'You') || []
 
   // Render specialized auction components
+  if (currentAuction.type === 'fixed_price') {
+    return (
+      <FixedPriceAuction
+        currentAuction={currentAuction}
+        isAuctionPlayerTurn={isAuctionPlayerTurn}
+        currentPlayerInAuction={currentPlayerInAuction}
+        gameState={gameState}
+      />
+    )
+  }
+
   if (currentAuction.type === 'hidden') {
     return (
       <HiddenAuction
