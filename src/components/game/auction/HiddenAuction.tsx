@@ -236,7 +236,9 @@ const HiddenAuction: React.FC<HiddenAuctionProps> = ({
                         : 'Pass'
                       : player.hasSubmitted
                         ? 'Submitted ✓'
-                        : 'Waiting...'
+                        : !player.isHuman && hasHumanSubmitted
+                          ? 'Thinking...'
+                          : 'Waiting...'
                     }
                   </span>
                 </div>
@@ -333,9 +335,31 @@ const HiddenAuction: React.FC<HiddenAuctionProps> = ({
             </button>
           </div>
         ) : hasHumanSubmitted && !bidsRevealed ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '38px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px', height: '38px' }}>
+            {/* Animated waiting indicator */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+              }}
+            >
+              {[0, 1, 2].map((i) => (
+                <div
+                  key={i}
+                  style={{
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    background: colors.accent.gold,
+                    opacity: 0.4 + (i * 0.2),
+                    animation: `pulse 1.2s ease-in-out ${i * 0.2}s infinite`,
+                  }}
+                />
+              ))}
+            </div>
             <span style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '14px' }}>
-              Waiting for other players to submit their bids...
+              Waiting for AI players to decide...
             </span>
           </div>
         ) : null}

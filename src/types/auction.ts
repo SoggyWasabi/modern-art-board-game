@@ -27,6 +27,12 @@ export type AuctionState =
 // -----------------------
 // OPEN AUCTION
 // -----------------------
+export interface BidHistoryItem {
+  playerId: string
+  amount: number
+  timestamp: number
+}
+
 export interface OpenAuctionState {
   type: 'open'
   card: Card
@@ -34,6 +40,13 @@ export interface OpenAuctionState {
   currentBid: number
   currentBidderId: string | null
   isActive: boolean
+
+  // NEW FIELDS for real-time auction
+  timerEndTime: number | null      // When countdown ends (epoch ms)
+  timerDuration: number            // Reset duration (10000ms)
+  bidHistory: BidHistoryItem[]     // Stream of recent bids
+
+  // DEPRECATED: Turn-based concepts (keeping for compatibility during transition)
   playerOrder: string[] // Order of players for auction
   currentPlayerIndex: number
   passCount: number // Number of consecutive passes

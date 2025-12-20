@@ -1,10 +1,11 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Card as GameCardComponent } from '../../Card'
 import { useGameStore } from '../../../store/gameStore'
 import type { Card, AuctionType } from '../../../types'
 import type { AuctionState } from '../../../types/auction'
 import { colors } from '../../../design/premiumTokens'
 import HiddenAuction from './HiddenAuction'
+import OpenAuction from './OpenAuction'
 
 interface ActiveAuctionProps {
   currentAuction: AuctionState
@@ -59,10 +60,21 @@ const ActiveAuction: React.FC<ActiveAuctionProps> = ({
   currentPlayerInAuction,
   gameState,
 }) => {
-  const { placeBid, passBid } = useGameStore()
+  const { placeBid, passBid, checkOpenAuctionTimer } = useGameStore()
   const [bidAmount, setBidAmount] = useState<number>(0)
   const auctionCard = getAuctionCard(currentAuction)
   const auctionInfo = AUCTION_TYPE_INFO[auctionCard.auctionType]
+
+  // Set up timer checking for open auctions
+  useEffect(() => {
+    if (currentAuction.type === 'open' && currentAuction.isActive) {
+      const timerInterval = setInterval(() => {
+        checkOpenAuctionTimer()
+      }, 100) // Check every 100ms
+
+      return () => clearInterval(timerInterval)
+    }
+  }, [currentAuction, checkOpenAuctionTimer])
 
   const currentBid = 'currentBid' in currentAuction ? currentAuction.currentBid : 0
   const highestBidder = 'currentBidderId' in currentAuction ? currentAuction.currentBidderId : null
@@ -70,10 +82,21 @@ const ActiveAuction: React.FC<ActiveAuctionProps> = ({
   // Get bidding players (excluding human player "You")
   const biddingPlayers = gameState?.players.filter((p: any) => p.name !== 'You') || []
 
-  // Render Hidden Auction component if it's a hidden auction
+  // Render specialized auction components
   if (currentAuction.type === 'hidden') {
     return (
       <HiddenAuction
+        currentAuction={currentAuction}
+        isAuctionPlayerTurn={isAuctionPlayerTurn}
+        currentPlayerInAuction={currentPlayerInAuction}
+        gameState={gameState}
+      />
+    )
+  }
+
+  if (currentAuction.type === 'open') {
+    return (
+      <OpenAuction
         currentAuction={currentAuction}
         isAuctionPlayerTurn={isAuctionPlayerTurn}
         currentPlayerInAuction={currentPlayerInAuction}

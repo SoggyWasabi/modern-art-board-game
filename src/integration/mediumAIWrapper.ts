@@ -69,8 +69,12 @@ export class MediumAIWrapper {
 
         case 'open':
           decisionType = 'bid'
+          console.log(`${player.name} making open auction decision...`)
           const openDecision = await strategy.makeDecision(decisionType as any, minimalContext, { auction })
-          return this.adaptOpenAuctionDecision(openDecision, player, auction)
+          console.log(`${player.name} raw strategy decision:`, openDecision)
+          const adaptedDecision = this.adaptOpenAuctionDecision(openDecision, player, auction)
+          console.log(`${player.name} adapted decision:`, adaptedDecision)
+          return adaptedDecision
 
         case 'hidden':
           decisionType = 'hidden_bid'
@@ -257,8 +261,98 @@ export class MediumAIWrapper {
    * Fallback simple decision when medium AI fails
    */
   private makeFallbackDecision(player: Player, auction: any): AIDecision | null {
-    // Use simple logic as fallback
-    if (auction.type === 'one_offer') {
+    // Use smarter logic as fallback
+    if (auction.type === 'open') {
+      const currentBid = auction.currentBid || 0
+      const playerMoney = player.money
+
+      console.log(`Open auction fallback for ${player.name}: money=$${playerMoney}k, current bid=$${currentBid}k`)
+
+      // SMART BIDDING LOGIC:
+
+      // 1. Don't bid if you're already the highest bidder
+      if (auction.currentBidderId === player.id) {
+        console.log(`  Already highest bidder, passing`)
+        return {
+          type: 'bid',
+          action: 'pass',
+          confidence: 0.9,
+          reasoning: 'Already winning the auction'
+        }
+      }
+
+      // 2. Calculate maximum reasonable bid (don't overpay)
+      // Base value calculation: consider card value and money situation
+      const maxReasonableBid = Math.min(
+        playerMoney * 0.4,  // Never bid more than 40% of total money
+        currentBid + 15,    // Don't increase bid by more than 15k at once
+        35                  // Hard cap of 35k for any single card
+      )
+
+      // 3. Calculate minimum bid needed
+      const minBid = currentBid + 1
+
+      // 4. Decide whether to bid based on value assessment
+      let shouldBid = false
+      let reasoning = ''
+
+      // Factors that increase likelihood to bid:
+      const cardValueScore = this.estimateCardValue(auction.card, player)
+      const moneyPressure = playerMoney < 20 ? 0.3 : 1.0  // Less likely if low on money
+      const bidPressure = currentBid > 25 ? 0.4 : 1.0      // Less likely if price is already high
+
+      const bidProbability = cardValueScore * moneyPressure * bidPressure
+
+      shouldBid = Math.random() < bidProbability
+
+      if (bidProbability < 0.3) {
+        reasoning = 'Card seems overvalued or too expensive'
+      } else if (moneyPressure < 0.5) {
+        reasoning = 'Low on money, being conservative'
+      } else if (bidPressure < 0.5) {
+        reasoning = 'Price already too high'
+      } else {
+        reasoning = 'Good value opportunity'
+      }
+
+      console.log(`  Bid probability: ${(bidProbability * 100).toFixed(1)}%, reasoning: ${reasoning}`)
+
+      // 5. Make decision
+      if (shouldBid && minBid <= maxReasonableBid && minBid <= playerMoney) {
+        // Calculate smart bid amount
+        let bidAmount: number
+
+        if (currentBid === 0) {
+          // Opening bid - bid conservatively
+          bidAmount = Math.min(Math.max(5, Math.floor(playerMoney * 0.1)), 15)
+        } else {
+          // Counter bid - small increments
+          const increment = Math.min(
+            Math.floor(Math.random() * 3) + 1,  // 1-3k increment
+            Math.floor(maxReasonableBid - currentBid)
+          )
+          bidAmount = currentBid + increment
+        }
+
+        console.log(`  Smart bid: $${bidAmount}k (was considering up to $${maxReasonableBid}k)`)
+
+        return {
+          type: 'bid',
+          action: 'bid',
+          amount: bidAmount,
+          confidence: Math.min(0.8, bidProbability),
+          reasoning: `${reasoning} - bidding $${bidAmount}k`
+        }
+      } else {
+        console.log(`  Passing: ${minBid > maxReasonableBid ? 'price too high' : 'choosing not to bid'}`)
+        return {
+          type: 'bid',
+          action: 'pass',
+          confidence: 0.7,
+          reasoning: reasoning
+        }
+      }
+    } else if (auction.type === 'one_offer') {
       if (auction.phase === 'bidding' && player.id !== auction.auctioneerId) {
         // Increased from 0.3 to 0.5 - more likely to bid
         const shouldBid = Math.random() < 0.5
@@ -307,5 +401,36 @@ export class MediumAIWrapper {
       'double': 30
     }
     return baseValues[card.auctionType] || 20
+  }
+
+  /**
+   * Simple card value estimation based on artist and player's hand
+   */
+  private estimateCardValue(card: any, player: Player): number {
+    // Base value by auction type
+    const baseValues = {
+      'open': 0.7,      // Open auctions can get expensive
+      'one_offer': 0.8, // Usually good value
+      'hidden': 0.6,    // Risky, unknown others
+      'fixed_price': 0.5, // Often overpriced
+      'double': 0.4     // Very risky
+    }
+
+    let baseValue = baseValues[card.auctionType] || 0.5
+
+    // Adjust based on player's existing cards (collecting sets)
+    const sameArtistCards = player.hand.filter(c => c.artist === card.artist).length
+    if (sameArtistCards >= 2) {
+      baseValue *= 1.3 // Value multiplier for collecting same artist
+    }
+
+    // Adjust based on money situation
+    if (player.money > 50) {
+      baseValue *= 1.2 // Can afford to be more aggressive
+    } else if (player.money < 20) {
+      baseValue *= 0.7 // Need to be conservative
+    }
+
+    return Math.min(1.0, Math.max(0.1, baseValue))
   }
 }

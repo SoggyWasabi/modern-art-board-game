@@ -1,11 +1,13 @@
 import type { Player, Card } from '../../types/game'
-import type { OpenAuctionState, AuctionResult } from '../../types/auction'
+import type { OpenAuctionState, AuctionResult, BidHistoryItem } from '../../types/auction'
 
 /**
  * Open Auction Engine
  *
  * Rules:
- * - Any player can bid anytime
+ * - Real-time auction with timer-based ending
+ * - Timer resets on each new bid (10 seconds of inactivity ends auction)
+ * - Any player can bid anytime (no turns)
  * - Bid must exceed current high bid
  * - Cannot bid more than own money
  * - No bids → auctioneer gets free
@@ -24,6 +26,13 @@ export function createOpenAuction(
     currentBid: 0,
     currentBidderId: null,
     isActive: true,
+
+    // NEW: Timer and bid history for real-time auction
+    timerEndTime: null, // No timer until first bid
+    timerDuration: 10000, // 10 seconds
+    bidHistory: [],
+
+    // DEPRECATED: Keeping for compatibility during transition
     playerOrder: players.map(p => p.id),
     currentPlayerIndex: 0,
     passCount: 0,
@@ -57,14 +66,28 @@ export function placeBid(
     throw new Error(`Player only has ${bidder.money}, cannot bid ${bidAmount}`)
   }
 
-  // Reset pass count since someone bid
-  const passCount = 0
+  // Create bid history entry
+  const bidHistoryItem: BidHistoryItem = {
+    playerId: bidderId,
+    amount: bidAmount,
+    timestamp: Date.now(),
+  }
+
+  // Add to bid history (keep last 10 bids for UI)
+  const bidHistory = [...state.bidHistory, bidHistoryItem].slice(-10)
+
+  // Reset timer for new bidding period
+  const timerEndTime = Date.now() + state.timerDuration
 
   return {
     ...state,
     currentBid: bidAmount,
     currentBidderId: bidderId,
-    passCount,
+    timerEndTime,
+    bidHistory,
+
+    // DEPRECATED: Reset pass count for compatibility
+    passCount: 0,
   }
 }
 
@@ -95,6 +118,31 @@ export function pass(
   return {
     ...state,
     passCount,
+  }
+}
+
+/**
+ * Check if auction timer has expired and should end
+ */
+export function checkTimerExpiration(state: OpenAuctionState): boolean {
+  if (!state.timerEndTime || !state.isActive) {
+    return false
+  }
+  return Date.now() >= state.timerEndTime
+}
+
+/**
+ * End auction due to timer expiration
+ */
+export function endAuctionByTimer(state: OpenAuctionState): OpenAuctionState {
+  if (!state.isActive) {
+    return state
+  }
+
+  return {
+    ...state,
+    isActive: false,
+    timerEndTime: null, // Clear timer
   }
 }
 

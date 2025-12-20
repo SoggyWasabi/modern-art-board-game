@@ -6,9 +6,10 @@ import { startGame } from '../engine/game'
 import { playCard } from '../engine/round'
 import { getGameController, GameActionHandler } from '../integration/gameIntegration'
 import { getAuctionAIOrchestrator } from '../integration/auctionAIOrchestrator'
+import { getOpenAuctionAIManager } from '../integration/openAuctionAIManager'
 
 // Import all auction engine functions
-import { placeBid as placeOpenBid, pass as passOpenBid } from '../engine/auction/open'
+import { placeBid as placeOpenBid, pass as passOpenBid, checkTimerExpiration, endAuctionByTimer, concludeAuction as concludeOpenAuction } from '../engine/auction/open'
 import { makeOffer, pass as passOneOffer, acceptHighestBid, auctioneerOutbid, auctioneerTakesFree, concludeAuction } from '../engine/auction/oneOffer'
 import { submitBid, revealBids, concludeAuction as concludeHiddenAuction } from '../engine/auction/hidden'
 import { buyAtPrice, pass as passFixedPrice } from '../engine/auction/fixedPrice'
@@ -53,6 +54,8 @@ interface GameStore {
   passFixedPrice: () => void
   offerSecondCardForDouble: (cardId: string) => void
   declineSecondCardForDouble: () => void
+  processAIActionsInAuction: () => void
+  processAITurn: () => void
 
   // UI actions
   selectCard: (cardId: string | null) => void
@@ -63,6 +66,11 @@ interface GameStore {
   setDealingProgress: (progress: number) => void
   setFirstPlayerIndex: (index: number) => void
   completeGameStart: () => void
+
+  // Open auction management
+  startOpenAuctionAI: () => void
+  stopOpenAuctionAI: () => void
+  checkOpenAuctionTimer: () => void
 
   // Utility actions
   resetGame: () => void
@@ -315,6 +323,14 @@ export const useGameStore = create<GameStore>()(
         }
 
         console.log('Processing AI actions in auction...')
+        const auction = gameState.round.phase.auction
+
+        // Start Open Auction AI Manager for open auctions
+        if (auction.type === 'open') {
+          console.log('Starting Open Auction AI Manager for new auction')
+          get().startOpenAuctionAI()
+          return // Open auctions are handled by AI manager, not orchestrator
+        }
 
         const orchestrator = getAuctionAIOrchestrator()
         let updatedGameState = await orchestrator.processAuctionAI(gameState)
@@ -492,6 +508,22 @@ export const useGameStore = create<GameStore>()(
           switch (auction.type) {
             case 'open':
               updatedAuction = placeOpenBid(auction, player.id, amount, gameState.players)
+
+              // Update AI manager with new state so AI can react to new bids
+              const aiManager = getOpenAuctionAIManager()
+              if (aiManager.isActive()) {
+                const newGameState = {
+                  ...gameState,
+                  round: {
+                    ...gameState.round,
+                    phase: {
+                      type: 'auction' as const,
+                      auction: updatedAuction
+                    }
+                  }
+                }
+                aiManager.updateGameState(newGameState)
+              }
               break
 
             case 'one_offer':
@@ -564,7 +596,7 @@ export const useGameStore = create<GameStore>()(
               break
 
             case 'hidden':
-              updatedAuction = submitBid(auction, player.id, amount)
+              updatedAuction = submitBid(auction, player.id, amount, gameState.players)
               break
 
             case 'fixed_price':
@@ -662,7 +694,7 @@ export const useGameStore = create<GameStore>()(
               break
 
             case 'fixed_price':
-              updatedAuction = passFixedPrice(auction, player.id)
+              updatedAuction = passFixedPrice(auction, player.id, gameState.players)
               break
 
             default:
@@ -919,6 +951,161 @@ export const useGameStore = create<GameStore>()(
           false,
           'completeGameStart'
         ),
+
+      // Open auction management
+      startOpenAuctionAI: () => {
+        const { gameState } = get()
+        if (!gameState || gameState.round.phase.type !== 'auction') {
+          return
+        }
+
+        const auction = gameState.round.phase.auction
+        if (auction.type === 'open') {
+          const aiManager = getOpenAuctionAIManager()
+
+          // Set up callback for AI to place bids
+          aiManager.setPlaceBidCallback((playerId: string, amount: number) => {
+            console.log(`AI ${playerId} placing bid of ${amount}k`)
+
+            // Create a copy of current game state for AI bid
+            const currentState = get().gameState
+            if (!currentState || currentState.round.phase.type !== 'auction') {
+              return
+            }
+
+            const currentAuction = currentState.round.phase.auction
+            if (currentAuction.type !== 'open') {
+              return
+            }
+
+            // Find the AI player
+            const aiPlayer = currentState.players.find(p => p.id === playerId)
+            if (!aiPlayer || !aiPlayer.isAI) {
+              return
+            }
+
+            try {
+              // Place the bid using the open auction engine
+              const updatedAuction = placeOpenBid(currentAuction, playerId, amount, currentState.players)
+
+              const newGameState = {
+                ...currentState,
+                round: {
+                  ...currentState.round,
+                  phase: {
+                    type: 'auction' as const,
+                    auction: updatedAuction
+                  }
+                }
+              }
+
+              // Update game state with AI bid
+              set(
+                { gameState: newGameState },
+                false,
+                'ai_open_bid'
+              )
+
+              // Sync the new state back to the AI manager so other AIs see updated bid
+              aiManager.updateGameState(newGameState)
+
+            } catch (error) {
+              console.error(`Error placing AI bid for ${playerId}:`, error)
+            }
+          })
+
+          aiManager.startManaging(gameState)
+          console.log('Started Open Auction AI management')
+        }
+      },
+
+      stopOpenAuctionAI: () => {
+        const aiManager = getOpenAuctionAIManager()
+        aiManager.stopManaging()
+        console.log('Stopped Open Auction AI management')
+      },
+
+      checkOpenAuctionTimer: () => {
+        const { gameState } = get()
+        if (!gameState || gameState.round.phase.type !== 'auction') {
+          return
+        }
+
+        const auction = gameState.round.phase.auction
+        if (auction.type === 'open' && checkTimerExpiration(auction)) {
+          console.log('Open auction timer expired, ending auction')
+
+          // End the auction due to timer expiration
+          const endedAuction = endAuctionByTimer(auction)
+
+          // Update game state with ended auction
+          set(
+            {
+              gameState: {
+                ...gameState,
+                round: {
+                  ...gameState.round,
+                  phase: {
+                    type: 'auction',
+                    auction: endedAuction
+                  }
+                }
+              }
+            },
+            false,
+            'open_auction_timer_ended'
+          )
+
+          // Stop AI management
+          get().stopOpenAuctionAI()
+
+          // Conclude and execute the auction after a short delay
+          setTimeout(() => {
+            const { gameState: currentGameState } = get()
+            if (currentGameState && currentGameState.round.phase.type === 'auction') {
+              const currentAuction = currentGameState.round.phase.auction
+              if (currentAuction.type === 'open' && !currentAuction.isActive) {
+                // Use the imported concludeOpenAuction function
+                const auctionResult = concludeOpenAuction(currentAuction, currentGameState.players)
+                console.log(`Open auction concluded: ${auctionResult.winnerId} won for $${auctionResult.salePrice}k`)
+
+                // Execute the auction (transfer money, card, etc.)
+                const finalGameState = executeAuction(
+                  {
+                    ...currentGameState,
+                    round: {
+                      ...currentGameState.round,
+                      phase: {
+                        type: 'auction',
+                        auction: currentAuction
+                      }
+                    }
+                  },
+                  auctionResult,
+                  currentAuction.card
+                )
+
+                set(
+                  { gameState: finalGameState },
+                  false,
+                  'open_auction_executed'
+                )
+
+                // Check if round should continue
+                setTimeout(() => {
+                  const { gameState: newGameState } = get()
+                  if (newGameState && newGameState.round.phase.type === 'awaiting_card_play') {
+                    // Check if it's an AI's turn to play a card
+                    if (newGameState.round.phase.activePlayerIndex !== 0) {
+                      get().processAITurn()
+                    }
+                  }
+                }, 1500)
+              }
+            }
+          }, 1000)
+        }
+      },
 
       // Utility actions
       resetGame: () =>

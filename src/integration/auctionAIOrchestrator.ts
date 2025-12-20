@@ -35,6 +35,12 @@ export class AuctionAIOrchestrator {
     const auction = gameState.round.phase.auction
     console.log('Processing AI for auction type:', auction.type)
 
+    // Skip open auctions - they are handled by OpenAuctionAIManager
+    if (auction.type === 'open') {
+      console.log('Skipping open auction - handled by OpenAuctionAIManager')
+      return null
+    }
+
     // Special handling for hidden auctions - process ALL AI players simultaneously
     if (auction.type === 'hidden') {
       return await this.processHiddenAuctionAI(gameState)
