@@ -22,6 +22,9 @@ interface CardProps {
   card: CardData
   size?: 'sm' | 'md' | 'lg' | 'xl'
   className?: string
+  isHighlighted?: boolean  // Golden glow for matching cards in double auction
+  isDisabled?: boolean     // Dimmed for non-matching cards in double auction
+  onClick?: () => void     // Click handler for card selection
 }
 
 // Auction icon component
@@ -217,23 +220,91 @@ const sizeConfig = {
   xl: { width: '200px', height: '280px', headerHeight: '36px', fontSize: 16, iconSize: 20 },
 }
 
-export function Card({ card, size = 'md', className = '' }: CardProps) {
+export function Card({
+  card,
+  size = 'md',
+  className = '',
+  isHighlighted = false,
+  isDisabled = false,
+  onClick
+}: CardProps) {
   const artist = ARTISTS[card.artistIndex] || ARTISTS[0]
   const config = sizeConfig[size]
 
+  // Base styles
+  const baseStyles = {
+    width: config.width,
+    height: config.height,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 8,
+    overflow: 'hidden',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+    flexShrink: 0,
+    position: 'relative' as const,
+    transition: 'all 0.3s ease',
+    cursor: onClick ? 'pointer' : 'default',
+  }
+
+  // Highlighted styles (golden glow + animation)
+  const highlightedStyles = isHighlighted ? {
+    boxShadow: `
+      0 0 20px rgba(251, 191, 36, 0.6),
+      0 0 40px rgba(251, 191, 36, 0.4),
+      0 8px 32px rgba(0,0,0,0.6)
+    `,
+    transform: 'scale(1.05)',
+    '&::before': {
+      content: '""',
+      position: 'absolute' as const,
+      inset: -2,
+      borderRadius: 10,
+      padding: 2,
+      background: 'linear-gradient(45deg, #fbbf24, #f59e0b, #fbbf24)',
+      mask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+      maskComposite: 'xor',
+      animation: 'pulse 2s ease-in-out infinite',
+    }
+  } : {}
+
+  // Disabled styles (dimmed + grayscale)
+  const disabledStyles = isDisabled ? {
+    opacity: 0.4,
+    filter: 'grayscale(80%)',
+    cursor: 'not-allowed',
+    transform: 'scale(0.95)',
+  } : {}
+
+  // Hover effects for highlighted cards
+  const hoverStyles = isHighlighted && onClick ? {
+    '&:hover': {
+      transform: 'scale(1.08)',
+      boxShadow: `
+        0 0 25px rgba(251, 191, 36, 0.8),
+        0 0 50px rgba(251, 191, 36, 0.6),
+        0 8px 32px rgba(0,0,0,0.6)
+      `,
+    }
+  } : {}
+
   return (
-    <div
-      className={className}
-      style={{
-        width: config.width,
-        height: config.height,
-        backgroundColor: '#1a1a1a',
-        borderRadius: 8,
-        overflow: 'hidden',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
-        flexShrink: 0,
-      }}
-    >
+    <>
+      <style>
+        {`
+          @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+          }
+        `}
+      </style>
+      <div
+        className={className}
+        onClick={isDisabled ? undefined : onClick}
+        style={{
+          ...baseStyles,
+          ...highlightedStyles,
+          ...disabledStyles,
+        }}
+      >
       {/* Header */}
       <div
         style={{
@@ -266,7 +337,59 @@ export function Card({ card, size = 'md', className = '' }: CardProps) {
       {/* Artwork */}
       <div style={{ height: `calc(${config.height} - ${config.headerHeight})` }}>
         <PlaceholderArt artistIndex={card.artistIndex} cardIndex={card.cardIndex} />
+
+        {/* Selection indicator for highlighted cards */}
+        {isHighlighted && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 8,
+              right: 8,
+              width: 28,
+              height: 28,
+              backgroundColor: 'rgba(251, 191, 36, 0.9)',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+              border: '2px solid #1a1a1a',
+            }}
+          >
+            <svg width={16} height={16} viewBox="0 0 16 16" fill="none">
+              <path
+                d="M3 8l3 3 7-7"
+                stroke="#1a1a1a"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </div>
+        )}
+
+        {/* "Double Auction" hint overlay */}
+        {isHighlighted && (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 8,
+              left: 8,
+              backgroundColor: 'rgba(0, 0, 0, 0.8)',
+              color: '#fbbf24',
+              fontSize: '10px',
+              fontWeight: 'bold',
+              padding: '4px 8px',
+              borderRadius: 4,
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+            }}
+          >
+            Offer This
+          </div>
+        )}
       </div>
-    </div>
+      </div>
+    </>
   )
 }

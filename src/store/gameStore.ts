@@ -13,6 +13,7 @@ import { placeBid as placeOpenBid, pass as passOpenBid, checkTimerExpiration, en
 import { makeOffer, pass as passOneOffer, acceptHighestBid, auctioneerOutbid, auctioneerTakesFree, concludeAuction } from '../engine/auction/oneOffer'
 import { submitBid, revealBids, concludeAuction as concludeHiddenAuction } from '../engine/auction/hidden'
 import { buyAtPrice, pass as passFixedPrice, setPrice as setFixedPrice, concludeAuction as concludeFixedPriceAuction } from '../engine/auction/fixedPrice'
+import { offerSecondCard, declineToOffer } from '../engine/auction/double'
 import { executeAuction } from '../engine/auction/executor'
 
 const PLAYER_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6']
@@ -981,11 +982,79 @@ export const useGameStore = create<GameStore>()(
       },
 
       offerSecondCardForDouble: (cardId: string) => {
-        console.log('Offering second card for double:', cardId)
+        const { gameState } = get()
+        if (!gameState || gameState.round.phase.type !== 'auction') return
+
+        const auction = gameState.round.phase.auction
+        if (auction.type !== 'double') return
+
+        const playerIndex = 0 // Assuming human player is index 0
+        const player = gameState.players[playerIndex]
+
+        // Find the card in player's hand
+        const card = player.hand.find(c => c.id === cardId)
+        if (!card) return
+
+        try {
+          // Use the double auction engine to offer the card
+          const updatedAuction = offerSecondCard(auction, player.id, card, gameState.players)
+
+          // Update game state with the new auction
+          set({
+            gameState: {
+              ...gameState,
+              round: {
+                ...gameState.round,
+                phase: {
+                  type: 'auction',
+                  auction: updatedAuction
+                }
+              }
+            }
+          }, false, 'offerSecondCardForDouble')
+
+          // Process AI for the new auction state
+          get().processAITurn()
+
+        } catch (error) {
+          console.error('Error offering second card:', error)
+        }
       },
 
       declineSecondCardForDouble: () => {
-        console.log('Declining second card for double')
+        const { gameState } = get()
+        if (!gameState || gameState.round.phase.type !== 'auction') return
+
+        const auction = gameState.round.phase.auction
+        if (auction.type !== 'double') return
+
+        const playerIndex = 0 // Assuming human player is index 0
+        const player = gameState.players[playerIndex]
+
+        try {
+          // Use the double auction engine to decline
+          const updatedAuction = declineToOffer(auction, player.id)
+
+          // Update game state with the new auction
+          set({
+            gameState: {
+              ...gameState,
+              round: {
+                ...gameState.round,
+                phase: {
+                  type: 'auction',
+                  auction: updatedAuction
+                }
+              }
+            }
+          }, false, 'declineSecondCardForDouble')
+
+          // Process AI for the next turn
+          get().processAITurn()
+
+        } catch (error) {
+          console.error('Error declining second card:', error)
+        }
       },
 
       // UI actions

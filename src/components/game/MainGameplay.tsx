@@ -18,7 +18,7 @@ interface MainGameplayProps {
 }
 
 const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
-  const { gameState, selectedCardId, selectCard, playCard, deselectCard, placeBid, passBid } = useGameStore()
+  const { gameState, selectedCardId, selectCard, playCard, deselectCard, placeBid, passBid, offerSecondCardForDouble, declineSecondCardForDouble } = useGameStore()
   const currentPlayer = useCurrentPlayer()
   const isPlayerTurn = useIsCurrentPlayerTurn()
   const { turnIndicator, isPlayerTurn: isCurrentPlayerTurn, isAIThinking, turnMessage } = useTurnManagement()
@@ -70,14 +70,7 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
     ? currentPlayer.hand.find((c: Card) => c.id === selectedCardId) || null
     : null
 
-  // Handle card selection from hand
-  const handleSelectCard = (cardId: string) => {
-    if (selectedCardId === cardId) {
-      deselectCard()
-    } else {
-      selectCard(cardId)
-    }
-  }
+  // Handle card selection from hand (will be overridden below for double auction)
 
   // Handle playing the selected card
   const handlePlayCard = async () => {
@@ -99,15 +92,62 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
     console.log('Pass turn')
   }
 
-  // Handle Double auction second card
+  // Double auction detection logic
+  const isDoubleAuctionPhase = gameState.round.phase.type === 'auction' &&
+    gameState.round.phase.auction.type === 'double' &&
+    !gameState.round.phase.auction.secondCard && // Still in offering phase
+    gameState.round.phase.auction.isActive
+
+  // Check if it's the player's turn to offer a second card
+  const isPlayerTurnToOffer = isDoubleAuctionPhase &&
+    gameState.round.phase.auction.turnOrder[gameState.round.phase.auction.currentTurnIndex] === currentPlayer.id
+
+  // Get the target artist for matching cards
+  const targetArtist = isDoubleAuctionPhase ? gameState.round.phase.auction.doubleCard.artist : null
+
+  // Determine which cards should be highlighted/disabled for double auction
+  const getCardHighlightStatus = (card: Card) => {
+    if (!isDoubleAuctionPhase || !isPlayerTurnToOffer || !targetArtist) {
+      return { isHighlighted: false, isDisabled: false }
+    }
+
+    const isMatchingCard = card.artist === targetArtist && card.auctionType !== 'double'
+    return {
+      isHighlighted: isMatchingCard,
+      isDisabled: !isMatchingCard
+    }
+  }
+
+  // Handle Double auction second card selection
   const handleOfferSecondCard = (cardId: string) => {
-    console.log('Offering second card:', cardId)
-    // TODO: Implement double auction second card logic
+    if (isDoubleAuctionPhase && isPlayerTurnToOffer) {
+      offerSecondCardForDouble(cardId)
+    }
   }
 
   const handleDeclineSecondCard = () => {
-    console.log('Declining to offer second card')
-    // TODO: Implement double auction decline logic
+    if (isDoubleAuctionPhase && isPlayerTurnToOffer) {
+      declineSecondCardForDouble()
+    }
+  }
+
+  // Handle card selection from hand with double auction support
+  const handleSelectCard = (cardId: string) => {
+    // In double auction offering phase, use different logic
+    if (isDoubleAuctionPhase && isPlayerTurnToOffer) {
+      const card = currentPlayer.hand.find(c => c.id === cardId)
+      if (card && getCardHighlightStatus(card).isHighlighted) {
+        handleOfferSecondCard(cardId)
+      }
+      return
+    }
+
+    // Normal card selection logic
+    if (selectedCardId === cardId) {
+      deselectCard()
+    } else {
+      selectCard(cardId)
+    }
   }
 
   return (
@@ -325,6 +365,55 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
         </div>
       </div>
 
+      {/* Double Auction Helper */}
+      {isDoubleAuctionPhase && isPlayerTurnToOffer && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 180,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            backgroundColor: 'rgba(0, 0, 0, 0.9)',
+            color: '#fbbf24',
+            padding: '12px 24px',
+            borderRadius: '8px',
+            fontSize: '14px',
+            fontWeight: 'bold',
+            textAlign: 'center',
+            zIndex: 1000,
+            border: '1px solid rgba(251, 191, 36, 0.3)',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
+            backdropFilter: 'blur(10px)',
+          }}
+        >
+          🎯 Double Auction! Select a {targetArtist} card to offer.
+          <div style={{ marginTop: '8px' }}>
+            <button
+              onClick={handleDeclineSecondCard}
+              style={{
+                backgroundColor: 'rgba(239, 68, 68, 0.8)',
+                border: 'none',
+                color: 'white',
+                padding: '6px 16px',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                transition: 'background-color 0.2s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(220, 38, 38, 0.9)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.8)'
+              }}
+            >
+              Pass (Decline to Offer)
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Bottom: Player Hand */}
       <div className="player-hand">
         <PlayerHand
@@ -332,8 +421,9 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
           selectedCardId={selectedCardId}
           onSelectCard={handleSelectCard}
           money={currentPlayer.money}
-          disabled={!isCurrentPlayerTurn || isAIThinking || round.phase.type === 'auction'}
+          disabled={!isCurrentPlayerTurn || isAIThinking || (round.phase.type === 'auction' && !isDoubleAuctionPhase)}
           purchasedThisRound={currentPlayer.purchasedThisRound}
+          getCardHighlightStatus={getCardHighlightStatus}
         />
       </div>
 

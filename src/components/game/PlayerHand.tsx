@@ -10,6 +10,8 @@ interface PlayerHandProps {
   money: number
   disabled?: boolean
   purchasedThisRound?: Card[]
+  // Double auction highlighting support
+  getCardHighlightStatus?: (card: Card) => { isHighlighted: boolean; isDisabled: boolean }
 }
 
 const PlayerHand: React.FC<PlayerHandProps> = ({
@@ -19,6 +21,7 @@ const PlayerHand: React.FC<PlayerHandProps> = ({
   money,
   disabled = false,
   purchasedThisRound = [],
+  getCardHighlightStatus,
 }) => {
   const [hoveredCard, setHoveredCard] = useState<string | null>(null)
 
@@ -170,6 +173,9 @@ const PlayerHand: React.FC<PlayerHandProps> = ({
                           auctionType: card.auctionType
                         }}
                         size="md" // Back to medium size
+                        isHighlighted={getCardHighlightStatus?.(card)?.isHighlighted || false}
+                        isDisabled={getCardHighlightStatus?.(card)?.isDisabled || disabled}
+                        onClick={() => !disabled && onSelectCard(card.id)}
                       />
                     </div>
                   </div>
