@@ -198,7 +198,7 @@ export class MediumAIStrategy implements AIStrategy {
           throw new Error('Auction state required for buy decisions')
         }
         // For buy decisions, evaluate if the fixed price is good value
-        const fixedPrice = options.auction.fixedPrice || 0
+        const fixedPrice = (options.auction as any).price || 0
         const cardValue = this.valuation.evaluateCard(options.auction.card || { id: 'unknown', artist: 'Unknown' as Artist, auctionType: 'fixed_price' as AuctionType }, context.gameState, context.playerIndex)
 
         return {

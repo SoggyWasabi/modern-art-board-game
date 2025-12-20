@@ -82,9 +82,22 @@ export class MediumAIWrapper {
           return this.adaptHiddenAuctionDecision(hiddenDecision, player, auction)
 
         case 'fixed_price':
-          decisionType = 'fixed_price'
-          const fixedDecision = await strategy.makeDecision(decisionType as any, minimalContext, { auction })
-          return this.adaptFixedPriceDecision(fixedDecision, player, auction)
+          if (auction.price === 0) {
+            // Price setting phase - auctioneer sets the price
+            if (player.id === auction.auctioneerId) {
+              decisionType = 'fixed_price'
+              const fixedDecision = await strategy.makeDecision(decisionType as any, minimalContext, { auction })
+              return this.adaptFixedPriceDecision(fixedDecision, player, auction)
+            }
+          } else {
+            // Buying phase - players decide to buy or pass
+            if (auction.turnOrder[auction.currentTurnIndex] === player.id) {
+              decisionType = 'buy'
+              const buyDecision = await strategy.makeDecision(decisionType as any, minimalContext, { auction })
+              return this.adaptFixedPriceDecision(buyDecision, player, auction)
+            }
+          }
+          break
 
         case 'double':
           if (!auction.secondCard && auction.currentAuctioneerId === player.id) {
