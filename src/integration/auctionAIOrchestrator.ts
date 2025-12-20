@@ -8,7 +8,7 @@ import { createDoubleAuction, offerSecondCard, declineToOffer } from '../engine/
 import { placeBid as placeOpenBid, pass as passOpenBid } from '../engine/auction/open'
 import { makeOffer, pass as passOneOffer, acceptHighestBid, auctioneerOutbid, auctioneerTakesFree, concludeAuction } from '../engine/auction/oneOffer'
 import { submitBid, revealBids } from '../engine/auction/hidden'
-import { buyAtPrice, pass as passFixedPrice, setPrice as setFixedPrice } from '../engine/auction/fixedPrice'
+import { buyAtPrice, pass as passFixedPrice, setPrice as setFixedPrice, concludeAuction as concludeFixedPriceAuction } from '../engine/auction/fixedPrice'
 import { executeAuction } from '../engine/auction/executor'
 
 /**
@@ -83,8 +83,13 @@ export class AuctionAIOrchestrator {
       // Check if auction has concluded after this action
       const auction = updatedGameState.round.phase.auction
       if (auction.type === 'one_offer' && !auction.isActive) {
-        console.log('Auction has ended, executing auction result')
+        console.log('One Offer auction has ended, executing auction result')
         const auctionResult = concludeAuction(auction, updatedGameState.players)
+        updatedGameState = executeAuction(updatedGameState, auctionResult, auction.card)
+        console.log(`Auction concluded: ${auctionResult.winnerId} won for $${auctionResult.salePrice}k`)
+      } else if (auction.type === 'fixed_price' && !auction.isActive) {
+        console.log('Fixed Price auction has ended, executing auction result')
+        const auctionResult = concludeFixedPriceAuction(auction, updatedGameState.players)
         updatedGameState = executeAuction(updatedGameState, auctionResult, auction.card)
         console.log(`Auction concluded: ${auctionResult.winnerId} won for $${auctionResult.salePrice}k`)
       }
