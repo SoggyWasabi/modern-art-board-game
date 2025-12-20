@@ -106,6 +106,8 @@ export interface CardEvaluation {
   riskLevel: number
   /** Overall strategic value */
   strategicValue: number
+  /** Estimated monetary value (in thousands) */
+  estimatedValue: number
   /** Evaluation confidence (0-1) */
   confidence: number
 }

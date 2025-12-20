@@ -44,6 +44,9 @@ export class MediumAICardValuation {
       gameState.round.roundNumber
     )
 
+    // Calculate estimated monetary value based on strategic value and market conditions
+    const estimatedValue = this.calculateEstimatedMonetaryValue(card, strategicValue, marketAnalysis, gameState.round.roundNumber)
+
     return {
       card,
       baseValue,
@@ -52,6 +55,7 @@ export class MediumAICardValuation {
       artistControl,
       riskLevel,
       strategicValue,
+      estimatedValue,
       confidence,
     }
   }
@@ -374,5 +378,50 @@ export class MediumAICardValuation {
     })
 
     return remaining
+  }
+
+  /**
+   * Calculate estimated monetary value for buy/pass decisions
+   */
+  private calculateEstimatedMonetaryValue(
+    card: Card,
+    strategicValue: number,
+    marketAnalysis: any,
+    roundNumber: number
+  ): number {
+    // Base value by auction type (in thousands)
+    const auctionTypeValues = {
+      'open': 25,
+      'one_offer': 30,
+      'hidden': 20,
+      'fixed_price': 22,
+      'double': 35
+    }
+
+    let baseValue = auctionTypeValues[card.auctionType] || 25
+
+    // Adjust by strategic value (0-1 scale)
+    baseValue = baseValue * (0.5 + strategicValue * 0.5)
+
+    // Market analysis adjustments
+    const artistData = marketAnalysis.artistCompetitiveness[card.artist]
+    if (artistData) {
+      // Higher rank = higher value
+      const rankBonus = (6 - artistData.rank) * 3  // Rank 1 = +15, Rank 5 = +3
+      baseValue += rankBonus
+
+      // Expected final value influence
+      baseValue += artistData.expectedFinalValue * 0.3
+    }
+
+    // Round progression (values increase over time)
+    const roundMultipliers = [1.0, 1.2, 1.4, 1.6]
+    const roundMultiplier = roundMultipliers[roundNumber - 1] || 1.0
+    baseValue *= roundMultiplier
+
+    // Add some randomness for natural variation
+    baseValue *= (0.9 + Math.random() * 0.2)  // ±10% variation
+
+    return Math.max(5, Math.floor(baseValue))  // Minimum 5k
   }
 }
