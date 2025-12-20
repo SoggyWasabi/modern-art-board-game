@@ -399,6 +399,7 @@ export class MediumAICardValuation {
     }
 
     let baseValue = auctionTypeValues[card.auctionType] || 25
+    const originalBaseValue = baseValue
 
     // Adjust by strategic value (0-1 scale)
     baseValue = baseValue * (0.5 + strategicValue * 0.5)
@@ -422,6 +423,23 @@ export class MediumAICardValuation {
     // Add some randomness for natural variation
     baseValue *= (0.9 + Math.random() * 0.2)  // ±10% variation
 
-    return Math.max(5, Math.floor(baseValue))  // Minimum 5k
+    const finalValue = Math.max(5, Math.floor(baseValue))  // Minimum 5k
+
+    // DEBUG: Log calculation details
+    console.log(`Card Value Calculation Debug:`, {
+      card: `${card.artist} (${card.auctionType})`,
+      originalBaseValue,
+      strategicValue,
+      afterStrategicAdjustment: baseValue / (0.9 + Math.random() * 0.2) / roundMultiplier,
+      artistData: artistData ? {
+        rank: artistData.rank,
+        expectedFinalValue: artistData.expectedFinalValue
+      } : 'none',
+      roundNumber,
+      roundMultiplier,
+      finalValue
+    })
+
+    return finalValue
   }
 }

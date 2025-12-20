@@ -201,9 +201,22 @@ export class MediumAIStrategy implements AIStrategy {
         const fixedPrice = (options.auction as any).price || 0
         const cardValue = this.valuation.evaluateCard(options.auction.card || { id: 'unknown', artist: 'Unknown' as Artist, auctionType: 'fixed_price' as AuctionType }, context.gameState, context.playerIndex)
 
+        const threshold = fixedPrice * 1.2
+        const shouldBuy = cardValue.estimatedValue > threshold
+
+        // DEBUG: Log buy decision details
+        console.log(`Buy Decision Debug:`, {
+          card: options.auction.card?.artist || 'Unknown',
+          fixedPrice,
+          threshold,
+          estimatedValue: cardValue.estimatedValue,
+          shouldBuy,
+          comparison: `${cardValue.estimatedValue} > ${threshold}`,
+        })
+
         return {
           type: 'buy',
-          action: cardValue.estimatedValue > fixedPrice * 1.2 ? 'buy' : 'pass',
+          action: shouldBuy ? 'buy' : 'pass',
           confidence: 0.7,
           reasoning: cardValue.estimatedValue > fixedPrice * 1.2
             ? `Good value: ${cardValue.estimatedValue.toFixed(1)} vs ${fixedPrice}`

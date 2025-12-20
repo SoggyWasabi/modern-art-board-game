@@ -40,6 +40,7 @@ export class MediumAIWrapper {
 
     // Create a minimal context with just what we need
     const minimalContext = {
+      gameState: gameState,  // CRITICAL: Provide the actual game state
       roundNumber: gameState.round.roundNumber,
       currentPhase: gameState.round.phase.type,
       players: gameState.players.map(p => ({
