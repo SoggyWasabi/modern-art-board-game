@@ -24,6 +24,7 @@ interface CardProps {
   className?: string
   isHighlighted?: boolean  // Golden glow for matching cards in double auction
   isDisabled?: boolean     // Dimmed for non-matching cards in double auction
+  isPartiallyHighlighted?: boolean  // Less highlighted state for non-selected eligible cards
   onClick?: () => void     // Click handler for card selection
 }
 
@@ -226,6 +227,7 @@ export function Card({
   className = '',
   isHighlighted = false,
   isDisabled = false,
+  isPartiallyHighlighted = false,
   onClick
 }: CardProps) {
   const artist = ARTISTS[card.artistIndex] || ARTISTS[0]
@@ -266,6 +268,16 @@ export function Card({
     }
   } : {}
 
+  // Partially highlighted styles (dimmer glow for non-selected eligible cards)
+  const partiallyHighlightedStyles = isPartiallyHighlighted ? {
+    boxShadow: `
+      0 0 12px rgba(251, 191, 36, 0.3),
+      0 0 24px rgba(251, 191, 36, 0.2),
+      0 8px 32px rgba(0,0,0,0.6)
+    `,
+    transform: 'scale(1.02)',
+  } : {}
+
   // Disabled styles (dimmed + grayscale)
   const disabledStyles = isDisabled ? {
     opacity: 0.4,
@@ -281,6 +293,15 @@ export function Card({
       boxShadow: `
         0 0 25px rgba(251, 191, 36, 0.8),
         0 0 50px rgba(251, 191, 36, 0.6),
+        0 8px 32px rgba(0,0,0,0.6)
+      `,
+    }
+  } : isPartiallyHighlighted && onClick ? {
+    '&:hover': {
+      transform: 'scale(1.05)',
+      boxShadow: `
+        0 0 20px rgba(251, 191, 36, 0.6),
+        0 0 40px rgba(251, 191, 36, 0.4),
         0 8px 32px rgba(0,0,0,0.6)
       `,
     }
@@ -302,6 +323,7 @@ export function Card({
         style={{
           ...baseStyles,
           ...highlightedStyles,
+          ...partiallyHighlightedStyles,
           ...disabledStyles,
         }}
       >
@@ -368,8 +390,8 @@ export function Card({
           </div>
         )}
 
-        {/* "Double Auction" hint overlay */}
-        {isHighlighted && (
+        {/* "Double Auction" hint overlay - show for both highlighted and partially highlighted */}
+        {(isHighlighted || isPartiallyHighlighted) && (
           <div
             style={{
               position: 'absolute',
@@ -383,6 +405,7 @@ export function Card({
               borderRadius: 4,
               textTransform: 'uppercase',
               letterSpacing: '0.5px',
+              opacity: isPartiallyHighlighted ? 0.6 : 1,
             }}
           >
             Offer This

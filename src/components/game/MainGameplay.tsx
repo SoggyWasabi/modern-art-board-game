@@ -8,7 +8,7 @@ import AuctionCenter from './AuctionCenter'
 import OpponentPanel from './OpponentPanel'
 import PlayerHand from './PlayerHand'
 import AIThinkingIndicator from './AIThinkingIndicator'
-import DoubleAuctionPrompt from './DoubleAuctionPrompt'
+// import DoubleAuctionPrompt from './DoubleAuctionPrompt' // Removed - now using card highlighting instead
 import { Card as GameCardComponent } from '../Card'
 import { colors } from '../../design/premiumTokens'
 import type { Card } from '../../types'
@@ -108,13 +108,16 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
   // Determine which cards should be highlighted/disabled for double auction
   const getCardHighlightStatus = (card: Card) => {
     if (!isDoubleAuctionPhase || !isPlayerTurnToOffer || !targetArtist) {
-      return { isHighlighted: false, isDisabled: false }
+      return { isHighlighted: false, isDisabled: false, isPartiallyHighlighted: false }
     }
 
     const isMatchingCard = card.artist === targetArtist && card.auctionType !== 'double'
+    const isSelected = selectedDoubleCard?.id === card.id
+
     return {
-      isHighlighted: isMatchingCard,
-      isDisabled: !isMatchingCard
+      isHighlighted: isSelected, // Only selected card gets full highlight
+      isDisabled: !isMatchingCard,
+      isPartiallyHighlighted: isMatchingCard && !isSelected // Other eligible cards get partial highlight
     }
   }
 
@@ -131,13 +134,18 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
     }
   }
 
+  // State to track selected card for double auction preview
+  const [selectedDoubleCard, setSelectedDoubleCard] = useState<Card | null>(null)
+
   // Handle card selection from hand with double auction support
   const handleSelectCard = (cardId: string) => {
     // In double auction offering phase, use different logic
     if (isDoubleAuctionPhase && isPlayerTurnToOffer) {
       const card = currentPlayer.hand.find(c => c.id === cardId)
-      if (card && getCardHighlightStatus(card).isHighlighted) {
-        handleOfferSecondCard(cardId)
+      const highlightStatus = getCardHighlightStatus(card)
+      if (card && (highlightStatus.isHighlighted || highlightStatus.isPartiallyHighlighted)) {
+        // Set the selected card for preview mode instead of immediately offering
+        setSelectedDoubleCard(card)
       }
       return
     }
@@ -149,6 +157,13 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
       selectCard(cardId)
     }
   }
+
+  // Reset double card selection when leaving double auction phase
+  React.useEffect(() => {
+    if (!isDoubleAuctionPhase) {
+      setSelectedDoubleCard(null)
+    }
+  }, [isDoubleAuctionPhase])
 
   return (
     <div
@@ -331,9 +346,11 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
           >
             <AuctionCenter
               selectedCard={selectedCard}
+              selectedDoubleCard={selectedDoubleCard}
               isPlayerTurn={isCurrentPlayerTurn}
               onPlayCard={handlePlayCard}
               onPass={handlePass}
+              onClearSelectedDoubleCard={() => setSelectedDoubleCard(null)}
             />
           </div>
         </div>
@@ -365,54 +382,8 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
         </div>
       </div>
 
-      {/* Double Auction Helper */}
-      {isDoubleAuctionPhase && isPlayerTurnToOffer && (
-        <div
-          style={{
-            position: 'fixed',
-            bottom: 180,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            backgroundColor: 'rgba(0, 0, 0, 0.9)',
-            color: '#fbbf24',
-            padding: '12px 24px',
-            borderRadius: '8px',
-            fontSize: '14px',
-            fontWeight: 'bold',
-            textAlign: 'center',
-            zIndex: 1000,
-            border: '1px solid rgba(251, 191, 36, 0.3)',
-            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
-            backdropFilter: 'blur(10px)',
-          }}
-        >
-          🎯 Double Auction! Select a {targetArtist} card to offer.
-          <div style={{ marginTop: '8px' }}>
-            <button
-              onClick={handleDeclineSecondCard}
-              style={{
-                backgroundColor: 'rgba(239, 68, 68, 0.8)',
-                border: 'none',
-                color: 'white',
-                padding: '6px 16px',
-                borderRadius: '6px',
-                fontSize: '12px',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                transition: 'background-color 0.2s ease',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(220, 38, 38, 0.9)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.8)'
-              }}
-            >
-              Pass (Decline to Offer)
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Double Auction Helper - REMOVED */}
+      {/* Helper prompt removed - now using card highlighting in hand instead */}
 
       {/* Bottom: Player Hand */}
       <div className="player-hand">
@@ -427,15 +398,8 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
         />
       </div>
 
-      {/* Double Auction Prompt */}
-      {gameState.round.phase.type === 'auction' &&
-       gameState.round.phase.auction.type === 'double' && (
-        <DoubleAuctionPrompt
-          auction={gameState.round.phase.auction as any}
-          onOfferCard={handleOfferSecondCard}
-          onDecline={handleDeclineSecondCard}
-        />
-      )}
+      {/* Double Auction Prompt - REMOVED */}
+      {/* Popup removed to improve UX - now using card highlighting in hand instead */}
     </div>
   )
 }

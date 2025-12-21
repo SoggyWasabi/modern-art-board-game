@@ -7,12 +7,15 @@ import { colors } from '../../../design/premiumTokens'
 import FixedPriceAuction from './FixedPriceAuction'
 import HiddenAuction from './HiddenAuction'
 import OpenAuction from './OpenAuction'
+import DoubleAuctionWrapper from './DoubleAuctionWrapper'
 
 interface ActiveAuctionProps {
   currentAuction: AuctionState
   isAuctionPlayerTurn: boolean
   currentPlayerInAuction: any
   gameState: any
+  selectedCard?: Card | null  // For double auction preview
+  onClearSelectedCard?: () => void
 }
 
 const AUCTION_TYPE_INFO: Record<AuctionType, {
@@ -60,6 +63,8 @@ const ActiveAuction: React.FC<ActiveAuctionProps> = ({
   isAuctionPlayerTurn,
   currentPlayerInAuction,
   gameState,
+  selectedCard,
+  onClearSelectedCard,
 }) => {
   const { placeBid, passBid, checkOpenAuctionTimer } = useGameStore()
   const [bidAmount, setBidAmount] = useState<number>(0)
@@ -84,6 +89,19 @@ const ActiveAuction: React.FC<ActiveAuctionProps> = ({
   const biddingPlayers = gameState?.players.filter((p: any) => p.name !== 'You') || []
 
   // Render specialized auction components
+  if (currentAuction.type === 'double') {
+    return (
+      <DoubleAuctionWrapper
+        currentAuction={currentAuction}
+        isAuctionPlayerTurn={isAuctionPlayerTurn}
+        currentPlayerInAuction={currentPlayerInAuction}
+        gameState={gameState}
+        selectedCard={selectedCard}
+        onClearSelectedCard={onClearSelectedCard}
+      />
+    )
+  }
+
   if (currentAuction.type === 'fixed_price') {
     return (
       <FixedPriceAuction

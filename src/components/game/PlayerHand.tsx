@@ -11,7 +11,7 @@ interface PlayerHandProps {
   disabled?: boolean
   purchasedThisRound?: Card[]
   // Double auction highlighting support
-  getCardHighlightStatus?: (card: Card) => { isHighlighted: boolean; isDisabled: boolean }
+  getCardHighlightStatus?: (card: Card) => { isHighlighted: boolean; isDisabled: boolean; isPartiallyHighlighted?: boolean }
 }
 
 const PlayerHand: React.FC<PlayerHandProps> = ({
@@ -44,10 +44,14 @@ const PlayerHand: React.FC<PlayerHandProps> = ({
     const isHovered = hoveredCard === sortedCards[index]?.id
     const isSelected = selectedCardId === sortedCards[index]?.id
 
+    // Check if this card is the selected double card (for double auction mode)
+    const cardHighlightStatus = getCardHighlightStatus?.(sortedCards[index])
+    const isDoubleCardSelected = cardHighlightStatus?.isHighlighted
+
     return {
-      transform: `rotate(${angle}deg) translateY(${isHovered || isSelected ? -20 : 0}px)`,
+      transform: `rotate(${angle}deg) translateY(${isHovered || isSelected || isDoubleCardSelected ? -20 : 0}px)`,
       transformOrigin: 'bottom center',
-      zIndex: isHovered || isSelected ? 1000 : index + 100, // Higher z-index to sit above other elements
+      zIndex: isHovered || isSelected || isDoubleCardSelected ? 1000 : index + 100, // Higher z-index to sit above other elements
       transition: 'transform 0.15s ease, z-index 0.15s ease',
     }
   }
@@ -139,6 +143,7 @@ const PlayerHand: React.FC<PlayerHandProps> = ({
               {sortedCards.map((card, index) => {
                 const fanStyle = getFanStyle(index, sortedCards.length)
                 const isSelected = selectedCardId === card.id
+                const cardHighlightStatus = getCardHighlightStatus?.(card) || {}
 
                 return (
                   <div
@@ -173,8 +178,9 @@ const PlayerHand: React.FC<PlayerHandProps> = ({
                           auctionType: card.auctionType
                         }}
                         size="md" // Back to medium size
-                        isHighlighted={getCardHighlightStatus?.(card)?.isHighlighted || false}
-                        isDisabled={getCardHighlightStatus?.(card)?.isDisabled || disabled}
+                        isHighlighted={cardHighlightStatus.isHighlighted || false}
+                        isDisabled={cardHighlightStatus.isDisabled || disabled}
+                        isPartiallyHighlighted={cardHighlightStatus.isPartiallyHighlighted || false}
                         onClick={() => !disabled && onSelectCard(card.id)}
                       />
                     </div>

@@ -9,16 +9,20 @@ import ActiveAuction from './auction/ActiveAuction'
 
 interface AuctionCenterProps {
   selectedCard: Card | null
+  selectedDoubleCard?: Card | null  // Card selected for double auction preview
   isPlayerTurn: boolean
   onPlayCard: () => void
   onPass: () => void
+  onClearSelectedDoubleCard?: () => void
 }
 
 const AuctionCenter: React.FC<AuctionCenterProps> = ({
   selectedCard,
+  selectedDoubleCard,
   isPlayerTurn,
   onPlayCard,
   onPass,
+  onClearSelectedDoubleCard,
 }) => {
   const { gameState, placeBid, passBid } = useGameStore()
 
@@ -57,6 +61,8 @@ const AuctionCenter: React.FC<AuctionCenterProps> = ({
         isAuctionPlayerTurn={isAuctionPlayerTurn}
         currentPlayerInAuction={currentPlayerInAuction}
         gameState={gameState}
+        selectedCard={selectedDoubleCard}
+        onClearSelectedCard={onClearSelectedDoubleCard}
       />
     )
   }
