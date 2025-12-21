@@ -19,7 +19,8 @@ import { transferMoney, payToBank } from '../money'
 export function executeAuction(
   gameState: GameState,
   auctionResult: AuctionResult,
-  auctionCard: Card
+  auctionCard: Card,
+  secondCard?: Card  // Optional second card for Double auctions
 ): GameState {
   const { winnerId, salePrice, auctioneerId } = auctionResult
 
@@ -36,15 +37,19 @@ export function executeAuction(
     newPlayers = transferMoney(winnerId, auctioneerId, salePrice, newPlayers)
   }
 
-  // Move the painting to winner's current round purchases (if there's a winner)
+  // Move the painting(s) to winner's current round purchases (if there's a winner)
   if (winnerId !== null) {
     newPlayers = newPlayers.map(player => {
       if (player.id === winnerId) {
+        const cardsToAdd = secondCard
+          ? [auctionCard, secondCard]  // Double auction - both cards
+          : [auctionCard]             // Regular auction - single card
+
         return {
           ...player,
           purchasedThisRound: [
             ...(player.purchasedThisRound || []),
-            auctionCard  // Just add the card itself, not the painting object
+            ...cardsToAdd
           ]
         }
       }
@@ -54,11 +59,12 @@ export function executeAuction(
 
   // Add auction event to event log
   const winnerIndex = newPlayers.findIndex(p => p.id === winnerId)
+  const cards = secondCard ? [auctionCard, secondCard] : [auctionCard]
   const auctionEvent = {
     type: 'auction_won' as const,
     winnerIndex,
     amount: salePrice,
-    cards: [auctionCard]
+    cards
   }
 
   return {

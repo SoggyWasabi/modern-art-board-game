@@ -13,7 +13,7 @@ import { placeBid as placeOpenBid, pass as passOpenBid, checkTimerExpiration, en
 import { makeOffer, pass as passOneOffer, acceptHighestBid, auctioneerOutbid, auctioneerTakesFree, concludeAuction } from '../engine/auction/oneOffer'
 import { submitBid, revealBids, concludeAuction as concludeHiddenAuction } from '../engine/auction/hidden'
 import { buyAtPrice, pass as passFixedPrice, setPrice as setFixedPrice, concludeAuction as concludeFixedPriceAuction } from '../engine/auction/fixedPrice'
-import { offerSecondCard, declineToOffer } from '../engine/auction/double'
+import { offerSecondCard, declineToOffer, concludeAuction as concludeDoubleAuction } from '../engine/auction/double'
 import { executeAuction } from '../engine/auction/executor'
 
 const PLAYER_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6']
@@ -622,6 +622,134 @@ export const useGameStore = create<GameStore>()(
               }
               break
 
+            case 'double':
+              // Handle Double auctions by delegating to embedded auction
+              if (auction.embeddedAuction) {
+                console.log('Double auction: delegating to embedded auction type:', auction.embeddedAuction.type)
+
+                // Handle the bid based on embedded auction type
+                const embeddedAuction = auction.embeddedAuction
+                let updatedEmbeddedAuction
+
+                switch (embeddedAuction.type) {
+                  case 'one_offer':
+                    if (embeddedAuction.phase === 'bidding') {
+                      updatedEmbeddedAuction = makeOffer(embeddedAuction, player.id, amount, gameState.players)
+                    } else if (embeddedAuction.phase === 'auctioneer_decision') {
+                      if (amount === -1) {
+                        updatedEmbeddedAuction = acceptHighestBid(embeddedAuction)
+                        console.log('Auctioneer accepted highest bid')
+                      } else if (amount === -2) {
+                        updatedEmbeddedAuction = auctioneerTakesFree(embeddedAuction)
+                        console.log('Auctioneer takes painting for free')
+                      } else {
+                        updatedEmbeddedAuction = auctioneerOutbid(embeddedAuction, amount, gameState.players)
+                        console.log(`Auctioneer outbid with ${amount}k`)
+                      }
+                    }
+                    break
+
+                  case 'open':
+                    updatedEmbeddedAuction = placeOpenBid(embeddedAuction, player.id, amount, gameState.players)
+                    break
+
+                  case 'hidden':
+                    updatedEmbeddedAuction = submitBid(embeddedAuction, player.id, amount, gameState.players)
+                    break
+
+                  case 'fixed_price':
+                    if (amount === -1) {
+                      updatedEmbeddedAuction = buyAtPrice(embeddedAuction, player.id, gameState.players)
+                    } else {
+                      console.error('Use buy action for fixed price auctions')
+                      return
+                    }
+                    break
+                }
+
+                if (updatedEmbeddedAuction) {
+                  updatedAuction = {
+                    ...auction,
+                    embeddedAuction: updatedEmbeddedAuction
+                  }
+
+                  // Check if the embedded auction has concluded
+                  if (!updatedEmbeddedAuction.isActive) {
+                    // Get the result from the embedded auction
+                    let embeddedAuctionResult
+                    if (embeddedAuction.type === 'one_offer') {
+                      embeddedAuctionResult = concludeAuction(updatedEmbeddedAuction, gameState.players)
+                    } else if (embeddedAuction.type === 'open') {
+                      embeddedAuctionResult = concludeOpenAuction(updatedEmbeddedAuction, gameState.players)
+                    } else if (embeddedAuction.type === 'hidden') {
+                      embeddedAuctionResult = concludeHiddenAuction(updatedEmbeddedAuction, gameState.players)
+                    } else if (embeddedAuction.type === 'fixed_price') {
+                      embeddedAuctionResult = concludeFixedPriceAuction(updatedEmbeddedAuction, gameState.players)
+                    }
+
+                    if (embeddedAuctionResult) {
+                      console.log(`Embedded auction concluded: ${embeddedAuctionResult.winnerId} won for $${embeddedAuctionResult.salePrice}k`)
+
+                      // Transfer the result to the Double auction
+                      updatedAuction = {
+                        ...updatedAuction,
+                        sold: true,
+                        isActive: false,
+                        winnerId: embeddedAuctionResult.winnerId,
+                        finalPrice: embeddedAuctionResult.salePrice
+                      }
+
+                      // Now conclude the Double auction
+                      const doubleAuctionResult = concludeDoubleAuction(updatedAuction, gameState.players)
+                      console.log(`Double auction concluded: ${doubleAuctionResult.winnerId} won for $${doubleAuctionResult.salePrice}k`)
+
+                      // Execute the auction (transfer money, cards, etc.)
+                      const finalGameState = executeAuction(
+                        {
+                          ...gameState,
+                          round: {
+                            ...gameState.round,
+                            phase: {
+                              type: 'auction',
+                              auction: updatedAuction
+                            }
+                          }
+                        },
+                        doubleAuctionResult,
+                        auction.doubleCard, // Double card is the primary card
+                        auction.secondCard   // Second card for Double auctions
+                      )
+
+                    set(
+                      { gameState: finalGameState },
+                      false,
+                      'placeBid_double_auction_concluded'
+                    )
+
+                    // Check if round should continue
+                    setTimeout(() => {
+                      const { gameState: newGameState } = get()
+                      if (newGameState && newGameState.round.phase.type === 'awaiting_card_play') {
+                        // Check if it's an AI's turn to play a card
+                        if (newGameState.round.phase.activePlayerIndex !== 0) {
+                          get().processAITurn()
+                        }
+                      }
+                    }, 1500)
+
+                    return // Exit early since auction is concluded
+                  }
+                } else {
+                  console.error('Failed to conclude embedded auction')
+                  return
+                }
+              }
+              } else {
+                console.error('Double auction has no embedded auction to handle bid')
+                return
+              }
+              break
+
             default:
               console.error('Auction type not implemented:', auction.type)
               return
@@ -995,14 +1123,26 @@ export const useGameStore = create<GameStore>()(
         const card = player.hand.find(c => c.id === cardId)
         if (!card) return
 
+        // Find the card index to remove it from hand
+        const cardIndex = player.hand.findIndex(c => c.id === cardId)
+        if (cardIndex === -1) return
+
         try {
           // Use the double auction engine to offer the card
           const updatedAuction = offerSecondCard(auction, player.id, card, gameState.players)
 
-          // Update game state with the new auction
+          // Create updated players array with the card removed from player's hand
+          const updatedPlayers = [...gameState.players]
+          updatedPlayers[playerIndex] = {
+            ...player,
+            hand: player.hand.filter((_, i) => i !== cardIndex)
+          }
+
+          // Update game state with the new auction and updated player hand
           set({
             gameState: {
               ...gameState,
+              players: updatedPlayers,
               round: {
                 ...gameState.round,
                 phase: {
@@ -1014,7 +1154,7 @@ export const useGameStore = create<GameStore>()(
           }, false, 'offerSecondCardForDouble')
 
           // Process AI for the new auction state
-          get().processAITurn()
+          get().processAIActionsInAuction()
 
         } catch (error) {
           console.error('Error offering second card:', error)
@@ -1050,7 +1190,7 @@ export const useGameStore = create<GameStore>()(
           }, false, 'declineSecondCardForDouble')
 
           // Process AI for the next turn
-          get().processAITurn()
+          get().processAIActionsInAuction()
 
         } catch (error) {
           console.error('Error declining second card:', error)

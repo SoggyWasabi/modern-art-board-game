@@ -35,21 +35,21 @@ export function isHumanPlayerTurn(gameState: GameState): boolean {
       if (!doubleAuction.secondCard) {
         // Offering phase
         return doubleAuction.currentAuctioneerId === humanPlayer.id
-      } else {
-        // Use second card's auction type
+      } else if (doubleAuction.embeddedAuction) {
+        // Use the embedded auction for bidding phase
         return isHumanPlayerTurn({
           ...gameState,
           round: {
             ...gameState.round,
             phase: {
               type: 'auction',
-              auction: {
-                ...doubleAuction,
-                type: doubleAuction.auctionType
-              }
+              auction: doubleAuction.embeddedAuction
             }
           }
         })
+      } else {
+        // No embedded auction yet - can't determine turn
+        return false
       }
     }
 

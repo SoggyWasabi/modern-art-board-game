@@ -208,13 +208,13 @@ const DoubleAuctionWrapper: React.FC<DoubleAuctionWrapperProps> = ({
             color: 'rgba(255, 255, 255, 0.5)',
             textTransform: 'uppercase',
             letterSpacing: '0.08em',
-            marginBottom: '12px',
+            marginBottom: '6px',
           }}
         >
           Offering Turn Order
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           {eligiblePlayers.map((player: any, index: number) => {
             const isCurrentTurn = player?.id === currentTurnPlayer?.id
             const hasPassed = index < currentAuction.currentTurnIndex
@@ -226,7 +226,7 @@ const DoubleAuctionWrapper: React.FC<DoubleAuctionWrapperProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  padding: '12px 16px',
+                  padding: '8px 12px',
                   background: isCurrentTurn
                     ? 'rgba(251, 191, 36, 0.12)'
                     : 'rgba(255, 255, 255, 0.03)',
@@ -283,7 +283,7 @@ const DoubleAuctionWrapper: React.FC<DoubleAuctionWrapperProps> = ({
             border: '1px solid rgba(251, 191, 36, 0.2)',
           }}
         >
-          <div style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.8)', lineHeight: 1.5 }}>
+          <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.8)', lineHeight: 1.4 }}>
             Players can offer a <strong style={{ color: colors.accent.gold }}>{currentAuction.doubleCard.artist}</strong> card
             to pair with the Double card. The second card determines the auction type.
           </div>
@@ -313,7 +313,7 @@ const DoubleAuctionWrapper: React.FC<DoubleAuctionWrapperProps> = ({
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: '12px',
+            marginBottom: '6px',
           }}
         >
           <div
@@ -339,7 +339,7 @@ const DoubleAuctionWrapper: React.FC<DoubleAuctionWrapperProps> = ({
           )}
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           {biddingPlayers.map((player: any) => {
             const isHighest = player.id === currentBidderId
             // Check if it's this player's turn in embedded auction
@@ -369,7 +369,7 @@ const DoubleAuctionWrapper: React.FC<DoubleAuctionWrapperProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  padding: '12px 16px',
+                  padding: '8px 12px',
                   background: isCurrentTurn
                     ? 'rgba(251, 191, 36, 0.12)'
                     : isHighest
@@ -454,7 +454,7 @@ const DoubleAuctionWrapper: React.FC<DoubleAuctionWrapperProps> = ({
         flexDirection: 'column',
         width: '100%',
         maxWidth: '950px',
-        minHeight: '420px',
+        minHeight: '320px',
         background: 'linear-gradient(145deg, rgba(20, 20, 30, 0.95), rgba(10, 10, 15, 0.98))',
         backdropFilter: 'blur(20px)',
         borderRadius: '20px',

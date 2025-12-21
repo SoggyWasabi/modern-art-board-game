@@ -1,5 +1,9 @@
 import type { Player, Card } from '../../types/game'
 import type { DoubleAuctionState, AuctionResult } from '../../types/auction'
+import { createOpenAuction } from './open'
+import { createOneOfferAuction } from './oneOffer'
+import { createHiddenAuction } from './hidden'
+import { createFixedPriceAuction } from './fixedPrice'
 
 /**
  * Double Auction Engine (Most Complex)
@@ -97,12 +101,31 @@ export function offerSecondCard(
   const offers = new Map(state.offers)
   offers.set(playerId, secondCard)
 
+  // Create the embedded auction based on the second card's type
+  let embeddedAuction = null
+  switch (secondCard.auctionType) {
+    case 'open':
+      embeddedAuction = createOpenAuction(secondCard, player, players)
+      break
+    case 'one_offer':
+      embeddedAuction = createOneOfferAuction(secondCard, player, players)
+      break
+    case 'hidden':
+      embeddedAuction = createHiddenAuction(secondCard, player, players)
+      break
+    case 'fixed_price':
+      embeddedAuction = createFixedPriceAuction(secondCard, player, players, 0) // Price to be set later
+      break
+  }
+
   // The player who offered becomes the new auctioneer
   const newState: DoubleAuctionState = {
     ...state,
     secondCard,
     currentAuctioneerId: playerId,
     auctionType: secondCard.auctionType, // Auction type follows second card
+    phase: 'bidding', // Switch to bidding phase
+    embeddedAuction, // Add the embedded auction
     offers,
   }
 

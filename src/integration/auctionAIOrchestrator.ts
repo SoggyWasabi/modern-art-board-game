@@ -35,6 +35,45 @@ export class AuctionAIOrchestrator {
     const auction = gameState.round.phase.auction
     console.log('Processing AI for auction type:', auction.type)
 
+    // Handle Double auctions by delegating to embedded auction
+    if (auction.type === 'double' && auction.embeddedAuction) {
+      console.log('Double auction detected, delegating to embedded auction type:', auction.embeddedAuction.type)
+
+      // Create game state with embedded auction as the main auction
+      const embeddedGameState = {
+        ...gameState,
+        round: {
+          ...gameState.round,
+          phase: {
+            type: 'auction' as const,
+            auction: auction.embeddedAuction
+          }
+        }
+      }
+
+      // Process the embedded auction normally
+      const updatedEmbeddedState = await this.processAuctionAI(embeddedGameState)
+
+      if (updatedEmbeddedState) {
+        // Map the updated embedded auction back to the double auction structure
+        return {
+          ...gameState,
+          round: {
+            ...gameState.round,
+            phase: {
+              type: 'auction' as const,
+              auction: {
+                ...auction,
+                embeddedAuction: updatedEmbeddedState.round.phase.auction
+              }
+            }
+          }
+        }
+      }
+
+      return null
+    }
+
     // Skip open auctions - they are handled by OpenAuctionAIManager
     if (auction.type === 'open') {
       console.log('Skipping open auction - handled by OpenAuctionAIManager')
@@ -228,6 +267,10 @@ export class AuctionAIOrchestrator {
       case 'double':
         if (!auction.secondCard) {
           return auction.currentAuctioneerId
+        }
+        // If there's an embedded auction, delegate to it
+        if (auction.embeddedAuction) {
+          return this.getCurrentPlayerId(auction.embeddedAuction)
         }
         return null
 

@@ -123,4 +123,5 @@ export interface DoubleAuctionState {
   currentTurnIndex: number
   offers: Map<string, Card> // playerId -> card offered (for tracking)
   phase: 'offering' | 'bidding' // Phase of the double auction
+  embeddedAuction?: OpenAuctionState | OneOfferAuctionState | HiddenAuctionState | FixedPriceAuctionState | null // The embedded auction of the second card's type
 }
