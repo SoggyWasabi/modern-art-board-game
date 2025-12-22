@@ -1,28 +1,27 @@
 import React, { useState, useEffect } from 'react'
 import { Card as GameCardComponent } from '../../Card'
 import { useGameStore } from '../../../store/gameStore'
-import type { Card, AuctionType } from '../../../types'
-import type { OpenAuctionState, BidHistoryItem } from '../../../types/auction'
+import type { BidHistoryItem } from '../../../types/auction'
+import type { OpenAuctionProps } from '../../../types/auctionComponents'
+import { normalizeCardsForAuction, getAuctionHeaderText } from '../../../types/auctionComponents'
 import { colors } from '../../../design/premiumTokens'
-
-interface OpenAuctionProps {
-  currentAuction: OpenAuctionState
-  isAuctionPlayerTurn: boolean
-  currentPlayerInAuction: any
-  gameState: any
-}
 
 const OpenAuction: React.FC<OpenAuctionProps> = ({
   currentAuction,
   isAuctionPlayerTurn,
   currentPlayerInAuction,
   gameState,
+  cards,
+  isDoubleAuction = false,
+  doubleAuctionType,
 }) => {
-  const { placeBid } = useGameStore()
+  const { placeBid, checkOpenAuctionTimer } = useGameStore()
   const [bidAmount, setBidAmount] = useState<number>(currentAuction.currentBid + 1)
   const [timeLeft, setTimeLeft] = useState<number>(0)
 
-  const auctionCard = currentAuction.card
+  // Use helper to normalize cards for display
+  const displayCards = normalizeCardsForAuction({ currentAuction, cards, isDoubleAuction, isAuctionPlayerTurn, currentPlayerInAuction, gameState })
+  const headerText = getAuctionHeaderText({ currentAuction, cards, isDoubleAuction, doubleAuctionType, isAuctionPlayerTurn, currentPlayerInAuction, gameState })
   const currentTime = Date.now()
 
   // Calculate time left on timer
@@ -47,6 +46,17 @@ const OpenAuction: React.FC<OpenAuctionProps> = ({
   useEffect(() => {
     setBidAmount(currentAuction.currentBid + 1)
   }, [currentAuction.currentBid])
+
+  // Set up timer expiration checking for open auctions
+  useEffect(() => {
+    if (currentAuction.isActive && currentAuction.timerEndTime) {
+      const timerInterval = setInterval(() => {
+        checkOpenAuctionTimer()
+      }, 100) // Check every 100ms
+
+      return () => clearInterval(timerInterval)
+    }
+  }, [currentAuction.isActive, currentAuction.timerEndTime, checkOpenAuctionTimer])
 
   const handleQuickBid = (amount: number) => {
     const newAmount = currentAuction.currentBid + amount
@@ -95,18 +105,18 @@ const OpenAuction: React.FC<OpenAuctionProps> = ({
           justifyContent: 'space-between',
           alignItems: 'center',
           padding: '16px 24px',
-          background: 'rgba(0, 0, 0, 0.4)',
-          borderBottom: '1px solid rgba(251, 191, 36, 0.2)',
+          background: isDoubleAuction ? 'linear-gradient(90deg, rgba(251, 191, 36, 0.15), rgba(251, 191, 36, 0.05))' : 'rgba(0, 0, 0, 0.4)',
+          borderBottom: `1px solid ${isDoubleAuction ? 'rgba(251, 191, 36, 0.3)' : 'rgba(251, 191, 36, 0.2)'}`,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <span style={{ fontSize: '24px' }}>🔊</span>
+          <span style={{ fontSize: '24px' }}>{isDoubleAuction ? '👯' : '🔊'}</span>
           <div>
             <div style={{ fontSize: '18px', fontWeight: 700, color: 'white' }}>
-              Open Auction
+              {headerText.title}
             </div>
-            <div style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.6)', fontWeight: 500 }}>
-              Real-time bidding - timer resets on each bid
+            <div style={{ fontSize: '13px', color: isDoubleAuction ? colors.accent.gold : 'rgba(255, 255, 255, 0.6)', fontWeight: 500 }}>
+              {isDoubleAuction ? 'Package deal - timer resets on each bid' : 'Real-time bidding - timer resets on each bid'}
             </div>
           </div>
         </div>
@@ -171,22 +181,70 @@ const OpenAuction: React.FC<OpenAuctionProps> = ({
               padding: '16px',
               background: 'rgba(0, 0, 0, 0.3)',
               borderRadius: '14px',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
+              border: `1px solid ${isDoubleAuction ? 'rgba(251, 191, 36, 0.3)' : 'rgba(255, 255, 255, 0.08)'}`,
             }}
           >
-            <div style={{ transform: 'scale(1.25)' }}>
-              <GameCardComponent
-                card={{
-                  id: auctionCard.id,
-                  artist: auctionCard.artist,
-                  artistIndex: ['Manuel Carvalho', 'Daniel Melim', 'Sigrid Thaler', 'Ramon Martins', 'Rafael Silveira'].indexOf(auctionCard.artist),
-                  cardIndex: parseInt(auctionCard.id.split('_')[1]) || 0,
-                  auctionType: auctionCard.auctionType
-                }}
-                size="md"
-              />
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              {displayCards.map((card, index) => (
+                <div
+                  key={card.id}
+                  style={{
+                    transform: `scale(${displayCards.length > 1 ? '1.0' : '1.25'})`,
+                    position: 'relative'
+                  }}
+                >
+                  {isDoubleAuction && index === 1 && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '-10px',
+                        right: '-10px',
+                        background: colors.accent.gold,
+                        color: '#000',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        padding: '2px 6px',
+                        borderRadius: '10px',
+                        zIndex: 10
+                      }}
+                    >
+                      +🔊
+                    </div>
+                  )}
+                  <GameCardComponent
+                    card={{
+                      id: card.id,
+                      artist: card.artist,
+                      artistIndex: ['Manuel Carvalho', 'Daniel Melim', 'Sigrid Thaler', 'Ramon Martins', 'Rafael Silveira'].indexOf(card.artist),
+                      cardIndex: parseInt(card.id.split('_')[1]) || 0,
+                      auctionType: card.auctionType
+                    }}
+                    size="md"
+                  />
+                </div>
+              ))}
             </div>
           </div>
+
+          {/* Package Deal Badge */}
+          {isDoubleAuction && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                background: 'rgba(251, 191, 36, 0.2)',
+                borderRadius: '20px',
+                border: '1px solid rgba(251, 191, 36, 0.4)',
+              }}
+            >
+              <span style={{ fontSize: '12px' }}>🎁</span>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: colors.accent.gold }}>
+                Package Deal - {displayCards.length} Cards!
+              </span>
+            </div>
+          )}
 
           {/* Quick Bid Buttons */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -451,7 +509,7 @@ const OpenAuction: React.FC<OpenAuctionProps> = ({
               transition: 'all 0.15s ease',
             }}
           >
-            Place Bid
+            {isDoubleAuction ? 'Bid for Package' : 'Place Bid'}
           </button>
 
           <div style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.5)', minWidth: '120px' }}>

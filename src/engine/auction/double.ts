@@ -118,6 +118,11 @@ export function offerSecondCard(
       break
   }
 
+  // For double auctions, populate the cards array with both cards
+  if (embeddedAuction) {
+    embeddedAuction.cards = [state.doubleCard, secondCard]
+  }
+
   // The player who offered becomes the new auctioneer
   const newState: DoubleAuctionState = {
     ...state,

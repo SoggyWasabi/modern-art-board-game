@@ -1,87 +1,26 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { Card as GameCardComponent } from '../../Card'
 import { useGameStore } from '../../../store/gameStore'
-import type { Card, AuctionType } from '../../../types'
-import type { AuctionState } from '../../../types/auction'
+import type { OneOfferAuctionState } from '../../../types/auction'
+import type { OneOfferAuctionProps } from '../../../types/auctionComponents'
+import { normalizeCardsForAuction, getAuctionHeaderText } from '../../../types/auctionComponents'
 import { colors } from '../../../design/premiumTokens'
-import FixedPriceAuction from './FixedPriceAuction'
-import HiddenAuction from './HiddenAuction'
-import OpenAuction from './OpenAuction'
-import OneOfferAuction from './OneOfferAuction'
-import DoubleAuctionWrapper from './DoubleAuctionWrapper'
 
-interface ActiveAuctionProps {
-  currentAuction: AuctionState
-  isAuctionPlayerTurn: boolean
-  currentPlayerInAuction: any
-  gameState: any
-  selectedCard?: Card | null  // For double auction preview
-  onClearSelectedCard?: () => void
-}
-
-const AUCTION_TYPE_INFO: Record<AuctionType, {
-  name: string
-  shortName: string
-  icon: string
-}> = {
-  open: {
-    name: 'Open Auction',
-    shortName: 'Open',
-    icon: '🔊',
-  },
-  one_offer: {
-    name: 'One Offer',
-    shortName: 'One Offer',
-    icon: '☝️',
-  },
-  hidden: {
-    name: 'Hidden Auction',
-    shortName: 'Hidden',
-    icon: '🙈',
-  },
-  fixed_price: {
-    name: 'Fixed Price',
-    shortName: 'Fixed',
-    icon: '🏷️',
-  },
-  double: {
-    name: 'Double Auction',
-    shortName: 'Double',
-    icon: '👯',
-  },
-}
-
-// Helper to get the primary card from any auction state
-const getAuctionCard = (auction: AuctionState): Card => {
-  if (auction.type === 'double') {
-    return auction.doubleCard
-  }
-  return auction.card
-}
-
-const ActiveAuction: React.FC<ActiveAuctionProps> = ({
+const OneOfferAuction: React.FC<OneOfferAuctionProps> = ({
   currentAuction,
   isAuctionPlayerTurn,
   currentPlayerInAuction,
   gameState,
-  selectedCard,
-  onClearSelectedCard,
+  cards,
+  isDoubleAuction = false,
+  doubleAuctionType,
 }) => {
-  const { placeBid, passBid, checkOpenAuctionTimer } = useGameStore()
+  const { placeBid, passBid } = useGameStore()
   const [bidAmount, setBidAmount] = useState<number>(0)
-  const auctionCard = getAuctionCard(currentAuction)
-  const auctionInfo = AUCTION_TYPE_INFO[auctionCard.auctionType]
 
-  // Set up timer checking for open auctions
-  useEffect(() => {
-    if (currentAuction.type === 'open' && currentAuction.isActive) {
-      const timerInterval = setInterval(() => {
-        checkOpenAuctionTimer()
-      }, 100) // Check every 100ms
-
-      return () => clearInterval(timerInterval)
-    }
-  }, [currentAuction, checkOpenAuctionTimer])
+  // Use helper to normalize cards for display
+  const displayCards = normalizeCardsForAuction({ currentAuction, cards, isDoubleAuction, isAuctionPlayerTurn, currentPlayerInAuction, gameState })
+  const headerText = getAuctionHeaderText({ currentAuction, cards, isDoubleAuction, doubleAuctionType, isAuctionPlayerTurn, currentPlayerInAuction, gameState })
 
   const currentBid = 'currentBid' in currentAuction ? currentAuction.currentBid : 0
   const highestBidder = 'currentBidderId' in currentAuction ? currentAuction.currentBidderId : null
@@ -89,132 +28,14 @@ const ActiveAuction: React.FC<ActiveAuctionProps> = ({
   // Get bidding players (excluding human player "You")
   const biddingPlayers = gameState?.players.filter((p: any) => p.name !== 'You') || []
 
-  // Render specialized auction components
-  if (currentAuction.type === 'double') {
-    // If in bidding phase with embedded auction, render the embedded auction directly
-    // This avoids the visual confusion of showing Double Auction wrapper + inner auction
-    if (currentAuction.phase === 'bidding' && currentAuction.embeddedAuction) {
-      const embedded = currentAuction.embeddedAuction
-      const cards = [currentAuction.doubleCard, currentAuction.secondCard!]
-
-      // Delegate to the appropriate auction component with double context
-      switch (embedded.type) {
-        case 'one_offer':
-          return (
-            <OneOfferAuction
-              currentAuction={embedded}
-              isAuctionPlayerTurn={isAuctionPlayerTurn}
-              currentPlayerInAuction={currentPlayerInAuction}
-              gameState={gameState}
-              cards={cards}
-              isDoubleAuction={true}
-              doubleAuctionType="one_offer"
-            />
-          )
-        case 'open':
-          return (
-            <OpenAuction
-              currentAuction={embedded}
-              isAuctionPlayerTurn={isAuctionPlayerTurn}
-              currentPlayerInAuction={currentPlayerInAuction}
-              gameState={gameState}
-              cards={cards}
-              isDoubleAuction={true}
-              doubleAuctionType="open"
-            />
-          )
-        case 'hidden':
-          return (
-            <HiddenAuction
-              currentAuction={embedded}
-              isAuctionPlayerTurn={isAuctionPlayerTurn}
-              currentPlayerInAuction={currentPlayerInAuction}
-              gameState={gameState}
-              cards={cards}
-              isDoubleAuction={true}
-              doubleAuctionType="hidden"
-            />
-          )
-        case 'fixed_price':
-          return (
-            <FixedPriceAuction
-              currentAuction={embedded}
-              isAuctionPlayerTurn={isAuctionPlayerTurn}
-              currentPlayerInAuction={currentPlayerInAuction}
-              gameState={gameState}
-              cards={cards}
-              isDoubleAuction={true}
-              doubleAuctionType="fixed_price"
-            />
-          )
-      }
-    }
-
-    // Offering phase - render the DoubleAuctionWrapper
-    return (
-      <DoubleAuctionWrapper
-        currentAuction={currentAuction}
-        isAuctionPlayerTurn={isAuctionPlayerTurn}
-        currentPlayerInAuction={currentPlayerInAuction}
-        gameState={gameState}
-        selectedCard={selectedCard}
-        onClearSelectedCard={onClearSelectedCard}
-      />
-    )
-  }
-
-  if (currentAuction.type === 'fixed_price') {
-    return (
-      <FixedPriceAuction
-        currentAuction={currentAuction}
-        isAuctionPlayerTurn={isAuctionPlayerTurn}
-        currentPlayerInAuction={currentPlayerInAuction}
-        gameState={gameState}
-      />
-    )
-  }
-
-  if (currentAuction.type === 'hidden') {
-    return (
-      <HiddenAuction
-        currentAuction={currentAuction}
-        isAuctionPlayerTurn={isAuctionPlayerTurn}
-        currentPlayerInAuction={currentPlayerInAuction}
-        gameState={gameState}
-      />
-    )
-  }
-
-  if (currentAuction.type === 'one_offer') {
-    return (
-      <OneOfferAuction
-        currentAuction={currentAuction}
-        isAuctionPlayerTurn={isAuctionPlayerTurn}
-        currentPlayerInAuction={currentPlayerInAuction}
-        gameState={gameState}
-      />
-    )
-  }
-
-  if (currentAuction.type === 'open') {
-    return (
-      <OpenAuction
-        currentAuction={currentAuction}
-        isAuctionPlayerTurn={isAuctionPlayerTurn}
-        currentPlayerInAuction={currentPlayerInAuction}
-        gameState={gameState}
-      />
-    )
-  }
-
   return (
     <div
       style={{
         display: 'flex',
         flexDirection: 'column',
         width: '100%',
-        maxWidth: '850px', // 25% wider than previous
-        minHeight: '340px', // 10% taller
+        maxWidth: '850px',
+        minHeight: '340px',
         background: 'linear-gradient(145deg, rgba(20, 20, 30, 0.95), rgba(10, 10, 15, 0.98))',
         backdropFilter: 'blur(20px)',
         borderRadius: '20px',
@@ -230,16 +51,21 @@ const ActiveAuction: React.FC<ActiveAuctionProps> = ({
           justifyContent: 'space-between',
           alignItems: 'center',
           padding: '16px 24px',
-          background: 'rgba(0, 0, 0, 0.4)',
-          borderBottom: '1px solid rgba(251, 191, 36, 0.2)',
+          background: isDoubleAuction ? 'linear-gradient(90deg, rgba(251, 191, 36, 0.15), rgba(251, 191, 36, 0.05))' : 'rgba(0, 0, 0, 0.4)',
+          borderBottom: `1px solid ${isDoubleAuction ? 'rgba(251, 191, 36, 0.3)' : 'rgba(251, 191, 36, 0.2)'}`,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <span style={{ fontSize: '24px' }}>{auctionInfo.icon}</span>
+          <span style={{ fontSize: '24px' }}>{isDoubleAuction ? '👯' : '☝️'}</span>
           <div>
             <div style={{ fontSize: '18px', fontWeight: 700, color: 'white' }}>
-              {auctionInfo.shortName}
+              {headerText.title}
             </div>
+            {headerText.subtitle && (
+              <div style={{ fontSize: '13px', color: isDoubleAuction ? colors.accent.gold : 'rgba(255, 255, 255, 0.6)', fontWeight: 500 }}>
+                {headerText.subtitle}
+              </div>
+            )}
             {currentPlayerInAuction && (
               <div style={{ fontSize: '13px', color: colors.accent.gold, fontWeight: 500 }}>
                 {currentPlayerInAuction.name}'s turn
@@ -248,16 +74,14 @@ const ActiveAuction: React.FC<ActiveAuctionProps> = ({
           </div>
         </div>
 
-        {(currentAuction.type === 'open' || currentAuction.type === 'one_offer') && (
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              High Bid
-            </div>
-            <div style={{ fontSize: '28px', fontWeight: 800, color: colors.accent.gold }}>
-              ${currentBid}k
-            </div>
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            {isDoubleAuction ? 'Package Bid' : 'High Bid'}
           </div>
-        )}
+          <div style={{ fontSize: '28px', fontWeight: 800, color: colors.accent.gold }}>
+            ${currentBid}k
+          </div>
+        </div>
       </div>
 
       {/* Main Content - Horizontal Layout */}
@@ -274,27 +98,80 @@ const ActiveAuction: React.FC<ActiveAuctionProps> = ({
           style={{
             flex: '0 0 auto',
             display: 'flex',
+            flexDirection: 'column',
             alignItems: 'center',
-            justifyContent: 'center',
-            padding: '16px',
-            background: 'rgba(0, 0, 0, 0.3)',
-            borderRadius: '14px',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
+            gap: '16px',
           }}
         >
-          <div style={{ transform: 'scale(1.35)' }}>
-            <GameCardComponent
-              card={{
-                id: auctionCard.id,
-                artist: auctionCard.artist,
-                artistIndex: ['Manuel Carvalho', 'Daniel Melim', 'Sigrid Thaler', 'Ramon Martins', 'Rafael Silveira'].indexOf(auctionCard.artist),
-                cardIndex: parseInt(auctionCard.id.split('_')[1]) || 0,
-                auctionType: auctionCard.auctionType,
-                artworkId: auctionCard.artworkId || auctionCard.id
-              }}
-              size="md"
-            />
+          <div
+            style={{
+              padding: '16px',
+              background: 'rgba(0, 0, 0, 0.3)',
+              borderRadius: '14px',
+              border: `1px solid ${isDoubleAuction ? 'rgba(251, 191, 36, 0.3)' : 'rgba(255, 255, 255, 0.08)'}`,
+            }}
+          >
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              {displayCards.map((card, index) => (
+                <div
+                  key={card.id}
+                  style={{
+                    transform: `scale(${displayCards.length > 1 ? '1.1' : '1.35'})`,
+                    position: 'relative'
+                  }}
+                >
+                  {isDoubleAuction && index === 1 && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '-10px',
+                        right: '-10px',
+                        background: colors.accent.gold,
+                        color: '#000',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        padding: '2px 6px',
+                        borderRadius: '10px',
+                        zIndex: 10
+                      }}
+                    >
+                      +{card.auctionType === 'one_offer' ? '☝️' : card.auctionType === 'open' ? '🔊' : card.auctionType === 'hidden' ? '🙈' : '🏷️'}
+                    </div>
+                  )}
+                  <GameCardComponent
+                    card={{
+                      id: card.id,
+                      artist: card.artist,
+                      artistIndex: ['Manuel Carvalho', 'Daniel Melim', 'Sigrid Thaler', 'Ramon Martins', 'Rafael Silveira'].indexOf(card.artist),
+                      cardIndex: parseInt(card.id.split('_')[1]) || 0,
+                      auctionType: card.auctionType
+                    }}
+                    size="md"
+                  />
+                </div>
+              ))}
+            </div>
           </div>
+
+          {/* Package Deal Badge */}
+          {isDoubleAuction && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                background: 'rgba(251, 191, 36, 0.2)',
+                borderRadius: '20px',
+                border: '1px solid rgba(251, 191, 36, 0.4)',
+              }}
+            >
+              <span style={{ fontSize: '12px' }}>🎁</span>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: colors.accent.gold }}>
+                Package Deal - {displayCards.length} Cards!
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Bidders Column */}
@@ -323,8 +200,6 @@ const ActiveAuction: React.FC<ActiveAuctionProps> = ({
               if (currentAuction.type === 'one_offer' && currentAuction.phase === 'bidding') {
                 const currentPlayerId = currentAuction.turnOrder[currentAuction.currentTurnIndex]
                 isCurrentTurn = player.id === currentPlayerId
-              } else if (currentAuction.type === 'open') {
-                isCurrentTurn = player.id === currentAuction.playerOrder[currentAuction.currentPlayerIndex]
               }
 
               // Check if player has passed
@@ -436,7 +311,7 @@ const ActiveAuction: React.FC<ActiveAuctionProps> = ({
                   >
                     <div>Buy ${currentBid + 1}k</div>
                     <div style={{ fontSize: '12px', opacity: 0.8, fontWeight: 400, marginTop: '2px' }}>
-                      keep the card
+                      keep {isDoubleAuction ? 'both cards' : 'the card'}
                     </div>
                   </button>
                 </>
@@ -455,7 +330,7 @@ const ActiveAuction: React.FC<ActiveAuctionProps> = ({
                     transition: 'all 0.15s ease',
                   }}
                 >
-                  Take Free
+                  Take {isDoubleAuction ? 'Both Cards' : 'Free'}
                 </button>
               )}
             </div>
@@ -534,4 +409,4 @@ const ActiveAuction: React.FC<ActiveAuctionProps> = ({
   )
 }
 
-export default ActiveAuction
+export default OneOfferAuction

@@ -36,6 +36,7 @@ export interface BidHistoryItem {
 export interface OpenAuctionState {
   type: 'open'
   card: Card
+  cards?: Card[]  // NEW: For double auction support (array of cards)
   auctioneerId: string
   currentBid: number
   currentBidderId: string | null
@@ -64,6 +65,7 @@ export interface OpenAuctionState {
 export interface OneOfferAuctionState {
   type: 'one_offer'
   card: Card
+  cards?: Card[]  // NEW: For double auction support (array of cards)
   auctioneerId: string
   currentBid: number
   currentBidderId: string | null
@@ -81,6 +83,7 @@ export interface OneOfferAuctionState {
 export interface HiddenAuctionState {
   type: 'hidden'
   card: Card
+  cards?: Card[]  // NEW: For double auction support (array of cards)
   auctioneerId: string
   bids: Record<string, number> // playerId -> bid amount
   isActive: boolean
@@ -95,6 +98,7 @@ export interface HiddenAuctionState {
 export interface FixedPriceAuctionState {
   type: 'fixed_price'
   card: Card
+  cards?: Card[]  // NEW: For double auction support (array of cards)
   auctioneerId: string
   price: number
   isActive: boolean

@@ -1,28 +1,26 @@
 import React, { useState } from 'react'
 import { Card as GameCardComponent } from '../../Card'
 import { useGameStore } from '../../../store/gameStore'
-import type { Card, AuctionType } from '../../../types'
-import type { HiddenAuctionState } from '../../../types/auction'
+import type { HiddenAuctionProps } from '../../../types/auctionComponents'
+import { normalizeCardsForAuction, getAuctionHeaderText } from '../../../types/auctionComponents'
 import { colors } from '../../../design/premiumTokens'
-
-interface HiddenAuctionProps {
-  currentAuction: HiddenAuctionState
-  isAuctionPlayerTurn: boolean
-  currentPlayerInAuction: any
-  gameState: any
-}
 
 const HiddenAuction: React.FC<HiddenAuctionProps> = ({
   currentAuction,
   isAuctionPlayerTurn,
   currentPlayerInAuction,
   gameState,
+  cards,
+  isDoubleAuction = false,
+  doubleAuctionType,
 }) => {
   const { submitHiddenBid, passBid } = useGameStore()
   const [bidAmount, setBidAmount] = useState<number>(0)
   const [hasSubmitted, setHasSubmitted] = useState<boolean>(false)
 
-  const auctionCard = currentAuction.card
+  // Use helper to normalize cards for display
+  const displayCards = normalizeCardsForAuction({ currentAuction, cards, isDoubleAuction, isAuctionPlayerTurn, currentPlayerInAuction, gameState })
+  const headerText = getAuctionHeaderText({ currentAuction, cards, isDoubleAuction, doubleAuctionType, isAuctionPlayerTurn, currentPlayerInAuction, gameState })
   const humanPlayerId = 'player_0' // Assuming player 0 is the human
   const hasHumanSubmitted = currentAuction.bids[humanPlayerId] !== undefined
   const allBidsSubmitted = currentAuction.readyToReveal
@@ -85,18 +83,20 @@ const HiddenAuction: React.FC<HiddenAuctionProps> = ({
           justifyContent: 'space-between',
           alignItems: 'center',
           padding: '16px 24px',
-          background: 'rgba(0, 0, 0, 0.4)',
-          borderBottom: '1px solid rgba(251, 191, 36, 0.2)',
+          background: isDoubleAuction ? 'linear-gradient(90deg, rgba(251, 191, 36, 0.15), rgba(251, 191, 36, 0.05))' : 'rgba(0, 0, 0, 0.4)',
+          borderBottom: `1px solid ${isDoubleAuction ? 'rgba(251, 191, 36, 0.3)' : 'rgba(251, 191, 36, 0.2)'}`,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <span style={{ fontSize: '24px' }}>🙈</span>
+          <span style={{ fontSize: '24px' }}>{isDoubleAuction ? '👯' : '🙈'}</span>
           <div>
             <div style={{ fontSize: '18px', fontWeight: 700, color: 'white' }}>
-              Hidden Auction
+              {headerText.title}
             </div>
-            <div style={{ fontSize: '13px', color: colors.accent.gold, fontWeight: 500 }}>
-              {!allBidsSubmitted
+            <div style={{ fontSize: '13px', color: isDoubleAuction ? colors.accent.gold : colors.accent.gold, fontWeight: 500 }}>
+              {isDoubleAuction && headerText.subtitle && !allBidsSubmitted ? (
+                `${headerText.subtitle} • ${playerBids.filter(p => p.hasSubmitted).length} of ${playerBids.length} bids submitted`
+              ) : !allBidsSubmitted
                 ? `${playerBids.filter(p => p.hasSubmitted).length} of ${playerBids.length} bids submitted`
                 : bidsRevealed
                   ? 'Bids revealed'
@@ -130,27 +130,80 @@ const HiddenAuction: React.FC<HiddenAuctionProps> = ({
           style={{
             flex: '0 0 auto',
             display: 'flex',
+            flexDirection: 'column',
             alignItems: 'center',
-            justifyContent: 'center',
-            padding: '16px',
-            background: 'rgba(0, 0, 0, 0.3)',
-            borderRadius: '14px',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
+            gap: '16px',
           }}
         >
-          <div style={{ transform: 'scale(1.35)' }}>
-            <GameCardComponent
-              card={{
-                id: auctionCard.id,
-                artist: auctionCard.artist,
-                artistIndex: ['Manuel Carvalho', 'Daniel Melim', 'Sigrid Thaler', 'Ramon Martins', 'Rafael Silveira'].indexOf(auctionCard.artist),
-                cardIndex: parseInt(auctionCard.id.split('_')[1]) || 0,
-                auctionType: auctionCard.auctionType,
-                artworkId: auctionCard.artworkId || auctionCard.id
-              }}
-              size="md"
-            />
+          <div
+            style={{
+              padding: '16px',
+              background: 'rgba(0, 0, 0, 0.3)',
+              borderRadius: '14px',
+              border: `1px solid ${isDoubleAuction ? 'rgba(251, 191, 36, 0.3)' : 'rgba(255, 255, 255, 0.08)'}`,
+            }}
+          >
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              {displayCards.map((card, index) => (
+                <div
+                  key={card.id}
+                  style={{
+                    transform: `scale(${displayCards.length > 1 ? '1.1' : '1.35'})`,
+                    position: 'relative'
+                  }}
+                >
+                  {isDoubleAuction && index === 1 && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '-10px',
+                        right: '-10px',
+                        background: colors.accent.gold,
+                        color: '#000',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        padding: '2px 6px',
+                        borderRadius: '10px',
+                        zIndex: 10
+                      }}
+                    >
+                      +🙈
+                    </div>
+                  )}
+                  <GameCardComponent
+                    card={{
+                      id: card.id,
+                      artist: card.artist,
+                      artistIndex: ['Manuel Carvalho', 'Daniel Melim', 'Sigrid Thaler', 'Ramon Martins', 'Rafael Silveira'].indexOf(card.artist),
+                      cardIndex: parseInt(card.id.split('_')[1]) || 0,
+                      auctionType: card.auctionType
+                    }}
+                    size="md"
+                  />
+                </div>
+              ))}
+            </div>
           </div>
+
+          {/* Package Deal Badge */}
+          {isDoubleAuction && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                background: 'rgba(251, 191, 36, 0.2)',
+                borderRadius: '20px',
+                border: '1px solid rgba(251, 191, 36, 0.4)',
+              }}
+            >
+              <span style={{ fontSize: '12px' }}>🎁</span>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: colors.accent.gold }}>
+                Package Deal - {displayCards.length} Cards!
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Players Column */}
@@ -331,7 +384,7 @@ const HiddenAuction: React.FC<HiddenAuctionProps> = ({
                 transition: 'all 0.15s ease',
               }}
             >
-              Submit Secret Bid
+              Submit Secret {isDoubleAuction ? 'Package' : 'Bid'}
             </button>
           </div>
         ) : hasHumanSubmitted && !bidsRevealed ? (
@@ -376,7 +429,7 @@ const HiddenAuction: React.FC<HiddenAuctionProps> = ({
           }}
         >
           <div style={{ fontSize: '16px', fontWeight: 700, color: colors.accent.gold, marginBottom: '4px' }}>
-            🎉 {winner.name} wins the auction!
+            🎉 {winner.name} wins {isDoubleAuction ? 'BOTH cards' : 'the auction'}!
           </div>
           <div style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.7)' }}>
             Winning bid: ${highestBid}k

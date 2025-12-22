@@ -18,6 +18,42 @@ import { executeAuction } from '../engine/auction/executor'
 
 const PLAYER_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6']
 
+/**
+ * Helper to get the effective auction for double auctions
+ * When a double auction is in bidding phase with an embedded auction,
+ * we delegate to the embedded auction for all mechanics
+ */
+function getEffectiveAuction(auction: AuctionState): AuctionState {
+  if (auction.type === 'double' && auction.embeddedAuction) {
+    return auction.embeddedAuction
+  }
+  return auction
+}
+
+/**
+ * Check if an auction is effectively an open auction (handles embedded case)
+ */
+function isEffectiveOpenAuction(auction: AuctionState): boolean {
+  const effective = getEffectiveAuction(auction)
+  return effective.type === 'open'
+}
+
+/**
+ * Check if an auction is effectively a hidden auction (handles embedded case)
+ */
+function isEffectiveHiddenAuction(auction: AuctionState): boolean {
+  const effective = getEffectiveAuction(auction)
+  return effective.type === 'hidden'
+}
+
+/**
+ * Check if an auction is effectively a fixed price auction (handles embedded case)
+ */
+function isEffectiveFixedPriceAuction(auction: AuctionState): boolean {
+  const effective = getEffectiveAuction(auction)
+  return effective.type === 'fixed_price'
+}
+
 type GameStartPhase = 'idle' | 'dealing' | 'selecting_first_player' | 'ready'
 
 interface GameStore {
@@ -327,7 +363,7 @@ export const useGameStore = create<GameStore>()(
         const auction = gameState.round.phase.auction
 
         // Start Open Auction AI Manager for open auctions
-        if (auction.type === 'open') {
+        if (isEffectiveOpenAuction(auction)) {
           console.log('Starting Open Auction AI Manager for new auction')
           get().startOpenAuctionAI()
           return // Open auctions are handled by AI manager, not orchestrator
@@ -344,36 +380,54 @@ export const useGameStore = create<GameStore>()(
           const { gameState: currentState } = get()
           if (currentState &&
               currentState.round.phase.type === 'auction' &&
-              currentState.round.phase.auction.type === 'hidden' &&
+              isEffectiveHiddenAuction(currentState.round.phase.auction) &&
               updatedGameState.round.phase.type === 'auction' &&
-              updatedGameState.round.phase.auction.type === 'hidden') {
+              isEffectiveHiddenAuction(updatedGameState.round.phase.auction)) {
             const currentAuction = currentState.round.phase.auction
             const aiAuction = updatedGameState.round.phase.auction
 
-            // Merge bids - keep any bids from current state that AI state doesn't have
-            const mergedBids = { ...aiAuction.bids }
-            for (const [playerId, bid] of Object.entries(currentAuction.bids)) {
-              if (mergedBids[playerId] === undefined) {
-                mergedBids[playerId] = bid
-                console.log(`Preserved human bid from ${playerId}: ${bid}`)
+            // Get the actual hidden auction (could be embedded in double auction)
+            const currentHidden = getEffectiveAuction(currentAuction)
+            const aiHidden = getEffectiveAuction(aiAuction)
+
+            if (currentHidden.type === 'hidden' && aiHidden.type === 'hidden') {
+              // Merge bids - keep any bids from current state that AI state doesn't have
+              const mergedBids = { ...aiHidden.bids }
+              for (const [playerId, bid] of Object.entries(currentHidden.bids)) {
+                if (mergedBids[playerId] === undefined) {
+                  mergedBids[playerId] = bid
+                  console.log(`Preserved human bid from ${playerId}: ${bid}`)
+                }
               }
-            }
 
-            // Update readyToReveal based on merged bids
-            const allPlayersCount = currentState.players.length
-            const submittedBidsCount = Object.keys(mergedBids).length
-            const readyToReveal = submittedBidsCount >= allPlayersCount
+              // Update readyToReveal based on merged bids
+              const allPlayersCount = currentState.players.length
+              const submittedBidsCount = Object.keys(mergedBids).length
+              const readyToReveal = submittedBidsCount >= allPlayersCount
 
-            updatedGameState = {
-              ...updatedGameState,
-              round: {
-                ...updatedGameState.round,
-                phase: {
-                  type: 'auction',
-                  auction: {
-                    ...aiAuction,
+              // Update the embedded auction with merged bids
+              const mergedAuction = currentAuction.type === 'double'
+                ? {
+                    ...currentAuction,
+                    embeddedAuction: {
+                      ...currentHidden,
+                      bids: mergedBids,
+                      readyToReveal
+                    }
+                  }
+                : {
+                    ...currentHidden,
                     bids: mergedBids,
                     readyToReveal
+                  }
+
+              updatedGameState = {
+                ...updatedGameState,
+                round: {
+                  ...updatedGameState.round,
+                  phase: {
+                    type: 'auction',
+                    auction: mergedAuction
                   }
                 }
               }
@@ -388,19 +442,25 @@ export const useGameStore = create<GameStore>()(
 
           // For hidden auctions, check if all bids are in and trigger reveal
           if (updatedGameState.round.phase.type === 'auction' &&
-              updatedGameState.round.phase.auction.type === 'hidden') {
-            const hiddenAuction = updatedGameState.round.phase.auction
-            if (hiddenAuction.readyToReveal && !hiddenAuction.revealedBids) {
+              isEffectiveHiddenAuction(updatedGameState.round.phase.auction)) {
+            const currentAuction = updatedGameState.round.phase.auction
+            const effectiveAuction = getEffectiveAuction(currentAuction)
+            if (effectiveAuction.type === 'hidden' && effectiveAuction.readyToReveal && !effectiveAuction.revealedBids) {
               console.log('All hidden bids submitted, triggering reveal...')
               setTimeout(() => {
                 const { gameState: currentGameState } = get()
                 if (currentGameState && currentGameState.round.phase.type === 'auction') {
                   const currentAuction = currentGameState.round.phase.auction
-                  if (currentAuction.type === 'hidden' && currentAuction.readyToReveal && !currentAuction.revealedBids) {
+                  const effectiveAuction = getEffectiveAuction(currentAuction)
+                  if (effectiveAuction.type === 'hidden' && effectiveAuction.readyToReveal && !effectiveAuction.revealedBids) {
                     // Reveal the bids
-                    const revealedAuction = revealBids(currentAuction)
+                    const revealedAuction = revealBids(effectiveAuction)
 
-                    // Update with revealed bids
+                    // Update with revealed bids (handle both embedded and standalone)
+                    const updatedAuction = currentAuction.type === 'double'
+                      ? { ...currentAuction, embeddedAuction: revealedAuction }
+                      : revealedAuction
+
                     set(
                       {
                         gameState: {
@@ -409,7 +469,7 @@ export const useGameStore = create<GameStore>()(
                             ...currentGameState.round,
                             phase: {
                               type: 'auction',
-                              auction: revealedAuction
+                              auction: updatedAuction
                             }
                           }
                         }
@@ -423,10 +483,16 @@ export const useGameStore = create<GameStore>()(
                       const { gameState: newGameState } = get()
                       if (newGameState && newGameState.round.phase.type === 'auction') {
                         const finalAuction = newGameState.round.phase.auction
-                        if (finalAuction.type === 'hidden' && finalAuction.revealedBids) {
+                        const finalEffective = getEffectiveAuction(finalAuction)
+                        if (finalEffective.type === 'hidden' && finalEffective.revealedBids) {
                           // Conclude the auction
-                          const auctionResult = concludeHiddenAuction(finalAuction, newGameState.players)
+                          const auctionResult = concludeHiddenAuction(finalEffective, newGameState.players)
                           console.log(`Hidden auction concluded: ${auctionResult.winnerId} won for $${auctionResult.salePrice}k`)
+
+                          // Get the card(s) for execution
+                          const cards = finalAuction.type === 'double' && finalAuction.secondCard
+                            ? [finalAuction.doubleCard, finalAuction.secondCard]
+                            : [finalEffective.card]
 
                           // Execute the auction (transfer money, card, etc.)
                           const finalGameState = executeAuction(
@@ -441,7 +507,8 @@ export const useGameStore = create<GameStore>()(
                               }
                             },
                             auctionResult,
-                            finalAuction.card
+                            cards[0], // Primary card
+                            cards[1]  // Second card for double auctions
                           )
 
                           set(
@@ -467,6 +534,112 @@ export const useGameStore = create<GameStore>()(
                 }
               }, 1000)
               return // Don't continue to check for more AI turns
+            }
+          }
+
+          // Check for concluded auctions that need execution
+          // This handles fixed price, one_offer, and other auctions that conclude during AI processing
+          if (updatedGameState.round.phase.type === 'auction') {
+            const currentAuction = updatedGameState.round.phase.auction
+            const effectiveAuction = getEffectiveAuction(currentAuction)
+
+            console.log('[DEBUG] Checking for concluded auctions:', {
+              auctionType: currentAuction.type,
+              effectiveType: effectiveAuction.type,
+              isActive: effectiveAuction.isActive,
+              sold: 'sold' in effectiveAuction ? effectiveAuction.sold : 'N/A',
+              winnerId: 'winnerId' in effectiveAuction ? (effectiveAuction.winnerId || 'N/A') : 'N/A'
+            })
+
+            // Check if auction has concluded (not active)
+            if (!effectiveAuction.isActive) {
+              console.log('Auction concluded during AI processing, executing...')
+
+              // Handle double auctions with embedded auctions
+              if (currentAuction.type === 'double' && currentAuction.embeddedAuction) {
+                // For embedded auctions, we need to call the appropriate conclude function
+                // to get the AuctionResult with winner/salePrice
+                const embedded = currentAuction.embeddedAuction
+                let embeddedAuctionResult
+                if (embedded.type === 'one_offer') {
+                  embeddedAuctionResult = concludeAuction(embedded, updatedGameState.players)
+                } else if (embedded.type === 'open') {
+                  embeddedAuctionResult = concludeOpenAuction(embedded, updatedGameState.players)
+                } else if (embedded.type === 'hidden') {
+                  embeddedAuctionResult = concludeHiddenAuction(embedded, updatedGameState.players)
+                } else if (embedded.type === 'fixed_price') {
+                  embeddedAuctionResult = concludeFixedPriceAuction(embedded, updatedGameState.players)
+                }
+
+                if (embeddedAuctionResult) {
+                  console.log(`Double auction executed: ${embeddedAuctionResult.winnerId} won for $${embeddedAuctionResult.salePrice}k`)
+
+                  const cards = currentAuction.secondCard
+                    ? [currentAuction.doubleCard, currentAuction.secondCard]
+                    : [currentAuction.doubleCard]
+
+                  const finalGameState = executeAuction(
+                    updatedGameState,
+                    embeddedAuctionResult,
+                    cards[0],
+                    cards[1]
+                  )
+
+                  set(
+                    { gameState: finalGameState },
+                    false,
+                    'auction_concluded_from_ai'
+                  )
+
+                  // Check if round should continue
+                  setTimeout(() => {
+                    const { gameState: nextGameState } = get()
+                    if (nextGameState && nextGameState.round.phase.type === 'awaiting_card_play') {
+                      if (nextGameState.round.phase.activePlayerIndex !== 0) {
+                        get().processAITurn()
+                      }
+                    }
+                  }, 1500)
+                  return // Auction executed, don't continue processing
+                }
+              } else {
+                // Handle regular auctions (one_offer, fixed_price, etc.)
+                let auctionResult
+                if (effectiveAuction.type === 'one_offer') {
+                  auctionResult = concludeAuction(effectiveAuction, updatedGameState.players)
+                } else if (effectiveAuction.type === 'fixed_price') {
+                  auctionResult = concludeFixedPriceAuction(effectiveAuction, updatedGameState.players)
+                } else if (effectiveAuction.type === 'open') {
+                  auctionResult = concludeOpenAuction(effectiveAuction, updatedGameState.players)
+                }
+
+                if (auctionResult) {
+                  console.log(`Auction executed: ${auctionResult.winnerId} won for $${auctionResult.salePrice}k`)
+
+                  const finalGameState = executeAuction(
+                    updatedGameState,
+                    auctionResult,
+                    effectiveAuction.card
+                  )
+
+                  set(
+                    { gameState: finalGameState },
+                    false,
+                    'auction_concluded_from_ai'
+                  )
+
+                  // Check if round should continue
+                  setTimeout(() => {
+                    const { gameState: nextGameState } = get()
+                    if (nextGameState && nextGameState.round.phase.type === 'awaiting_card_play') {
+                      if (nextGameState.round.phase.activePlayerIndex !== 0) {
+                        get().processAITurn()
+                      }
+                    }
+                  }, 1500)
+                  return // Auction executed, don't continue processing
+                }
+              }
             }
           }
 
@@ -651,6 +824,25 @@ export const useGameStore = create<GameStore>()(
 
                   case 'open':
                     updatedEmbeddedAuction = placeOpenBid(embeddedAuction, player.id, amount, gameState.players)
+
+                    // Update AI manager with new state so AI can react to new bids
+                    const aiManager = getOpenAuctionAIManager()
+                    if (aiManager.isActive()) {
+                      const newGameState = {
+                        ...gameState,
+                        round: {
+                          ...gameState.round,
+                          phase: {
+                            type: 'auction' as const,
+                            auction: {
+                              ...auction,
+                              embeddedAuction: updatedEmbeddedAuction
+                            }
+                          }
+                        }
+                      }
+                      aiManager.updateGameState(newGameState)
+                    }
                     break
 
                   case 'hidden':
@@ -658,11 +850,23 @@ export const useGameStore = create<GameStore>()(
                     break
 
                   case 'fixed_price':
-                    if (amount === -1) {
-                      updatedEmbeddedAuction = buyAtPrice(embeddedAuction, player.id, gameState.players)
+                    // Check if we're in price setting phase (price = 0)
+                    if (embeddedAuction.price === 0) {
+                      // Auctioneer setting the price
+                      if (player.id === embeddedAuction.auctioneerId && amount > 0) {
+                        updatedEmbeddedAuction = setFixedPrice(embeddedAuction, player.id, amount, gameState.players)
+                      } else {
+                        console.error('Only auctioneer can set price')
+                        return
+                      }
                     } else {
-                      console.error('Use buy action for fixed price auctions')
-                      return
+                      // Buying phase - player buying at fixed price
+                      if (amount === -1) {
+                        updatedEmbeddedAuction = buyAtPrice(embeddedAuction, player.id, gameState.players)
+                      } else {
+                        console.error('Use buy action to purchase at fixed price')
+                        return
+                      }
                     }
                     break
                 }
@@ -739,10 +943,10 @@ export const useGameStore = create<GameStore>()(
 
                     return // Exit early since auction is concluded
                   }
-                } else {
-                  console.error('Failed to conclude embedded auction')
-                  return
                 }
+                // Note: If the embedded auction is still active (e.g., fixed price waiting for buyers,
+                // open auction with active timer), we continue below to update the game state normally.
+                // This is not an error - it's the expected behavior for these auction types.
               }
               } else {
                 console.error('Double auction has no embedded auction to handle bid')
@@ -774,9 +978,21 @@ export const useGameStore = create<GameStore>()(
           )
 
           // Check if fixed price auction has ended (someone bought or everyone passed)
-          if (auction.type === 'fixed_price' && !updatedAuction.isActive) {
-            const auctionResult = concludeFixedPriceAuction(updatedAuction, gameState.players)
+          if (isEffectiveFixedPriceAuction(auction) && !updatedAuction.isActive) {
+            // Get the effective auction (could be embedded in double auction)
+            const effectiveAuction = getEffectiveAuction(updatedAuction)
+            if (effectiveAuction.type !== 'fixed_price') {
+              console.error('Expected fixed price auction but got:', effectiveAuction.type)
+              return
+            }
+
+            const auctionResult = concludeFixedPriceAuction(effectiveAuction, gameState.players)
             console.log(`Fixed price auction concluded: ${auctionResult.winnerId} won for $${auctionResult.salePrice}k`)
+
+            // Get the card(s) for execution
+            const cards = auction.type === 'double' && auction.secondCard
+              ? [auction.doubleCard, auction.secondCard]
+              : [effectiveAuction.card]
 
             // Execute the auction (transfer money, card, etc.)
             const finalGameState = executeAuction(
@@ -791,7 +1007,8 @@ export const useGameStore = create<GameStore>()(
                 }
               },
               auctionResult,
-              updatedAuction.card
+              cards[0], // Primary card
+              cards[1]  // Second card for double auctions
             )
 
             console.log('Fixed price auction executed successfully')
@@ -905,9 +1122,21 @@ export const useGameStore = create<GameStore>()(
           )
 
           // Check if fixed price auction has ended (everyone passed, auctioneer forced to buy)
-          if (auction.type === 'fixed_price' && !updatedAuction.isActive) {
-            const auctionResult = concludeFixedPriceAuction(updatedAuction, gameState.players)
+          if (isEffectiveFixedPriceAuction(auction) && !updatedAuction.isActive) {
+            // Get the effective auction (could be embedded in double auction)
+            const effectiveAuction = getEffectiveAuction(updatedAuction)
+            if (effectiveAuction.type !== 'fixed_price') {
+              console.error('Expected fixed price auction but got:', effectiveAuction.type)
+              return
+            }
+
+            const auctionResult = concludeFixedPriceAuction(effectiveAuction, gameState.players)
             console.log(`Fixed price auction concluded: ${auctionResult.winnerId} won for $${auctionResult.salePrice}k`)
+
+            // Get the card(s) for execution
+            const cards = auction.type === 'double' && auction.secondCard
+              ? [auction.doubleCard, auction.secondCard]
+              : [effectiveAuction.card]
 
             // Execute the auction (transfer money, card, etc.)
             const finalGameState = executeAuction(
@@ -922,7 +1151,8 @@ export const useGameStore = create<GameStore>()(
                 }
               },
               auctionResult,
-              updatedAuction.card
+              cards[0], // Primary card
+              cards[1]  // Second card for double auctions
             )
 
             console.log('Fixed price auction executed successfully')
@@ -981,7 +1211,8 @@ export const useGameStore = create<GameStore>()(
         }
 
         const auction = gameState.round.phase.auction
-        if (auction.type !== 'hidden') {
+        const effectiveAuction = getEffectiveAuction(auction)
+        if (effectiveAuction.type !== 'hidden') {
           console.error('Not a hidden auction')
           return
         }
@@ -990,7 +1221,12 @@ export const useGameStore = create<GameStore>()(
 
         try {
           const player = gameState.players[0]
-          const updatedAuction = submitBid(auction, player.id, amount, gameState.players)
+          const updatedHiddenAuction = submitBid(effectiveAuction, player.id, amount, gameState.players)
+
+          // Update the auction state (handle both embedded and standalone)
+          const updatedAuction = auction.type === 'double'
+            ? { ...auction, embeddedAuction: updatedHiddenAuction }
+            : updatedHiddenAuction
 
           // Update game state
           set(
@@ -1011,16 +1247,21 @@ export const useGameStore = create<GameStore>()(
           )
 
           // If all bids submitted, reveal them after a short delay
-          if (updatedAuction.readyToReveal && !updatedAuction.revealedBids) {
+          if (updatedHiddenAuction.readyToReveal && !updatedHiddenAuction.revealedBids) {
             setTimeout(() => {
               const { gameState: currentGameState } = get()
               if (currentGameState && currentGameState.round.phase.type === 'auction') {
                 const currentAuction = currentGameState.round.phase.auction
-                if (currentAuction.type === 'hidden' && currentAuction.readyToReveal) {
+                const currentEffective = getEffectiveAuction(currentAuction)
+                if (currentEffective.type === 'hidden' && currentEffective.readyToReveal && !currentEffective.revealedBids) {
                   // Reveal the bids
-                  const revealedAuction = revealBids(currentAuction)
+                  const revealedAuction = revealBids(currentEffective)
 
-                  // Update with revealed bids
+                  // Update with revealed bids (handle both embedded and standalone)
+                  const updatedAuction = currentAuction.type === 'double'
+                    ? { ...currentAuction, embeddedAuction: revealedAuction }
+                    : revealedAuction
+
                   set(
                     {
                       gameState: {
@@ -1029,7 +1270,7 @@ export const useGameStore = create<GameStore>()(
                           ...currentGameState.round,
                           phase: {
                             type: 'auction',
-                            auction: revealedAuction
+                            auction: updatedAuction
                           }
                         }
                       }
@@ -1043,10 +1284,16 @@ export const useGameStore = create<GameStore>()(
                     const { gameState: newGameState } = get()
                     if (newGameState && newGameState.round.phase.type === 'auction') {
                       const finalAuction = newGameState.round.phase.auction
-                      if (finalAuction.type === 'hidden' && finalAuction.revealedBids) {
+                      const finalEffective = getEffectiveAuction(finalAuction)
+                      if (finalEffective.type === 'hidden' && finalEffective.revealedBids) {
                         // Conclude the auction
-                        const auctionResult = concludeHiddenAuction(finalAuction, newGameState.players)
+                        const auctionResult = concludeHiddenAuction(finalEffective, newGameState.players)
                         console.log(`Hidden auction concluded: ${auctionResult.winnerId} won for $${auctionResult.salePrice}k`)
+
+                        // Get the card(s) for execution
+                        const cards = finalAuction.type === 'double' && finalAuction.secondCard
+                          ? [finalAuction.doubleCard, finalAuction.secondCard]
+                          : [finalEffective.card]
 
                         // Execute the auction (transfer money, card, etc.)
                         const finalGameState = executeAuction(
@@ -1061,7 +1308,8 @@ export const useGameStore = create<GameStore>()(
                             }
                           },
                           auctionResult,
-                          finalAuction.card
+                          cards[0], // Primary card
+                          cards[1]  // Second card for double auctions
                         )
 
                         set(
@@ -1269,7 +1517,7 @@ export const useGameStore = create<GameStore>()(
         }
 
         const auction = gameState.round.phase.auction
-        if (auction.type === 'open') {
+        if (isEffectiveOpenAuction(auction)) {
           const aiManager = getOpenAuctionAIManager()
 
           // Set up callback for AI to place bids
@@ -1283,7 +1531,8 @@ export const useGameStore = create<GameStore>()(
             }
 
             const currentAuction = currentState.round.phase.auction
-            if (currentAuction.type !== 'open') {
+            const effectiveAuction = getEffectiveAuction(currentAuction)
+            if (effectiveAuction.type !== 'open') {
               return
             }
 
@@ -1295,7 +1544,12 @@ export const useGameStore = create<GameStore>()(
 
             try {
               // Place the bid using the open auction engine
-              const updatedAuction = placeOpenBid(currentAuction, playerId, amount, currentState.players)
+              const updatedAuction = placeOpenBid(effectiveAuction, playerId, amount, currentState.players)
+
+              // Update the auction state (handle both embedded and standalone)
+              const finalAuction = currentAuction.type === 'double'
+                ? { ...currentAuction, embeddedAuction: updatedAuction }
+                : updatedAuction
 
               const newGameState = {
                 ...currentState,
@@ -1303,7 +1557,7 @@ export const useGameStore = create<GameStore>()(
                   ...currentState.round,
                   phase: {
                     type: 'auction' as const,
-                    auction: updatedAuction
+                    auction: finalAuction
                   }
                 }
               }
@@ -1341,11 +1595,17 @@ export const useGameStore = create<GameStore>()(
         }
 
         const auction = gameState.round.phase.auction
-        if (auction.type === 'open' && checkTimerExpiration(auction)) {
+        const effectiveAuction = getEffectiveAuction(auction)
+        if (effectiveAuction.type === 'open' && checkTimerExpiration(effectiveAuction)) {
           console.log('Open auction timer expired, ending auction')
 
           // End the auction due to timer expiration
-          const endedAuction = endAuctionByTimer(auction)
+          const endedAuction = endAuctionByTimer(effectiveAuction)
+
+          // Update the auction state (handle both embedded and standalone)
+          const updatedAuction = auction.type === 'double'
+            ? { ...auction, embeddedAuction: endedAuction }
+            : endedAuction
 
           // Update game state with ended auction
           set(
@@ -1356,7 +1616,7 @@ export const useGameStore = create<GameStore>()(
                   ...gameState.round,
                   phase: {
                     type: 'auction',
-                    auction: endedAuction
+                    auction: updatedAuction
                   }
                 }
               }
@@ -1373,10 +1633,16 @@ export const useGameStore = create<GameStore>()(
             const { gameState: currentGameState } = get()
             if (currentGameState && currentGameState.round.phase.type === 'auction') {
               const currentAuction = currentGameState.round.phase.auction
-              if (currentAuction.type === 'open' && !currentAuction.isActive) {
+              const currentEffective = getEffectiveAuction(currentAuction)
+              if (currentEffective.type === 'open' && !currentEffective.isActive) {
                 // Use the imported concludeOpenAuction function
-                const auctionResult = concludeOpenAuction(currentAuction, currentGameState.players)
+                const auctionResult = concludeOpenAuction(currentEffective, currentGameState.players)
                 console.log(`Open auction concluded: ${auctionResult.winnerId} won for $${auctionResult.salePrice}k`)
+
+                // Get the card(s) for execution
+                const cards = currentAuction.type === 'double' && currentAuction.secondCard
+                  ? [currentAuction.doubleCard, currentAuction.secondCard]
+                  : [currentEffective.card]
 
                 // Execute the auction (transfer money, card, etc.)
                 const finalGameState = executeAuction(
@@ -1391,7 +1657,8 @@ export const useGameStore = create<GameStore>()(
                     }
                   },
                   auctionResult,
-                  currentAuction.card
+                  cards[0], // Primary card
+                  cards[1]  // Second card for double auctions
                 )
 
                 set(

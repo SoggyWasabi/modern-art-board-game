@@ -1,7 +1,19 @@
 import type { GameState, Player } from '../types/game'
-import type { OpenAuctionState } from '../types/auction'
+import type { OpenAuctionState, AuctionState } from '../types/auction'
 import { MediumAIWrapper } from './mediumAIWrapper'
 import { placeBid, checkTimerExpiration } from '../engine/auction/open'
+
+/**
+ * Helper to get the effective auction for double auctions
+ * When a double auction is in bidding phase with an embedded auction,
+ * we delegate to the embedded auction for all mechanics
+ */
+function getEffectiveAuction(auction: AuctionState): AuctionState {
+  if (auction.type === 'double' && auction.embeddedAuction) {
+    return auction.embeddedAuction
+  }
+  return auction
+}
 
 /**
  * Manages concurrent AI bidding for open auctions
@@ -37,7 +49,7 @@ export class OpenAuctionAIManager {
     this.isRunning = true
     this.currentGameState = gameState
 
-    const auction = gameState.round.phase.auction
+    const auction = getEffectiveAuction(gameState.round.phase.auction)
     if (auction.type !== 'open') {
       return
     }
@@ -61,9 +73,10 @@ export class OpenAuctionAIManager {
       return
     }
     this.currentGameState = gameState
+    const auction = getEffectiveAuction(gameState.round.phase.auction)
     console.log('OpenAuctionAIManager: Updated game state, current bid:',
-      gameState.round.phase.type === 'auction' && gameState.round.phase.auction.type === 'open'
-        ? gameState.round.phase.auction.currentBid
+      gameState.round.phase.type === 'auction' && auction.type === 'open'
+        ? auction.currentBid
         : 'N/A')
   }
 
@@ -101,7 +114,7 @@ export class OpenAuctionAIManager {
       }
 
       // Check if auction is still active and we haven't exceeded timer
-      const currentAuction = this.currentGameState.round.phase.auction
+      const currentAuction = getEffectiveAuction(this.currentGameState.round.phase.auction)
       if (currentAuction.type !== 'open' || !currentAuction.isActive || checkTimerExpiration(currentAuction)) {
         return
       }
@@ -115,7 +128,7 @@ export class OpenAuctionAIManager {
         }
 
         // Check if auction is still valid
-        const currentAuction = this.currentGameState.round.phase.auction
+        const currentAuction = getEffectiveAuction(this.currentGameState.round.phase.auction)
         if (currentAuction.type !== 'open' || !currentAuction.isActive || checkTimerExpiration(currentAuction)) {
           return
         }

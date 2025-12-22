@@ -4,14 +4,18 @@ import { useGameStore } from '../../../store/gameStore'
 import type { Card, AuctionType, Player } from '../../../types'
 import type { DoubleAuctionState } from '../../../types/auction'
 import { colors } from '../../../design/premiumTokens'
+import OneOfferAuction from './OneOfferAuction'
+import OpenAuction from './OpenAuction'
+import HiddenAuction from './HiddenAuction'
+import FixedPriceAuction from './FixedPriceAuction'
 
 interface DoubleAuctionWrapperProps {
   currentAuction: DoubleAuctionState
   isAuctionPlayerTurn: boolean
   currentPlayerInAuction: Player | null
   gameState: any
-  selectedCard?: Card | null  // Card selected from hand for preview
-  onClearSelectedCard?: () => void  // Callback to clear selected card
+  selectedCard?: Card | null
+  onClearSelectedCard?: () => void
 }
 
 const AUCTION_TYPE_INFO: Record<AuctionType, {
@@ -54,7 +58,11 @@ const DoubleAuctionWrapper: React.FC<DoubleAuctionWrapperProps> = ({
   selectedCard,
   onClearSelectedCard,
 }) => {
-  const { placeBid, passBid, setFixedPrice, buyAtFixedPrice, passFixedPrice, checkOpenAuctionTimer, declineSecondCardForDouble, offerSecondCardForDouble } = useGameStore()
+  const {
+    offerSecondCardForDouble,
+    declineSecondCardForDouble,
+  } = useGameStore()
+
   const [bidAmount, setBidAmount] = useState<number>(0)
   const [timeLeft, setTimeLeft] = useState<number>(0)
 
@@ -292,159 +300,72 @@ const DoubleAuctionWrapper: React.FC<DoubleAuctionWrapperProps> = ({
     )
   }
 
-  // Render bidding phase content based on auction type
+  // Render bidding phase content using component delegation
   const renderBiddingPhaseContent = () => {
-    if (!currentAuction.secondCard || currentAuction.auctionType === 'double') {
+    if (!currentAuction.secondCard || !currentAuction.embeddedAuction) {
       return null
     }
 
     const embedded = currentAuction.embeddedAuction
-    const biddingPlayers = gameState?.players.filter((p: any) => p.name !== 'You') || []
+    const cards = [currentAuction.doubleCard, currentAuction.secondCard]
 
-    // Get current bid info from embedded auction
-    const currentBid = embedded && 'currentBid' in embedded ? embedded.currentBid : 0
-    const currentBidderId = embedded && 'currentBidderId' in embedded ? embedded.currentBidderId : null
-    const highestBidder = gameState?.players.find((p: any) => p.id === currentBidderId)
+    // Delegate to the appropriate auction component with double context
+    switch (embedded.type) {
+      case 'one_offer':
+        return (
+          <OneOfferAuction
+            currentAuction={embedded}
+            isAuctionPlayerTurn={isAuctionPlayerTurn}
+            currentPlayerInAuction={currentPlayerInAuction}
+            gameState={gameState}
+            cards={cards}
+            isDoubleAuction={true}
+            doubleAuctionType="one_offer"
+          />
+        )
 
-    return (
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '6px',
-          }}
-        >
-          <div
-            style={{
-              fontSize: '12px',
-              fontWeight: 600,
-              color: 'rgba(255, 255, 255, 0.5)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.08em',
-            }}
-          >
-            Bidders
-          </div>
-          {currentBid > 0 && (
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>
-                High Bid
-              </div>
-              <div style={{ fontSize: '20px', fontWeight: 700, color: colors.accent.gold }}>
-                ${currentBid}k
-              </div>
-            </div>
-          )}
-        </div>
+      case 'open':
+        return (
+          <OpenAuction
+            currentAuction={embedded}
+            isAuctionPlayerTurn={isAuctionPlayerTurn}
+            currentPlayerInAuction={currentPlayerInAuction}
+            gameState={gameState}
+            cards={cards}
+            isDoubleAuction={true}
+            doubleAuctionType="open"
+          />
+        )
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          {biddingPlayers.map((player: any) => {
-            const isHighest = player.id === currentBidderId
-            // Check if it's this player's turn in embedded auction
-            let isCurrentTurn = false
-            if (embedded) {
-              if (embedded.type === 'one_offer' && embedded.phase === 'bidding') {
-                isCurrentTurn = player.id === embedded.turnOrder[embedded.currentTurnIndex]
-              } else if (embedded.type === 'open') {
-                isCurrentTurn = player.id === embedded.playerOrder[embedded.currentPlayerIndex]
-              } else if (embedded.type === 'fixed_price') {
-                isCurrentTurn = player.id === embedded.turnOrder[embedded.currentTurnIndex]
-              }
-            }
+      case 'hidden':
+        return (
+          <HiddenAuction
+            currentAuction={embedded}
+            isAuctionPlayerTurn={isAuctionPlayerTurn}
+            currentPlayerInAuction={currentPlayerInAuction}
+            gameState={gameState}
+            cards={cards}
+            isDoubleAuction={true}
+            doubleAuctionType="hidden"
+          />
+        )
 
-            // Get player's bid history if available
-            let playerBid: number | null = null
-            let hasPassed = false
-            if (embedded?.type === 'one_offer' && embedded.bidHistory) {
-              playerBid = embedded.bidHistory[player.id] ?? null
-              hasPassed = playerBid === 0
-            }
+      case 'fixed_price':
+        return (
+          <FixedPriceAuction
+            currentAuction={embedded}
+            isAuctionPlayerTurn={isAuctionPlayerTurn}
+            currentPlayerInAuction={currentPlayerInAuction}
+            gameState={gameState}
+            cards={cards}
+            isDoubleAuction={true}
+            doubleAuctionType="fixed_price"
+          />
+        )
 
-            return (
-              <div
-                key={player.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '8px 12px',
-                  background: isCurrentTurn
-                    ? 'rgba(251, 191, 36, 0.12)'
-                    : isHighest
-                      ? 'rgba(76, 175, 80, 0.1)'
-                      : 'rgba(255, 255, 255, 0.03)',
-                  border: isCurrentTurn
-                    ? `1px solid rgba(251, 191, 36, 0.4)`
-                    : isHighest
-                      ? '1px solid rgba(76, 175, 80, 0.3)'
-                      : '1px solid rgba(255, 255, 255, 0.06)',
-                  borderRadius: '10px',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <div
-                    style={{
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      background: isCurrentTurn
-                        ? colors.accent.gold
-                        : isHighest
-                          ? '#4CAF50'
-                          : 'rgba(255, 255, 255, 0.2)',
-                      boxShadow: isCurrentTurn ? `0 0 8px ${colors.accent.gold}` : 'none',
-                    }}
-                  />
-                  <span style={{ fontSize: '15px', fontWeight: 600, color: 'white' }}>
-                    {player.name}
-                  </span>
-                </div>
-                <span
-                  style={{
-                    fontSize: '14px',
-                    fontWeight: 600,
-                    color: isHighest
-                      ? '#4CAF50'
-                      : hasPassed
-                        ? 'rgba(239, 68, 68, 0.7)'
-                        : playerBid !== null && playerBid > 0
-                          ? colors.accent.gold
-                          : 'rgba(255, 255, 255, 0.25)',
-                  }}
-                >
-                  {isHighest && currentBid > 0
-                    ? `$${currentBid}k`
-                    : hasPassed
-                      ? 'Passed'
-                      : playerBid !== null && playerBid > 0
-                        ? `$${playerBid}k`
-                        : isCurrentTurn
-                          ? 'Deciding...'
-                          : '—'}
-                </span>
-              </div>
-            )
-          })}
-        </div>
-
-        <div
-          style={{
-            marginTop: '16px',
-            padding: '12px 16px',
-            background: 'rgba(76, 175, 80, 0.1)',
-            borderRadius: '8px',
-            border: '1px solid rgba(76, 175, 80, 0.2)',
-          }}
-        >
-          <div style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.8)', lineHeight: 1.5 }}>
-            Winner gets <strong style={{ color: '#4CAF50' }}>BOTH cards</strong> for one price!
-          </div>
-        </div>
-      </div>
-    )
+      default:
+        return null
+    }
   }
 
   return (
@@ -564,7 +485,7 @@ const DoubleAuctionWrapper: React.FC<DoubleAuctionWrapperProps> = ({
         {isOfferingPhase ? renderOfferingPhase() : renderBiddingPhaseContent()}
       </div>
 
-      {/* Offering Phase Action Bar */}
+      {/* Offering Phase Action Bar - Bidding phase handled by delegated components */}
       {isOfferingPhase && isAuctionPlayerTurn && (
         <div
           style={{
@@ -573,31 +494,16 @@ const DoubleAuctionWrapper: React.FC<DoubleAuctionWrapperProps> = ({
               ? 'linear-gradient(90deg, rgba(76, 175, 80, 0.15), rgba(76, 175, 80, 0.1))'
               : 'linear-gradient(90deg, rgba(251, 191, 36, 0.15), rgba(251, 191, 36, 0.1))',
             borderTop: isPreviewMode
-              ? '1px solid rgba(76, 175, 80, 0.3)'
-              : '1px solid rgba(251, 191, 36, 0.3)',
-            transition: 'all 0.3s ease',
+              ? '2px solid rgba(76, 175, 80, 0.4)'
+              : '1px solid rgba(251, 191, 36, 0.2)',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <span style={{ fontSize: '20px' }}>
-                {isPreviewMode ? '✨' : '👆'}
-              </span>
-              <div>
-                <div style={{
-                  fontSize: '15px',
-                  fontWeight: 600,
-                  color: isPreviewMode ? '#4CAF50' : colors.accent.gold
-                }}>
-                  {isPreviewMode ? 'Preview Mode' : 'Your Turn to Offer'}
-                </div>
-                <div style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.7)' }}>
-                  {isPreviewMode && previewCard
-                    ? `Offer ${previewCard.artist} ${AUCTION_TYPE_INFO[previewCard.auctionType].name} card`
-                    : `Select a ${currentAuction.doubleCard.artist} card from your hand, or pass`
-                  }
-                </div>
-              </div>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.7)' }}>
+              {isPreviewMode && previewCard
+                ? `Offer ${previewCard.artist} ${AUCTION_TYPE_INFO[previewCard.auctionType].name}?`
+                : "Pass on offering a second card"
+              }
             </div>
 
             {/* Preview Mode Buttons */}
@@ -679,305 +585,6 @@ const DoubleAuctionWrapper: React.FC<DoubleAuctionWrapperProps> = ({
               </button>
             )}
           </div>
-        </div>
-      )}
-
-      {/* Bidding Phase Action Bar */}
-      {isBiddingPhase && isAuctionPlayerTurn && currentAuction.embeddedAuction && (
-        <div
-          style={{
-            padding: '16px 24px',
-            background: 'rgba(0, 0, 0, 0.5)',
-            borderTop: '1px solid rgba(251, 191, 36, 0.2)',
-          }}
-        >
-          {/* Fixed Price - Price Setting Phase */}
-          {currentAuction.embeddedAuction.type === 'fixed_price' && currentAuction.embeddedAuction.price === 0 && (
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-              <div style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.7)' }}>Set your price:</div>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  borderRadius: '10px',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  overflow: 'hidden',
-                }}
-              >
-                <span style={{ padding: '0 10px', color: 'rgba(255,255,255,0.4)', fontSize: '15px' }}>$</span>
-                <input
-                  type="number"
-                  value={bidAmount}
-                  onChange={(e) => setBidAmount(Math.max(1, parseInt(e.target.value) || 1))}
-                  style={{
-                    width: '60px',
-                    padding: '12px 4px',
-                    background: 'transparent',
-                    border: 'none',
-                    color: 'white',
-                    fontSize: '16px',
-                    fontWeight: 600,
-                    textAlign: 'center',
-                    outline: 'none',
-                  }}
-                  placeholder="1"
-                />
-                <span style={{ padding: '0 10px', color: 'rgba(255,255,255,0.4)', fontSize: '15px' }}>k</span>
-              </div>
-              <button
-                onClick={() => setFixedPrice(bidAmount)}
-                style={{
-                  flex: 1,
-                  padding: '14px 20px',
-                  background: colors.accent.gold,
-                  border: 'none',
-                  borderRadius: '10px',
-                  color: '#000',
-                  fontSize: '15px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                Set Price
-              </button>
-            </div>
-          )}
-
-          {/* Fixed Price - Buy/Pass Phase */}
-          {currentAuction.embeddedAuction.type === 'fixed_price' && currentAuction.embeddedAuction.price > 0 && (
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', justifyContent: 'center' }}>
-              <div style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.7)' }}>
-                Price: <strong style={{ color: colors.accent.gold }}>${currentAuction.embeddedAuction.price}k</strong>
-              </div>
-              <button
-                onClick={() => buyAtFixedPrice()}
-                style={{
-                  padding: '14px 30px',
-                  background: 'linear-gradient(135deg, rgba(76, 175, 80, 0.2), rgba(76, 175, 80, 0.1))',
-                  border: '1px solid rgba(76, 175, 80, 0.5)',
-                  borderRadius: '10px',
-                  color: '#4CAF50',
-                  fontSize: '15px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                Buy (Both Cards!)
-              </button>
-              <button
-                onClick={() => passFixedPrice()}
-                style={{
-                  padding: '14px 20px',
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  border: '1px solid rgba(255, 255, 255, 0.15)',
-                  borderRadius: '10px',
-                  color: 'rgba(255, 255, 255, 0.7)',
-                  fontSize: '15px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                Pass
-              </button>
-            </div>
-          )}
-
-          {/* Open / One Offer Bidding */}
-          {(currentAuction.embeddedAuction.type === 'open' ||
-            (currentAuction.embeddedAuction.type === 'one_offer' && currentAuction.embeddedAuction.phase === 'bidding')) && (
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  borderRadius: '10px',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  overflow: 'hidden',
-                }}
-              >
-                <span style={{ padding: '0 10px', color: 'rgba(255,255,255,0.4)', fontSize: '15px' }}>$</span>
-                <input
-                  type="number"
-                  value={bidAmount}
-                  onChange={(e) => setBidAmount(Math.max(0, parseInt(e.target.value) || 0))}
-                  style={{
-                    width: '60px',
-                    padding: '12px 4px',
-                    background: 'transparent',
-                    border: 'none',
-                    color: 'white',
-                    fontSize: '16px',
-                    fontWeight: 600,
-                    textAlign: 'center',
-                    outline: 'none',
-                  }}
-                  placeholder="0"
-                />
-                <span style={{ padding: '0 10px', color: 'rgba(255,255,255,0.4)', fontSize: '15px' }}>k</span>
-              </div>
-
-              <button
-                onClick={() => placeBid(bidAmount)}
-                style={{
-                  flex: 1,
-                  padding: '14px 20px',
-                  background: colors.accent.gold,
-                  border: 'none',
-                  borderRadius: '10px',
-                  color: '#000',
-                  fontSize: '15px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                Place Bid
-              </button>
-
-              <button
-                onClick={() => passBid()}
-                style={{
-                  padding: '14px 20px',
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  border: '1px solid rgba(255, 255, 255, 0.15)',
-                  borderRadius: '10px',
-                  color: 'rgba(255, 255, 255, 0.7)',
-                  fontSize: '15px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                Pass
-              </button>
-            </div>
-          )}
-
-          {/* One Offer Auctioneer Decision */}
-          {currentAuction.embeddedAuction.type === 'one_offer' && currentAuction.embeddedAuction.phase === 'auctioneer_decision' && (
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-              {currentAuction.embeddedAuction.currentBid > 0 ? (
-                <>
-                  <button
-                    onClick={() => placeBid(-1)}
-                    style={{
-                      flex: 1,
-                      padding: '14px 20px',
-                      background: 'linear-gradient(135deg, rgba(76, 175, 80, 0.2), rgba(76, 175, 80, 0.1))',
-                      border: '1px solid rgba(76, 175, 80, 0.5)',
-                      borderRadius: '10px',
-                      color: '#4CAF50',
-                      fontSize: '15px',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                    }}
-                  >
-                    <div>Sell ${currentAuction.embeddedAuction.currentBid}k</div>
-                    <div style={{ fontSize: '12px', opacity: 0.8, fontWeight: 400, marginTop: '2px' }}>
-                      to highest bidder
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => placeBid(currentAuction.embeddedAuction!.type === 'one_offer' ? (currentAuction.embeddedAuction as any).currentBid + 1 : 1)}
-                    style={{
-                      flex: 1,
-                      padding: '14px 20px',
-                      background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(251, 191, 36, 0.1))',
-                      border: '1px solid rgba(251, 191, 36, 0.5)',
-                      borderRadius: '10px',
-                      color: colors.accent.gold,
-                      fontSize: '15px',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                    }}
-                  >
-                    <div>Buy ${currentAuction.embeddedAuction.type === 'one_offer' ? (currentAuction.embeddedAuction as any).currentBid + 1 : 1}k</div>
-                    <div style={{ fontSize: '12px', opacity: 0.8, fontWeight: 400, marginTop: '2px' }}>
-                      keep both cards
-                    </div>
-                  </button>
-                </>
-              ) : (
-                <button
-                  onClick={() => placeBid(-2)}
-                  style={{
-                    padding: '14px 40px',
-                    background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(251, 191, 36, 0.1))',
-                    border: '1px solid rgba(251, 191, 36, 0.5)',
-                    borderRadius: '10px',
-                    color: colors.accent.gold,
-                    fontSize: '15px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  Take Both Cards Free
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Hidden Auction */}
-          {currentAuction.embeddedAuction.type === 'hidden' && (
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-              <div style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.7)' }}>Your secret bid:</div>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  borderRadius: '10px',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  overflow: 'hidden',
-                }}
-              >
-                <span style={{ padding: '0 10px', color: 'rgba(255,255,255,0.4)', fontSize: '15px' }}>$</span>
-                <input
-                  type="number"
-                  value={bidAmount}
-                  onChange={(e) => setBidAmount(Math.max(0, parseInt(e.target.value) || 0))}
-                  style={{
-                    width: '60px',
-                    padding: '12px 4px',
-                    background: 'transparent',
-                    border: 'none',
-                    color: 'white',
-                    fontSize: '16px',
-                    fontWeight: 600,
-                    textAlign: 'center',
-                    outline: 'none',
-                  }}
-                  placeholder="0"
-                />
-                <span style={{ padding: '0 10px', color: 'rgba(255,255,255,0.4)', fontSize: '15px' }}>k</span>
-              </div>
-              <button
-                onClick={() => placeBid(bidAmount)}
-                style={{
-                  flex: 1,
-                  padding: '14px 20px',
-                  background: colors.accent.gold,
-                  border: 'none',
-                  borderRadius: '10px',
-                  color: '#000',
-                  fontSize: '15px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                Submit Hidden Bid
-              </button>
-            </div>
-          )}
         </div>
       )}
     </div>
