@@ -1386,6 +1386,10 @@ export const useGameStore = create<GameStore>()(
             hand: player.hand.filter((_, i) => i !== cardIndex)
           }
 
+          // Increment cards played per artist for the second card
+          const newCardsPlayed = { ...gameState.round.cardsPlayedPerArtist }
+          newCardsPlayed[card.artist] = (newCardsPlayed[card.artist] || 0) + 1
+
           // Update game state with the new auction and updated player hand
           set({
             gameState: {
@@ -1393,6 +1397,7 @@ export const useGameStore = create<GameStore>()(
               players: updatedPlayers,
               round: {
                 ...gameState.round,
+                cardsPlayedPerArtist: newCardsPlayed,
                 phase: {
                   type: 'auction',
                   auction: updatedAuction
