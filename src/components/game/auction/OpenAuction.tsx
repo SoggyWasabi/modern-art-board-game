@@ -88,8 +88,9 @@ const OpenAuction: React.FC<OpenAuctionProps> = ({
         display: 'flex',
         flexDirection: 'column',
         width: '100%',
-        maxWidth: '1000px', // Wider for bid stream
-        minHeight: '420px',
+        maxWidth: isDoubleAuction ? '1210px' : '1100px',
+        maxHeight: isDoubleAuction ? '450px' : undefined,
+        minHeight: isDoubleAuction ? undefined : '420px',
         background: 'linear-gradient(145deg, rgba(20, 20, 30, 0.95), rgba(10, 10, 15, 0.98))',
         backdropFilter: 'blur(20px)',
         borderRadius: '20px',
@@ -104,7 +105,7 @@ const OpenAuction: React.FC<OpenAuctionProps> = ({
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          padding: '16px 24px',
+          padding: isDoubleAuction ? '10px 20px' : '16px 24px',
           background: isDoubleAuction ? 'linear-gradient(90deg, rgba(251, 191, 36, 0.15), rgba(251, 191, 36, 0.05))' : 'rgba(0, 0, 0, 0.4)',
           borderBottom: `1px solid ${isDoubleAuction ? 'rgba(251, 191, 36, 0.3)' : 'rgba(251, 191, 36, 0.2)'}`,
         }}
@@ -223,67 +224,6 @@ const OpenAuction: React.FC<OpenAuctionProps> = ({
                   />
                 </div>
               ))}
-            </div>
-          </div>
-
-          {/* Package Deal Badge */}
-          {isDoubleAuction && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '6px 12px',
-                background: 'rgba(251, 191, 36, 0.2)',
-                borderRadius: '20px',
-                border: '1px solid rgba(251, 191, 36, 0.4)',
-              }}
-            >
-              <span style={{ fontSize: '12px' }}>🎁</span>
-              <span style={{ fontSize: '12px', fontWeight: 600, color: colors.accent.gold }}>
-                Package Deal - {displayCards.length} Cards!
-              </span>
-            </div>
-          )}
-
-          {/* Quick Bid Buttons */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.5)', textAlign: 'center' }}>
-              Quick Bids
-            </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                onClick={() => handleQuickBid(1)}
-                style={{
-                  padding: '8px 12px',
-                  background: 'rgba(251, 191, 36, 0.2)',
-                  border: '1px solid rgba(251, 191, 36, 0.4)',
-                  borderRadius: '6px',
-                  color: colors.accent.gold,
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                +1k
-              </button>
-              <button
-                onClick={() => handleQuickBid(5)}
-                style={{
-                  padding: '8px 12px',
-                  background: 'rgba(251, 191, 36, 0.2)',
-                  border: '1px solid rgba(251, 191, 36, 0.4)',
-                  borderRadius: '6px',
-                  color: colors.accent.gold,
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                +5k
-              </button>
             </div>
           </div>
         </div>
@@ -492,6 +432,42 @@ const OpenAuction: React.FC<OpenAuctionProps> = ({
             />
             <span style={{ padding: '0 10px', color: 'rgba(255,255,255,0.4)', fontSize: '15px' }}>k</span>
           </div>
+
+          <button
+            onClick={() => handleQuickBid(1)}
+            style={{
+              padding: '12px 16px',
+              background: 'rgba(251, 191, 36, 0.15)',
+              border: '1px solid rgba(251, 191, 36, 0.3)',
+              borderRadius: '10px',
+              color: colors.accent.gold,
+              fontSize: '14px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            +1k
+          </button>
+
+          <button
+            onClick={() => handleQuickBid(5)}
+            style={{
+              padding: '12px 16px',
+              background: 'rgba(251, 191, 36, 0.15)',
+              border: '1px solid rgba(251, 191, 36, 0.3)',
+              borderRadius: '10px',
+              color: colors.accent.gold,
+              fontSize: '14px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            +5k
+          </button>
 
           <button
             onClick={handleBid}
