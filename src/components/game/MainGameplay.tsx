@@ -18,7 +18,7 @@ interface MainGameplayProps {
 }
 
 const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
-  const { gameState, selectedCardId, selectCard, playCard, deselectCard, placeBid, passBid, offerSecondCardForDouble, declineSecondCardForDouble } = useGameStore()
+  const { gameState, selectedCardId, selectCard, playCard, deselectCard, placeBid, passBid, offerSecondCardForDouble, declineSecondCardForDouble, processAITurn } = useGameStore()
   const currentPlayer = useCurrentPlayer()
   const isPlayerTurn = useIsCurrentPlayerTurn()
   const { turnIndicator, isPlayerTurn: isCurrentPlayerTurn, isAIThinking, turnMessage } = useTurnManagement()
@@ -164,6 +164,36 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
       setSelectedDoubleCard(null)
     }
   }, [isDoubleAuctionPhase])
+
+  // Process AI turns when it's an AI player's turn
+  React.useEffect(() => {
+    if (!gameState) {
+      return
+    }
+
+    const phase = gameState.round.phase
+
+    // Only process AI turns during awaiting_card_play phase
+    if (phase.type !== 'awaiting_card_play') {
+      return
+    }
+
+    const activePlayerIndex = phase.activePlayerIndex
+    const activePlayer = gameState.players[activePlayerIndex]
+
+    // Check if it's an AI player's turn
+    if (activePlayer && activePlayer.isAI) {
+      console.log(`[AI Turn] Detected AI player's turn: ${activePlayer.name}`)
+
+      // Small delay for UI to update, then trigger AI turn
+      const timeoutId = setTimeout(() => {
+        console.log(`[AI Turn] Triggering AI turn for ${activePlayer.name}`)
+        processAITurn()
+      }, 1000)
+
+      return () => clearTimeout(timeoutId)
+    }
+  }, [gameState, processAITurn])
 
   return (
     <div

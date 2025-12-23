@@ -6,10 +6,10 @@ import { MediumAIWrapper } from './mediumAIWrapper'
 // Import auction engine functions
 import { createDoubleAuction, offerSecondCard, declineToOffer } from '../engine/auction/double'
 import { placeBid as placeOpenBid, pass as passOpenBid } from '../engine/auction/open'
-import { makeOffer, pass as passOneOffer, acceptHighestBid, auctioneerOutbid, auctioneerTakesFree, concludeAuction } from '../engine/auction/oneOffer'
+import { makeOffer, pass as passOneOffer, acceptHighestBid, auctioneerOutbid, auctioneerTakesFree } from '../engine/auction/oneOffer'
 import { submitBid, revealBids } from '../engine/auction/hidden'
-import { buyAtPrice, pass as passFixedPrice, setPrice as setFixedPrice, concludeAuction as concludeFixedPriceAuction } from '../engine/auction/fixedPrice'
-import { executeAuction } from '../engine/auction/executor'
+import { buyAtPrice, pass as passFixedPrice, setPrice as setFixedPrice } from '../engine/auction/fixedPrice'
+// Note: executeAuction is handled by gameStore.ts to prevent duplicate execution
 
 /**
  * Orchestrates AI participation in auctions using Medium AI
@@ -119,19 +119,8 @@ export class AuctionAIOrchestrator {
       let updatedGameState = await this.applyAIDecision(gameState, currentPlayer, decision)
       console.log(`Successfully applied ${currentPlayer.name}'s decision`)
 
-      // Check if auction has concluded after this action
-      const auction = updatedGameState.round.phase.auction
-      if (auction.type === 'one_offer' && !auction.isActive) {
-        console.log('One Offer auction has ended, executing auction result')
-        const auctionResult = concludeAuction(auction, updatedGameState.players)
-        updatedGameState = executeAuction(updatedGameState, auctionResult, auction.card)
-        console.log(`Auction concluded: ${auctionResult.winnerId} won for $${auctionResult.salePrice}k`)
-      } else if (auction.type === 'fixed_price' && !auction.isActive) {
-        console.log('Fixed Price auction has ended, executing auction result')
-        const auctionResult = concludeFixedPriceAuction(auction, updatedGameState.players)
-        updatedGameState = executeAuction(updatedGameState, auctionResult, auction.card)
-        console.log(`Auction concluded: ${auctionResult.winnerId} won for $${auctionResult.salePrice}k`)
-      }
+      // NOTE: We do NOT execute the auction here - that's handled by gameStore.ts
+      // This prevents duplicate execution. The orchestrator only applies AI decisions.
 
       return updatedGameState
     } catch (error) {
@@ -262,6 +251,10 @@ export class AuctionAIOrchestrator {
         return null
 
       case 'fixed_price':
+        // If price is 0, the auctioneer needs to set the price first
+        if (auction.price === 0) {
+          return auction.auctioneerId
+        }
         return auction.turnOrder[auction.currentTurnIndex]
 
       case 'double':
@@ -361,14 +354,19 @@ export class AuctionAIOrchestrator {
     const auction = gameState.round.phase.auction
     const player = gameState.players[playerIndex]
 
-    if (decision.type === 'bid') {
-      if (decision.action === 'offer' && auction.currentAuctioneerId === player.id && !auction.secondCard) {
+    if (auction.type !== 'double') {
+      return gameState
+    }
+
+    // Handle offering phase (no second card yet)
+    if (!auction.secondCard && auction.currentAuctioneerId === player.id) {
+      if (decision.type === 'bid' && decision.action === 'offer') {
         // Find a matching card in AI's hand
         const matchingCard = player.hand.find(card =>
           card.artist === auction.doubleCard.artist && card.auctionType !== 'double'
         )
 
-        if (matchingCard) {
+        if (matchingCard && decision.cardId) {
           const updatedAuction = offerSecondCard(auction, player.id, matchingCard, gameState.players)
 
           return {
@@ -380,6 +378,21 @@ export class AuctionAIOrchestrator {
                 auction: updatedAuction
               }
             }
+          }
+        }
+      }
+
+      // If AI has no matching card or decides not to offer, decline
+      // This moves to the next player in turn order
+      const updatedAuction = declineToOffer(auction, player.id)
+
+      return {
+        ...gameState,
+        round: {
+          ...gameState.round,
+          phase: {
+            type: 'auction',
+            auction: updatedAuction
           }
         }
       }

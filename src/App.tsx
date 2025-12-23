@@ -706,12 +706,18 @@ function App() {
     // Start the game - the mock game state will randomly select first player
     startGameFromSetup()
 
-    // If player wants to start, we need to update the game state
-    if (playerStarts) {
-      const { gameState } = useGameStore.getState()
-      if (gameState) {
-        // Update the first player to be the human player (index 0)
+    // Handle first player selection
+    const { gameState } = useGameStore.getState()
+    if (gameState) {
+      if (playerStarts) {
+        // Human wants to go first - set to index 0
+        console.log('[handlePlayerCountSelect] Human selected to go first')
         useGameStore.getState().setFirstPlayerIndex(0)
+      } else {
+        // Random selection - pick a random player to go first
+        const randomIndex = Math.floor(Math.random() * count)
+        console.log('[handlePlayerCountSelect] Randomly selected first player:', randomIndex, 'Player:', gameState.players[randomIndex]?.name)
+        useGameStore.getState().setFirstPlayerIndex(randomIndex)
       }
     }
 

@@ -122,6 +122,8 @@ const GameStartSequence: React.FC<GameStartSequenceProps> = ({ onComplete }) => 
     const maxIterations = 20 + Math.floor(Math.random() * 10) // Random number of spins
     const winnerIndex = Math.floor(Math.random() * playerCount)
 
+    console.log('[Random First Player] Player count:', playerCount, 'Winner index:', winnerIndex, 'Winner name:', players[winnerIndex]?.name)
+
     const spin = () => {
       setHighlightedPlayer(currentIndex)
       currentIndex = (currentIndex + 1) % playerCount

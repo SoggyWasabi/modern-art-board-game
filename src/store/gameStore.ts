@@ -3,10 +3,11 @@ import { devtools } from 'zustand/middleware'
 import type { GameState, SetupState, AuctionState, PlayerSlotConfig, Artist } from '../types'
 import { validateAndCreateGame } from '../types/setup'
 import { startGame } from '../engine/game'
-import { playCard } from '../engine/round'
+import { playCard, getNextAuctioneerIndex, shouldRoundEnd } from '../engine/round'
 import { getGameController, GameActionHandler } from '../integration/gameIntegration'
 import { getAuctionAIOrchestrator } from '../integration/auctionAIOrchestrator'
 import { getOpenAuctionAIManager } from '../integration/openAuctionAIManager'
+import { getCardSelectionAIOrchestrator } from '../integration/cardSelectionAIOrchestrator'
 
 // Import all auction engine functions
 import { placeBid as placeOpenBid, pass as passOpenBid, checkTimerExpiration, endAuctionByTimer, concludeAuction as concludeOpenAuction } from '../engine/auction/open'
@@ -52,6 +53,40 @@ function isEffectiveHiddenAuction(auction: AuctionState): boolean {
 function isEffectiveFixedPriceAuction(auction: AuctionState): boolean {
   const effective = getEffectiveAuction(auction)
   return effective.type === 'fixed_price'
+}
+
+/**
+ * Transition to the next auctioneer after an auction completes
+ * This handles the phase transition from auction to awaiting_card_play
+ */
+function transitionToNextAuctioneer(gameState: GameState): GameState {
+  // First check if the round should end
+  if (shouldRoundEnd(gameState)) {
+    // Round should end - trigger round ending
+    // Import the endRound function from round.ts
+    const { endRound } = require('../engine/round')
+    return endRound(gameState)
+  }
+
+  // Get the next auctioneer
+  const nextAuctioneerIndex = getNextAuctioneerIndex(gameState)
+
+  console.log(`Transitioning to next auctioneer: player ${nextAuctioneerIndex}`)
+
+  // Create new round state with next auctioneer
+  const newRoundState = {
+    ...gameState.round,
+    currentAuctioneerIndex: nextAuctioneerIndex,
+    phase: {
+      type: 'awaiting_card_play' as const,
+      activePlayerIndex: nextAuctioneerIndex
+    }
+  }
+
+  return {
+    ...gameState,
+    round: newRoundState
+  }
 }
 
 type GameStartPhase = 'idle' | 'dealing' | 'selecting_first_player' | 'ready'
@@ -495,7 +530,7 @@ export const useGameStore = create<GameStore>()(
                             : [finalEffective.card]
 
                           // Execute the auction (transfer money, card, etc.)
-                          const finalGameState = executeAuction(
+                          const executedGameState = executeAuction(
                             {
                               ...newGameState,
                               round: {
@@ -510,6 +545,9 @@ export const useGameStore = create<GameStore>()(
                             cards[0], // Primary card
                             cards[1]  // Second card for double auctions
                           )
+
+                          // Transition to next auctioneer
+                          const finalGameState = transitionToNextAuctioneer(executedGameState)
 
                           set(
                             { gameState: finalGameState },
@@ -543,17 +581,8 @@ export const useGameStore = create<GameStore>()(
             const currentAuction = updatedGameState.round.phase.auction
             const effectiveAuction = getEffectiveAuction(currentAuction)
 
-            console.log('[DEBUG] Checking for concluded auctions:', {
-              auctionType: currentAuction.type,
-              effectiveType: effectiveAuction.type,
-              isActive: effectiveAuction.isActive,
-              sold: 'sold' in effectiveAuction ? effectiveAuction.sold : 'N/A',
-              winnerId: 'winnerId' in effectiveAuction ? (effectiveAuction.winnerId || 'N/A') : 'N/A'
-            })
-
             // Check if auction has concluded (not active)
             if (!effectiveAuction.isActive) {
-              console.log('Auction concluded during AI processing, executing...')
 
               // Handle double auctions with embedded auctions
               if (currentAuction.type === 'double' && currentAuction.embeddedAuction) {
@@ -578,12 +607,15 @@ export const useGameStore = create<GameStore>()(
                     ? [currentAuction.doubleCard, currentAuction.secondCard]
                     : [currentAuction.doubleCard]
 
-                  const finalGameState = executeAuction(
+                  const executedGameState = executeAuction(
                     updatedGameState,
                     embeddedAuctionResult,
                     cards[0],
                     cards[1]
                   )
+
+                  // Transition to next auctioneer
+                  const finalGameState = transitionToNextAuctioneer(executedGameState)
 
                   set(
                     { gameState: finalGameState },
@@ -616,11 +648,14 @@ export const useGameStore = create<GameStore>()(
                 if (auctionResult) {
                   console.log(`Auction executed: ${auctionResult.winnerId} won for $${auctionResult.salePrice}k`)
 
-                  const finalGameState = executeAuction(
+                  const executedGameState = executeAuction(
                     updatedGameState,
                     auctionResult,
-                    effectiveAuction.card
+                    effectiveAuction.type === 'double' ? effectiveAuction.doubleCard : effectiveAuction.card
                   )
+
+                  // Transition to next auctioneer
+                  const finalGameState = transitionToNextAuctioneer(executedGameState)
 
                   set(
                     { gameState: finalGameState },
@@ -673,6 +708,13 @@ export const useGameStore = create<GameStore>()(
 
         try {
           const player = gameState.players[0]
+
+          // Check if we're in auction phase
+          if (gameState.round.phase.type !== 'auction') {
+            console.error('Cannot place bid: not in auction phase')
+            return
+          }
+
           const auction = gameState.round.phase.auction
 
           // Auction functions now imported at top of file
@@ -729,7 +771,7 @@ export const useGameStore = create<GameStore>()(
                   console.log(`Auction concluded: ${auctionResult.winnerId} won for $${auctionResult.salePrice}k`)
 
                   // Execute the auction (transfer money, card, etc.)
-                  const finalGameState = executeAuction(
+                  const executedGameState = executeAuction(
                     {
                       ...gameState,
                       round: {
@@ -743,6 +785,9 @@ export const useGameStore = create<GameStore>()(
                     auctionResult,
                     updatedAuction.card
                   )
+
+                  // Transition to next auctioneer
+                  const finalGameState = transitionToNextAuctioneer(executedGameState)
 
                   set(
                     { gameState: finalGameState },
@@ -908,7 +953,7 @@ export const useGameStore = create<GameStore>()(
                       console.log(`Double auction concluded: ${doubleAuctionResult.winnerId} won for $${doubleAuctionResult.salePrice}k`)
 
                       // Execute the auction (transfer money, cards, etc.)
-                      const finalGameState = executeAuction(
+                      const executedGameState = executeAuction(
                         {
                           ...gameState,
                           round: {
@@ -923,6 +968,9 @@ export const useGameStore = create<GameStore>()(
                         auction.doubleCard, // Double card is the primary card
                         auction.secondCard   // Second card for Double auctions
                       )
+
+                      // Transition to next auctioneer
+                      const finalGameState = transitionToNextAuctioneer(executedGameState)
 
                     set(
                       { gameState: finalGameState },
@@ -995,7 +1043,7 @@ export const useGameStore = create<GameStore>()(
               : [effectiveAuction.card]
 
             // Execute the auction (transfer money, card, etc.)
-            const finalGameState = executeAuction(
+            const executedGameState = executeAuction(
               {
                 ...gameState,
                 round: {
@@ -1011,6 +1059,9 @@ export const useGameStore = create<GameStore>()(
               cards[1]  // Second card for double auctions
             )
 
+            // Transition to next auctioneer
+            const finalGameState = transitionToNextAuctioneer(executedGameState)
+
             console.log('Fixed price auction executed successfully')
 
             // Update with final state
@@ -1023,7 +1074,8 @@ export const useGameStore = create<GameStore>()(
             // Check if we should transition to next turn
             if (finalGameState && finalGameState.round.phase.type === 'awaiting_card_play') {
               setTimeout(() => {
-                if (finalGameState.round.phase.activePlayerIndex !== 0) {
+                if (finalGameState.round.phase.type === 'awaiting_card_play' &&
+                    finalGameState.round.phase.activePlayerIndex !== 0) {
                   get().processAITurn()
                 }
               }, 1500)
@@ -1074,6 +1126,13 @@ export const useGameStore = create<GameStore>()(
 
         try {
           const player = gameState.players[0]
+
+          // Check if we're in auction phase
+          if (gameState.round.phase.type !== 'auction') {
+            console.error('Cannot pass bid: not in auction phase')
+            return
+          }
+
           const auction = gameState.round.phase.auction
 
           // Auction functions now imported at top of file
@@ -1082,7 +1141,7 @@ export const useGameStore = create<GameStore>()(
 
           switch (auction.type) {
             case 'open':
-              updatedAuction = passOpenBid(auction, player.id)
+              updatedAuction = passOpenBid(auction, player.id, gameState.players)
               break
 
             case 'one_offer':
@@ -1095,7 +1154,7 @@ export const useGameStore = create<GameStore>()(
               break
 
             case 'fixed_price':
-              updatedAuction = passFixedPrice(auction, player.id, gameState.players)
+              updatedAuction = passFixedPrice(auction, player.id)
               break
 
             default:
@@ -1139,7 +1198,7 @@ export const useGameStore = create<GameStore>()(
               : [effectiveAuction.card]
 
             // Execute the auction (transfer money, card, etc.)
-            const finalGameState = executeAuction(
+            const executedGameState = executeAuction(
               {
                 ...gameState,
                 round: {
@@ -1155,6 +1214,9 @@ export const useGameStore = create<GameStore>()(
               cards[1]  // Second card for double auctions
             )
 
+            // Transition to next auctioneer
+            const finalGameState = transitionToNextAuctioneer(executedGameState)
+
             console.log('Fixed price auction executed successfully')
 
             // Update with final state
@@ -1167,7 +1229,8 @@ export const useGameStore = create<GameStore>()(
             // Check if we should transition to next turn
             if (finalGameState && finalGameState.round.phase.type === 'awaiting_card_play') {
               setTimeout(() => {
-                if (finalGameState.round.phase.activePlayerIndex !== 0) {
+                if (finalGameState.round.phase.type === 'awaiting_card_play' &&
+                    finalGameState.round.phase.activePlayerIndex !== 0) {
                   get().processAITurn()
                 }
               }, 1500)
@@ -1296,7 +1359,7 @@ export const useGameStore = create<GameStore>()(
                           : [finalEffective.card]
 
                         // Execute the auction (transfer money, card, etc.)
-                        const finalGameState = executeAuction(
+                        const executedGameState = executeAuction(
                           {
                             ...newGameState,
                             round: {
@@ -1311,6 +1374,9 @@ export const useGameStore = create<GameStore>()(
                           cards[0], // Primary card
                           cards[1]  // Second card for double auctions
                         )
+
+                        // Transition to next auctioneer
+                        const finalGameState = transitionToNextAuctioneer(executedGameState)
 
                         set(
                           { gameState: finalGameState },
@@ -1483,6 +1549,12 @@ export const useGameStore = create<GameStore>()(
       setFirstPlayerIndex: (index) =>
         set(
           (state) => {
+            console.log('[setFirstPlayerIndex] Setting first player to index:', index, {
+              firstPlayerIndex: state.firstPlayerIndex,
+              currentAuctioneerIndex: state.gameState?.round?.currentAuctioneerIndex,
+              activePlayerIndex: state.gameState?.round?.phase?.activePlayerIndex
+            })
+
             // Update the store state
             const newState: any = { firstPlayerIndex: index }
 
@@ -1649,8 +1721,21 @@ export const useGameStore = create<GameStore>()(
                   ? [currentAuction.doubleCard, currentAuction.secondCard]
                   : [currentEffective.card]
 
+                // Debug logging
+                console.log('[Open Auction] executeAuction call params:', {
+                  auctionType: currentAuction.type,
+                  isDoubleAuction: currentAuction.type === 'double',
+                  hasSecondCard: !!(currentAuction.type === 'double' && currentAuction.secondCard),
+                  effectiveAuctionType: currentEffective.type,
+                  cardsArrayLength: cards.length,
+                  primaryCardId: cards[0]?.id,
+                  primaryCardArtist: cards[0]?.artist,
+                  secondCardId: cards[1]?.id,
+                  secondCardArtist: cards[1]?.artist
+                })
+
                 // Execute the auction (transfer money, card, etc.)
-                const finalGameState = executeAuction(
+                const executedGameState = executeAuction(
                   {
                     ...currentGameState,
                     round: {
@@ -1665,6 +1750,9 @@ export const useGameStore = create<GameStore>()(
                   cards[0], // Primary card
                   cards[1]  // Second card for double auctions
                 )
+
+                // Transition to next auctioneer
+                const finalGameState = transitionToNextAuctioneer(executedGameState)
 
                 set(
                   { gameState: finalGameState },
@@ -1685,6 +1773,108 @@ export const useGameStore = create<GameStore>()(
               }
             }
           }, 1000)
+        }
+      },
+
+      processAITurn: async () => {
+        const { gameState } = get()
+        if (!gameState) {
+          console.log('No game state available for AI turn')
+          return
+        }
+
+        const phase = gameState.round.phase
+
+        // Only process AI turns during awaiting_card_play phase
+        if (phase.type !== 'awaiting_card_play') {
+          console.log('Not in awaiting_card_play phase, skipping AI turn')
+          return
+        }
+
+        const activePlayerIndex = phase.activePlayerIndex
+        const activePlayer = gameState.players[activePlayerIndex]
+
+        if (!activePlayer || !activePlayer.isAI) {
+          console.log(`Player at index ${activePlayerIndex} is not an AI or not found`)
+          return
+        }
+
+        console.log(`Processing AI turn for ${activePlayer.name}...`)
+
+        // Get the card selection orchestrator
+        const cardOrchestrator = getCardSelectionAIOrchestrator()
+
+        try {
+          // Have the AI select a card to play
+          const selectedCard = await cardOrchestrator.processAICardSelection(activePlayer, gameState)
+
+          if (!selectedCard) {
+            console.log(`${activePlayer.name} has no cards to play`)
+            // Check if round should end due to no cards
+            if (shouldRoundEnd(gameState)) {
+              // Round should end - transition to selling phase
+              console.log('All players out of cards, ending round')
+              // The round ending logic will be handled elsewhere
+            }
+            return
+          }
+
+          // Find the card index in the player's hand
+          const cardIndex = activePlayer.hand.findIndex(c => c.id === selectedCard.id)
+          if (cardIndex === -1) {
+            console.error(`Selected card ${selectedCard.id} not found in ${activePlayer.name}'s hand`)
+            return
+          }
+
+          console.log(`${activePlayer.name} playing ${selectedCard.artist} (${selectedCard.auctionType})`)
+
+          // Play the card using the round engine
+          const newGameState = playCard(gameState, activePlayerIndex, cardIndex)
+
+          // Update game state
+          set(
+            { gameState: newGameState },
+            false,
+            'ai_played_card'
+          )
+
+          // Check if we started an auction - if so, trigger AI auction processing
+          if (newGameState.round.phase.type === 'auction') {
+            console.log('Auction started by AI, triggering AI auction processing')
+
+            // Small delay before starting auction AI
+            setTimeout(() => {
+              const { gameState: currentGameState } = get()
+              if (currentGameState && currentGameState.round.phase.type === 'auction') {
+                // Start open auction AI if applicable
+                const auction = currentGameState.round.phase.auction
+                if (auction.type === 'open' ||
+                    (auction.type === 'double' && auction.embeddedAuction?.type === 'open')) {
+                  get().startOpenAuctionAI()
+                } else {
+                  // For other auction types, use the orchestrator
+                  get().processAIActionsInAuction()
+                }
+              }
+            }, 1000)
+          } else if (newGameState.round.phase.type === 'round_ending') {
+            console.log('Round ending (5th card played)')
+            // Round ending logic will be handled by the game flow
+          } else if (newGameState.round.phase.type === 'awaiting_card_play') {
+            // Continue to next player if it's their turn
+            setTimeout(() => {
+              const { gameState: nextGameState } = get()
+              if (nextGameState && nextGameState.round.phase.type === 'awaiting_card_play') {
+                const nextPlayerIndex = nextGameState.round.phase.activePlayerIndex
+                if (nextPlayerIndex !== 0) {
+                  get().processAITurn()
+                }
+              }
+            }, 1500)
+          }
+
+        } catch (error) {
+          console.error(`Error processing AI turn for ${activePlayer.name}:`, error)
         }
       },
 
