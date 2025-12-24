@@ -33,8 +33,11 @@ export function isHumanPlayerTurn(gameState: GameState): boolean {
       const doubleAuction = auction as any
       // Double auction - handle based on phase
       if (!doubleAuction.secondCard) {
-        // Offering phase
-        return doubleAuction.currentAuctioneerId === humanPlayer.id
+        // Offering phase - check turn order, NOT currentAuctioneerId
+        // currentAuctioneerId only changes when someone offers a card
+        // During offering, turn progresses via turnOrder[currentTurnIndex]
+        const currentPlayerId = doubleAuction.turnOrder?.[doubleAuction.currentTurnIndex]
+        return currentPlayerId === humanPlayer.id
       } else if (doubleAuction.embeddedAuction) {
         // Use the embedded auction for bidding phase
         return isHumanPlayerTurn({
@@ -120,8 +123,8 @@ export function getCurrentAuctionPlayer(auction: AuctionState, players: Player[]
     case 'double': {
       const doubleAuction = auction as any
       if (!doubleAuction.secondCard) {
-        // Offering phase
-        const currentPlayerId = doubleAuction.currentAuctioneerId
+        // Offering phase - use turnOrder, NOT currentAuctioneerId
+        const currentPlayerId = doubleAuction.turnOrder?.[doubleAuction.currentTurnIndex]
         return players.find(p => p.id === currentPlayerId) || null
       }
       // Use second card's auction type logic

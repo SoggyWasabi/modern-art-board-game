@@ -101,8 +101,18 @@ export class MediumAIWrapper {
           break
 
         case 'double':
-          if (!auction.secondCard && auction.currentAuctioneerId === player.id) {
-            return this.makeDoubleOfferDecision(player, auction)
+          // Check if it's this player's turn using turnOrder, NOT currentAuctioneerId
+          // currentAuctioneerId only changes when someone offers a card
+          if (!auction.secondCard) {
+            const currentPlayerId = auction.turnOrder?.[auction.currentTurnIndex]
+            if (currentPlayerId === player.id) {
+              return this.makeDoubleOfferDecision(player, auction)
+            }
+          }
+          // Handle embedded auction if second card is offered
+          if (auction.secondCard && auction.embeddedAuction) {
+            // Delegate to embedded auction type
+            return this.makeAuctionDecision(player, auction.embeddedAuction, gameState)
           }
           break
 
@@ -277,7 +287,12 @@ export class MediumAIWrapper {
       }
     }
 
-    return null
+    // No matching card - decline to offer, so the next player can try
+    // This is critical: return a decision rather than null so the auction progresses
+    return {
+      type: 'bid',
+      action: 'decline'
+    }
   }
 
   /**

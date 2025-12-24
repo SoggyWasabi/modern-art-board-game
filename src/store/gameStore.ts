@@ -513,9 +513,9 @@ export const useGameStore = create<GameStore>()(
           )
 
           // KEY FIX: If AI offered a second card in double auction, continue processing
-          // This ensures AI players act in the newly created embedded auction
+          // Also continue if AI declined and auction is still in offering phase (next player might be AI)
           if (result.shouldContinue) {
-            console.log('AI offered second card in double auction, continuing AI processing for embedded auction...')
+            console.log('AI action in double auction requires continuation, processing next AI turn...')
             setTimeout(() => {
               get().processAIActionsInAuction()
             }, 500)

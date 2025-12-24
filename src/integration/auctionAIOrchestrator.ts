@@ -273,7 +273,9 @@ export class AuctionAIOrchestrator {
 
       case 'double':
         if (!auction.secondCard) {
-          return auction.currentAuctioneerId
+          // Offering phase - use turnOrder, NOT currentAuctioneerId
+          // currentAuctioneerId only changes when someone offers a card
+          return auction.turnOrder[auction.currentTurnIndex]
         }
         // If there's an embedded auction, delegate to it
         if (auction.embeddedAuction) {
@@ -295,8 +297,9 @@ export class AuctionAIOrchestrator {
     switch (auction.type) {
       case 'double':
         // AI should act if it's their turn to offer second card
-        if (!auction.secondCard && auction.currentAuctioneerId === player.id) {
-          return true
+        if (!auction.secondCard) {
+          // Check turnOrder, NOT currentAuctioneerId
+          return auction.turnOrder[auction.currentTurnIndex] === player.id
         }
         // If second card is offered, handle based on second card's auction type
         if (auction.secondCard && auction.auctionType !== 'double') {
@@ -378,7 +381,12 @@ export class AuctionAIOrchestrator {
     }
 
     // Handle offering phase (no second card yet)
-    if (!auction.secondCard && auction.currentAuctioneerId === player.id) {
+    if (!auction.secondCard) {
+      // Check turnOrder, NOT currentAuctioneerId
+      if (auction.turnOrder[auction.currentTurnIndex] !== player.id) {
+        return { gameState, shouldContinue: false }
+      }
+      // It's this player's turn to offer or decline
       if (decision.type === 'bid' && decision.action === 'offer') {
         // Find a matching card in AI's hand
         const matchingCard = player.hand.find(card =>
@@ -415,6 +423,9 @@ export class AuctionAIOrchestrator {
       // This moves to the next player in turn order
       const updatedAuction = declineToOffer(auction, player.id)
 
+      // Continue processing AI if still in offering phase (next player might be AI)
+      const stillInOfferingPhase = updatedAuction.isActive && !updatedAuction.secondCard
+
       return {
         gameState: {
           ...gameState,
@@ -426,7 +437,7 @@ export class AuctionAIOrchestrator {
             }
           }
         },
-        shouldContinue: false
+        shouldContinue: stillInOfferingPhase
       }
     }
 

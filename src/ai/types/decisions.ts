@@ -39,12 +39,14 @@ export interface AICardPlayDecision extends AIDecision {
 export interface AIBidDecision extends AIDecision {
   /** Type identifier for bid decisions */
   type: 'bid'
-  /** Action: place a bid or pass */
-  action: 'bid' | 'pass'
-  /** Bid amount if action is 'bid' */
+  /** Action: place a bid, pass, offer (double auction), or decline (double auction) */
+  action: 'bid' | 'pass' | 'offer' | 'decline' | 'buy' | 'set_price' | 'accept' | 'outbid' | 'take_free'
+  /** Bid amount if action is 'bid' or 'outbid' */
   amount?: number
   /** Maximum willing to bid (for internal strategy) */
   maxBid?: number
+  /** Card ID for double auction offers */
+  cardId?: string
 }
 
 /**
