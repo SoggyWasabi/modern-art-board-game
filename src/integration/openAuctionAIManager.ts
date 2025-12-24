@@ -56,8 +56,9 @@ export class OpenAuctionAIManager {
 
     console.log('Starting OpenAuctionAIManager for auction:', auction.card.artist)
 
-    // Start a bidding "thread" for each AI player
-    const aiPlayers = gameState.players.filter(p => p.isAI && p.id !== auction.auctioneerId)
+    // Start a bidding "thread" for each AI player (including the auctioneer!)
+    // In open auctions, the auctioneer CAN bid - they just pay the bank if they win
+    const aiPlayers = gameState.players.filter(p => p.isAI)
 
     for (const player of aiPlayers) {
       this.startAIBiddingThread(player, auction)

@@ -15,15 +15,15 @@ export function createFixedPriceAuction(
   card: Card,
   auctioneer: Player,
   players: Player[],
-  setPrice: number
+  setPrice: number = 0
 ): FixedPriceAuctionState {
-  // Validate price
+  // Validate price if provided
   if (setPrice < 0) {
     throw new Error('Price cannot be negative')
   }
 
-  // Auctioneer must be able to afford buying it themselves
-  if (setPrice > auctioneer.money) {
+  // If price is set during creation, validate auctioneer can afford it
+  if (setPrice > 0 && setPrice > auctioneer.money) {
     throw new Error(`Auctioneer only has ${auctioneer.money}, cannot set price ${setPrice}`)
   }
 
@@ -45,6 +45,7 @@ export function createFixedPriceAuction(
     card,
     auctioneerId: auctioneer.id,
     price: setPrice,
+    phase: setPrice > 0 ? 'buying' : 'price_setting', // Start in price_setting if no price set
     isActive: true,
     sold: false,
     winnerId: null,
@@ -274,6 +275,11 @@ export function setPrice(
     throw new Error('Only the auctioneer can set the price')
   }
 
+  // Validate phase
+  if (state.phase !== 'price_setting') {
+    throw new Error('Price has already been set')
+  }
+
   // Validate price
   if (price <= 0) {
     throw new Error('Price must be greater than 0')
@@ -292,6 +298,7 @@ export function setPrice(
   return {
     ...state,
     price,
+    phase: 'buying', // Transition to buying phase
   }
 }
 
@@ -306,5 +313,5 @@ export function isAuctioneerForcedToBuy(state: FixedPriceAuctionState): boolean 
  * Check if auction is in price setting phase
  */
 export function isPriceSettingPhase(state: FixedPriceAuctionState): boolean {
-  return state.price === 0 && !state.sold
+  return state.phase === 'price_setting' && !state.sold
 }

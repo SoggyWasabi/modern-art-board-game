@@ -1,16 +1,19 @@
 import React, { useState } from 'react'
 import { useGameStore, useCurrentPlayer, useIsCurrentPlayerTurn } from '../../store/gameStore'
 import { useTurnManagement } from '../../hooks/useTurnManagement'
+import { useRoundTransitionAnimation } from '../../hooks/useRoundTransitionAnimation'
 import { isHumanPlayerTurn } from '../../utils/auctionTurnDetection'
 import GameHeader from './GameHeader'
 import ArtistBoard from './ArtistBoard'
 import AuctionCenter from './AuctionCenter'
 import OpponentPanel from './OpponentPanel'
 import PlayerHand from './PlayerHand'
-import AIThinkingIndicator from './AIThinkingIndicator'
+import GameEndDisplay from './phases/GameEndDisplay'
+import PurchaseSaleAnimation from './animations/PurchaseSaleAnimation'
+import ArtistValuationAnimation from './animations/ArtistValuationAnimation'
+import CardDealingAnimation from './animations/CardDealingAnimation'
 // import DoubleAuctionPrompt from './DoubleAuctionPrompt' // Removed - now using card highlighting instead
 import { Card as GameCardComponent } from '../Card'
-import { colors } from '../../design/premiumTokens'
 import type { Card } from '../../types'
 
 interface MainGameplayProps {
@@ -18,10 +21,11 @@ interface MainGameplayProps {
 }
 
 const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
-  const { gameState, selectedCardId, selectCard, playCard, deselectCard, placeBid, passBid, offerSecondCardForDouble, declineSecondCardForDouble, processAITurn } = useGameStore()
+  const { gameState, selectedCardId, selectCard, playCard, deselectCard, placeBid, passBid, offerSecondCardForDouble, declineSecondCardForDouble, processAITurn, sellAllPaintings } = useGameStore()
   const currentPlayer = useCurrentPlayer()
   const isPlayerTurn = useIsCurrentPlayerTurn()
   const { turnIndicator, isPlayerTurn: isCurrentPlayerTurn, isAIThinking, turnMessage } = useTurnManagement()
+  const animationState = useRoundTransitionAnimation()
   const [artistBoardCollapsed, setArtistBoardCollapsed] = useState(false)
 
   // Debug logging
@@ -165,6 +169,7 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
     }
   }, [isDoubleAuctionPhase])
 
+
   // Process AI turns when it's an AI player's turn
   React.useEffect(() => {
     if (!gameState) {
@@ -194,6 +199,19 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
       return () => clearTimeout(timeoutId)
     }
   }, [gameState, processAITurn])
+
+  // Render phase overlays
+  if (gameState) {
+    const phase = gameState.round.phase
+
+    // Game ended
+    if (gameState.gamePhase === 'ended') {
+      return <GameEndDisplay gameState={gameState} onReturnToMenu={onExitToMenu} />
+    }
+
+    // Selling phase and round complete will be handled by animations on the main board
+    // No full-screen overlays needed
+  }
 
   return (
     <div
@@ -330,40 +348,9 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'flex-start',
-            marginTop: '12px',
+            marginTop: '0px',
           }}
         >
-          {/* Turn indicator */}
-          <div style={{ marginBottom: '16px' }}>
-            {isAIThinking ? (
-              <AIThinkingIndicator turnIndicator={turnIndicator} />
-            ) : (
-              <div
-                style={{
-                  padding: '8px 20px',
-                  background: isCurrentPlayerTurn
-                    ? 'rgba(251, 191, 36, 0.2)'
-                    : 'rgba(255, 255, 255, 0.1)',
-                  border: isCurrentPlayerTurn
-                    ? `1px solid ${colors.accent.gold}`
-                    : '1px solid rgba(255, 255, 255, 0.1)',
-                  borderRadius: '20px',
-                  animation: isCurrentPlayerTurn ? 'active-turn-pulse 2s ease-in-out infinite' : 'none',
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    color: isCurrentPlayerTurn ? colors.accent.gold : 'rgba(255, 255, 255, 0.6)',
-                  }}
-                >
-                  {turnMessage || (isCurrentPlayerTurn ? "It's Your Turn!" : `Waiting for ${players[activePlayerIndex]?.name || 'opponent'}...`)}
-                </span>
-              </div>
-            )}
-          </div>
-
           <div
             style={{
               flex: 1,
@@ -430,6 +417,11 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
 
       {/* Double Auction Prompt - REMOVED */}
       {/* Popup removed to improve UX - now using card highlighting in hand instead */}
+
+      {/* Round Transition Animations */}
+      <ArtistValuationAnimation show={animationState.showArtistValuation} />
+      <PurchaseSaleAnimation show={animationState.showPurchaseSales} />
+      <CardDealingAnimation show={animationState.showCardDealing} />
     </div>
   )
 }

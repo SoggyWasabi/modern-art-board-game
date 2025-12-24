@@ -101,6 +101,7 @@ export interface FixedPriceAuctionState {
   cards?: Card[]  // NEW: For double auction support (array of cards)
   auctioneerId: string
   price: number
+  phase: 'price_setting' | 'buying' // Phase: auctioneer sets price, then players buy/pass
   isActive: boolean
   sold: boolean
   winnerId: string | null

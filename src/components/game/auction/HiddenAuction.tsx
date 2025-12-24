@@ -67,7 +67,7 @@ const HiddenAuction: React.FC<HiddenAuctionProps> = ({
         flexDirection: 'column',
         width: '100%',
         maxWidth: '900px',
-        minHeight: '400px',
+        minHeight: '450px',
         background: 'linear-gradient(145deg, rgba(20, 20, 30, 0.95), rgba(10, 10, 15, 0.98))',
         backdropFilter: 'blur(20px)',
         borderRadius: '20px',

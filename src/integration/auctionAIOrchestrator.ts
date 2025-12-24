@@ -12,6 +12,16 @@ import { buyAtPrice, pass as passFixedPrice, setPrice as setFixedPrice } from '.
 // Note: executeAuction is handled by gameStore.ts to prevent duplicate execution
 
 /**
+ * Return type for processAuctionAI that includes continuation signal
+ */
+export interface AuctionAIResult {
+  /** Updated game state if changes were made */
+  gameState: GameState | null
+  /** Signal that AI processing should continue (e.g., embedded auction created) */
+  shouldContinue: boolean
+}
+
+/**
  * Orchestrates AI participation in auctions using Medium AI
  * This provides better decision making for testing gameplay
  */
@@ -25,11 +35,11 @@ export class AuctionAIOrchestrator {
 
   /**
    * Process AI turns for the current auction
-   * Returns updated game state if changes were made
+   * Returns result object with updated state and continuation signal
    */
-  async processAuctionAI(gameState: GameState): Promise<GameState | null> {
+  async processAuctionAI(gameState: GameState): Promise<AuctionAIResult> {
     if (gameState.round.phase.type !== 'auction') {
-      return null
+      return { gameState: null, shouldContinue: false }
     }
 
     const auction = gameState.round.phase.auction
@@ -52,50 +62,54 @@ export class AuctionAIOrchestrator {
       }
 
       // Process the embedded auction normally
-      const updatedEmbeddedState = await this.processAuctionAI(embeddedGameState)
+      const embeddedResult = await this.processAuctionAI(embeddedGameState)
 
-      if (updatedEmbeddedState) {
+      if (embeddedResult.gameState) {
         // Map the updated embedded auction back to the double auction structure
         return {
-          ...gameState,
-          round: {
-            ...gameState.round,
-            phase: {
-              type: 'auction' as const,
-              auction: {
-                ...auction,
-                embeddedAuction: updatedEmbeddedState.round.phase.auction
+          gameState: {
+            ...gameState,
+            round: {
+              ...gameState.round,
+              phase: {
+                type: 'auction' as const,
+                auction: {
+                  ...auction,
+                  embeddedAuction: embeddedResult.gameState.round.phase.auction
+                }
               }
             }
-          }
+          },
+          shouldContinue: embeddedResult.shouldContinue
         }
       }
 
-      return null
+      return { gameState: null, shouldContinue: false }
     }
 
     // Skip open auctions - they are handled by OpenAuctionAIManager
     if (auction.type === 'open') {
       console.log('Skipping open auction - handled by OpenAuctionAIManager')
-      return null
+      return { gameState: null, shouldContinue: false }
     }
 
     // Special handling for hidden auctions - process ALL AI players simultaneously
     if (auction.type === 'hidden') {
-      return await this.processHiddenAuctionAI(gameState)
+      const hiddenState = await this.processHiddenAuctionAI(gameState)
+      return { gameState: hiddenState, shouldContinue: false }
     }
 
     // Find which AI player's turn it is (if any)
     const currentPlayerId = this.getCurrentPlayerId(auction)
     if (!currentPlayerId) {
       console.log('No current player turn found')
-      return null
+      return { gameState: null, shouldContinue: false }
     }
 
     const currentPlayer = gameState.players.find(p => p.id === currentPlayerId)
     if (!currentPlayer || !currentPlayer.isAI) {
       console.log('Current player is not AI or not found')
-      return null
+      return { gameState: null, shouldContinue: false }
     }
 
     console.log(`It's ${currentPlayer.name}'s turn`)
@@ -103,29 +117,29 @@ export class AuctionAIOrchestrator {
     // Check if this AI should act
     if (!(await this.shouldAIAct(auction, currentPlayer, gameState))) {
       console.log(`${currentPlayer.name} should not act`)
-      return null
+      return { gameState: null, shouldContinue: false }
     }
 
     // Get and apply decision for this single AI player
     const decision = await this.getAIDecision(currentPlayer, auction, gameState)
     if (!decision) {
       console.log(`${currentPlayer.name} returned no decision`)
-      return null
+      return { gameState: null, shouldContinue: false }
     }
 
     console.log(`${currentPlayer.name} decision:`, decision)
 
     try {
-      let updatedGameState = await this.applyAIDecision(gameState, currentPlayer, decision)
+      const result = await this.applyAIDecision(gameState, currentPlayer, decision)
       console.log(`Successfully applied ${currentPlayer.name}'s decision`)
 
       // NOTE: We do NOT execute the auction here - that's handled by gameStore.ts
       // This prevents duplicate execution. The orchestrator only applies AI decisions.
 
-      return updatedGameState
+      return result
     } catch (error) {
       console.error(`Failed to apply AI decision for player ${currentPlayer.id}:`, error)
-      return null
+      return { gameState: null, shouldContinue: false }
     }
   }
 
@@ -251,8 +265,8 @@ export class AuctionAIOrchestrator {
         return null
 
       case 'fixed_price':
-        // If price is 0, the auctioneer needs to set the price first
-        if (auction.price === 0) {
+        // If in price_setting phase, the auctioneer needs to set the price first
+        if (auction.phase === 'price_setting') {
           return auction.auctioneerId
         }
         return auction.turnOrder[auction.currentTurnIndex]
@@ -329,33 +343,38 @@ export class AuctionAIOrchestrator {
 
   /**
    * Apply AI decision to the auction
+   * Returns result with game state and continuation signal
    */
-  private async applyAIDecision(gameState: GameState, player: Player, decision: AIDecision): Promise<GameState> {
+  private async applyAIDecision(gameState: GameState, player: Player, decision: AIDecision): Promise<AuctionAIResult> {
     const playerIndex = gameState.players.findIndex(p => p.id === player.id)
     const auction = gameState.round.phase.auction
 
     if (auction.type === 'double') {
       return await this.applyDoubleAuctionDecision(gameState, playerIndex, decision)
     } else if (auction.type === 'open') {
-      return await this.applyOpenAuctionDecision(gameState, playerIndex, decision)
+      const state = await this.applyOpenAuctionDecision(gameState, playerIndex, decision)
+      return { gameState: state, shouldContinue: false }
     } else if (auction.type === 'one_offer') {
-      return await this.applyOneOfferAuctionDecision(gameState, playerIndex, decision)
+      const state = await this.applyOneOfferAuctionDecision(gameState, playerIndex, decision)
+      return { gameState: state, shouldContinue: false }
     } else if (auction.type === 'fixed_price') {
-      return await this.applyFixedPriceAuctionDecision(gameState, playerIndex, decision)
+      const state = await this.applyFixedPriceAuctionDecision(gameState, playerIndex, decision)
+      return { gameState: state, shouldContinue: false }
     }
 
-    return gameState
+    return { gameState, shouldContinue: false }
   }
 
   /**
    * Apply decisions for Double auction
+   * Returns result with game state and continuation signal (true when second card offered)
    */
-  private async applyDoubleAuctionDecision(gameState: GameState, playerIndex: number, decision: AIDecision): Promise<GameState> {
+  private async applyDoubleAuctionDecision(gameState: GameState, playerIndex: number, decision: AIDecision): Promise<AuctionAIResult> {
     const auction = gameState.round.phase.auction
     const player = gameState.players[playerIndex]
 
     if (auction.type !== 'double') {
-      return gameState
+      return { gameState, shouldContinue: false }
     }
 
     // Handle offering phase (no second card yet)
@@ -369,15 +388,25 @@ export class AuctionAIOrchestrator {
         if (matchingCard && decision.cardId) {
           const updatedAuction = offerSecondCard(auction, player.id, matchingCard, gameState.players)
 
+          // Increment cards played per artist for the second card
+          const newCardsPlayed = { ...gameState.round.cardsPlayedPerArtist }
+          newCardsPlayed[matchingCard.artist] = (newCardsPlayed[matchingCard.artist] || 0) + 1
+
+          // KEY FIX: When AI offers second card, signal that AI processing should continue
+          // because an embedded auction was created that needs AI players to act in
           return {
-            ...gameState,
-            round: {
-              ...gameState.round,
-              phase: {
-                type: 'auction',
-                auction: updatedAuction
+            gameState: {
+              ...gameState,
+              round: {
+                ...gameState.round,
+                cardsPlayedPerArtist: newCardsPlayed,
+                phase: {
+                  type: 'auction',
+                  auction: updatedAuction
+                }
               }
-            }
+            },
+            shouldContinue: true  // Signal to continue processing AI for the embedded auction
           }
         }
       }
@@ -387,19 +416,22 @@ export class AuctionAIOrchestrator {
       const updatedAuction = declineToOffer(auction, player.id)
 
       return {
-        ...gameState,
-        round: {
-          ...gameState.round,
-          phase: {
-            type: 'auction',
-            auction: updatedAuction
+        gameState: {
+          ...gameState,
+          round: {
+            ...gameState.round,
+            phase: {
+              type: 'auction',
+              auction: updatedAuction
+            }
           }
-        }
+        },
+        shouldContinue: false
       }
     }
 
     // If AI decides to offer second card, or any other action
-    return gameState
+    return { gameState, shouldContinue: false }
   }
 
   /**
@@ -621,6 +653,13 @@ export class AuctionAIOrchestrator {
 
   private isAITurnInFixedPrice(auction: any, playerIndex: number, gameState: GameState): boolean {
     const player = gameState.players[playerIndex]
+
+    // If in price_setting phase, check if player is the auctioneer
+    if (auction.phase === 'price_setting') {
+      return player.id === auction.auctioneerId
+    }
+
+    // In buying phase, check if it's this player's turn in the turn order
     return auction.turnOrder[auction.currentTurnIndex] === player.id
   }
 

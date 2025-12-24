@@ -21,7 +21,7 @@ const FixedPriceAuction: React.FC<FixedPriceAuctionProps> = ({
   const headerText = getAuctionHeaderText({ currentAuction, cards, isDoubleAuction, doubleAuctionType, isAuctionPlayerTurn, currentPlayerInAuction, gameState })
 
   // Check if it's the price-setting phase (auctioneer's turn) or buying phase
-  const isPriceSettingPhase = currentAuction.price === 0 && !currentAuction.sold
+  const isPriceSettingPhase = currentAuction.phase === 'price_setting' && !currentAuction.sold
   const isAuctioneer = gameState?.players[0]?.id === currentAuction.auctioneerId // Assuming player 0 is human
 
   // Get current player whose turn it is to buy/pass
@@ -65,7 +65,7 @@ const FixedPriceAuction: React.FC<FixedPriceAuctionProps> = ({
         flexDirection: 'column',
         width: '100%',
         maxWidth: '900px',
-        minHeight: '420px',
+        minHeight: '470px',
         background: 'linear-gradient(145deg, rgba(20, 20, 30, 0.95), rgba(10, 10, 15, 0.98))',
         backdropFilter: 'blur(20px)',
         borderRadius: '20px',

@@ -83,14 +83,14 @@ export class MediumAIWrapper {
           return this.adaptHiddenAuctionDecision(hiddenDecision, player, auction)
 
         case 'fixed_price':
-          if (auction.price === 0) {
+          if (auction.phase === 'price_setting') {
             // Price setting phase - auctioneer sets the price
             if (player.id === auction.auctioneerId) {
               decisionType = 'fixed_price'
               const fixedDecision = await strategy.makeDecision(decisionType as any, minimalContext, { auction })
               return this.adaptFixedPriceDecision(fixedDecision, player, auction)
             }
-          } else {
+          } else if (auction.phase === 'buying') {
             // Buying phase - players decide to buy or pass
             if (auction.turnOrder[auction.currentTurnIndex] === player.id) {
               decisionType = 'buy'
@@ -409,9 +409,9 @@ export class MediumAIWrapper {
       }
     } else if (auction.type === 'fixed_price') {
       // Fixed price fallback logic
-      console.log(`Fixed price auction fallback for ${player.name}: money=$${player.money}k, price=$${auction.price}k`)
+      console.log(`Fixed price auction fallback for ${player.name}: money=$${player.money}k, price=$${auction.price}k, phase=${auction.phase}`)
 
-      if (auction.price === 0) {
+      if (auction.phase === 'price_setting') {
         // Price setting phase - auctioneer sets price
         if (player.id === auction.auctioneerId) {
           // Set price between 10-30% of money, but at least 5k
@@ -426,7 +426,7 @@ export class MediumAIWrapper {
             amount: setPrice
           }
         }
-      } else {
+      } else if (auction.phase === 'buying') {
         // Buying phase - player decides to buy or pass
         if (auction.turnOrder[auction.currentTurnIndex] === player.id) {
           // Evaluate if price is good value (simple heuristic)

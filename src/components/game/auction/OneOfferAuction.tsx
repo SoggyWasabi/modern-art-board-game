@@ -35,7 +35,7 @@ const OneOfferAuction: React.FC<OneOfferAuctionProps> = ({
         flexDirection: 'column',
         width: '100%',
         maxWidth: '850px',
-        minHeight: '340px',
+        minHeight: '390px',
         background: 'linear-gradient(145deg, rgba(20, 20, 30, 0.95), rgba(10, 10, 15, 0.98))',
         backdropFilter: 'blur(20px)',
         borderRadius: '20px',
