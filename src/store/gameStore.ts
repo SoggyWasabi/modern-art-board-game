@@ -2,13 +2,14 @@ import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
 import type { GameState, SetupState, AuctionState, PlayerSlotConfig, Artist } from '../types'
 import { validateAndCreateGame } from '../types/setup'
-import { startGame } from '../engine/game'
+import { startGame, nextRound } from '../engine/game'
 import { playCard, getNextAuctioneerIndex, shouldRoundEnd, startRound, endRound } from '../engine/round'
 import { sellAllPaintingsToBank } from '../engine/selling'
 import { getGameController, GameActionHandler } from '../integration/gameIntegration'
 import { getAuctionAIOrchestrator } from '../integration/auctionAIOrchestrator'
 import { getOpenAuctionAIManager } from '../integration/openAuctionAIManager'
 import { getCardSelectionAIOrchestrator } from '../integration/cardSelectionAIOrchestrator'
+import { createRoundEndTestScenario } from '../engine/testScenarios'
 
 // Import all auction engine functions
 import { placeBid as placeOpenBid, pass as passOpenBid, checkTimerExpiration, endAuctionByTimer, concludeAuction as concludeOpenAuction } from '../engine/auction/open'
@@ -64,8 +65,7 @@ function transitionToNextAuctioneer(gameState: GameState): GameState {
   // First check if the round should end
   if (shouldRoundEnd(gameState)) {
     // Round should end - trigger round ending
-    // Import the endRound function from round.ts
-    const { endRound } = require('../engine/round')
+    // endRound is already imported at the top of the file
     return endRound(gameState)
   }
 
@@ -112,6 +112,7 @@ interface GameStore {
   setPlayerCount: (count: 3 | 4 | 5) => void
   updatePlayerSlot: (slotIndex: number, slot: Partial<PlayerSlotConfig>) => void
   startGameFromSetup: () => void
+  loadDebugScenario: (playerCount: 3 | 4 | 5) => void
   resetSetup: () => void
 
   // Setup helper actions
@@ -151,6 +152,9 @@ interface GameStore {
   // Round transition actions
   completeRound: () => void
   progressToNextRound: () => void
+
+  // Unified phase transition handler - works for any player (human or AI)
+  handlePhaseTransitionAfterCardPlay: (newGameState: GameState) => void
 }
 
 const initialSetupState: SetupState = {
@@ -281,6 +285,36 @@ export const useGameStore = create<GameStore>()(
         )
       },
 
+      loadDebugScenario: (playerCount: 3 | 4 | 5) => {
+        console.log('[loadDebugScenario] Loading debug scenario for', playerCount, 'players')
+
+        // Create test scenario with human player at index 0
+        const gameState = createRoundEndTestScenario(playerCount, 0)
+
+        console.log('[loadDebugScenario] Debug scenario loaded:', {
+          round: gameState.round.roundNumber,
+          phase: gameState.round.phase.type,
+          cardsPlayedPerArtist: gameState.round.cardsPlayedPerArtist,
+          humanHand: gameState.players[0].hand.map(c => ({ artist: c.artist, auctionType: c.auctionType })),
+          humanMoney: gameState.players[0].money,
+          purchasedThisRound: gameState.players.map(p => ({ name: p.name, count: p.purchasedThisRound.length }))
+        })
+
+        set(
+          {
+            gameState,
+            isGameStarted: true,
+            firstPlayerIndex: 0,
+            setupState: {
+              ...get().setupState,
+              step: 'ready_to_start',
+            },
+          },
+          false,
+          'loadDebugScenario'
+        )
+      },
+
       resetSetup: () =>
         set(
           {
@@ -373,12 +407,8 @@ export const useGameStore = create<GameStore>()(
             'playCard_success'
           )
 
-          // If auction started, process AI turns for all auction types
-          if (newGameState.round.phase.type === 'auction') {
-            setTimeout(() => {
-              get().processAIActionsInAuction()
-            }, 1000) // Give user time to see the auction
-          }
+          // Handle phase transitions (unified handler - works for human or AI)
+          get().handlePhaseTransitionAfterCardPlay(newGameState)
 
         } catch (error) {
           console.error('Error playing card:', error)
@@ -1569,7 +1599,9 @@ export const useGameStore = create<GameStore>()(
             console.log('[setFirstPlayerIndex] Setting first player to index:', index, {
               firstPlayerIndex: state.firstPlayerIndex,
               currentAuctioneerIndex: state.gameState?.round?.currentAuctioneerIndex,
-              activePlayerIndex: state.gameState?.round?.phase?.activePlayerIndex
+              activePlayerIndex: state.gameState?.round?.phase?.type === 'awaiting_card_play'
+                ? state.gameState.round.phase.activePlayerIndex
+                : undefined
             })
 
             // Update the store state
@@ -1855,56 +1887,8 @@ export const useGameStore = create<GameStore>()(
             'ai_played_card'
           )
 
-          // Check if we started an auction - if so, trigger AI auction processing
-          if (newGameState.round.phase.type === 'auction') {
-            console.log('Auction started by AI, triggering AI auction processing')
-
-            // Small delay before starting auction AI
-            setTimeout(() => {
-              const { gameState: currentGameState } = get()
-              if (currentGameState && currentGameState.round.phase.type === 'auction') {
-                // Start open auction AI if applicable
-                const auction = currentGameState.round.phase.auction
-                if (auction.type === 'open' ||
-                    (auction.type === 'double' && auction.embeddedAuction?.type === 'open')) {
-                  get().startOpenAuctionAI()
-                } else {
-                  // For other auction types, use the orchestrator
-                  get().processAIActionsInAuction()
-                }
-              }
-            }, 1000)
-          } else if (newGameState.round.phase.type === 'round_ending') {
-            console.log('Round ending (5th card played)')
-
-            // Auto-trigger endRound() to transition to selling_to_bank phase
-            setTimeout(() => {
-              const { gameState: currentGameState } = get()
-              if (currentGameState && currentGameState.round.phase.type === 'round_ending') {
-                console.log('[playCard] Auto-triggering endRound() to transition to selling_to_bank')
-
-                // Call endRound to rank artists and transition to selling_to_bank
-                const endedRoundState = endRound(currentGameState)
-
-                set(
-                  { gameState: endedRoundState },
-                  false,
-                  'endRound_from_5th_card'
-                )
-              }
-            }, 1500) // Wait 1.5s to show the 5th card before transitioning
-          } else if (newGameState.round.phase.type === 'awaiting_card_play') {
-            // Continue to next player if it's their turn
-            setTimeout(() => {
-              const { gameState: nextGameState } = get()
-              if (nextGameState && nextGameState.round.phase.type === 'awaiting_card_play') {
-                const nextPlayerIndex = nextGameState.round.phase.activePlayerIndex
-                if (nextPlayerIndex !== 0) {
-                  get().processAITurn()
-                }
-              }
-            }, 1500)
-          }
+          // Handle phase transitions (unified handler - works for human or AI)
+          get().handlePhaseTransitionAfterCardPlay(newGameState)
 
         } catch (error) {
           console.error(`Error processing AI turn for ${activePlayer.name}:`, error)
@@ -1943,33 +1927,37 @@ export const useGameStore = create<GameStore>()(
           return
         }
 
-        console.log('[completeRound] Completing round, transitioning to round_complete')
+        console.log('[completeRound] Completing round, selling paintings and transitioning to round_complete')
 
-        // Sell all paintings to the bank and clear purchasedThisRound
-        let updatedGameState = sellAllPaintingsToBank(gameState)
+        // Move purchasedThisRound paintings into purchases so sellAllPaintingsToBank can process them
+        // purchasedThisRound now contains Painting objects (after executeAuction fix)
+        let gameStateForSelling = {
+          ...gameState,
+          players: gameState.players.map(player => {
+            const purchasesCount = player.purchasedThisRound.length
+            console.log(`[completeRound] Moving ${purchasesCount} paintings from purchasedThisRound to purchases for ${player.name}`)
 
-        // Clear purchasedThisRound for all players (move to purchases if needed)
-        updatedGameState = {
-          ...updatedGameState,
-          players: updatedGameState.players.map(player => {
-            // Move purchasedThisRound cards to purchases
-            const newPaintings = [
-              ...(player.purchases || []),
-              ...player.purchasedThisRound.map(card => ({
-                card,
-                artist: card.artist,
-                auctionPrice: 0, // Will be set when sold
-                salePrice: undefined as number | undefined,
-                soldRound: undefined as number | undefined
-              }))
-            ]
             return {
               ...player,
-              purchasedThisRound: [],
-              purchases: newPaintings
+              purchases: [
+                ...(player.purchases || []),
+                ...player.purchasedThisRound
+              ],
+              purchasedThisRound: [] // Clear after moving to purchases
             }
-          }),
-          // Transition to round_complete phase
+          })
+        }
+
+        // Now sell all paintings (includes both existing purchases and newly moved cards)
+        let updatedGameState = sellAllPaintingsToBank(gameStateForSelling)
+
+        // Log what happened
+        const totalPaidOut = updatedGameState.players.reduce((sum, p) => p.money, 0) - gameState.players.reduce((sum, p) => p.money, 0)
+        console.log('[completeRound] Sold paintings, total paid out:', totalPaidOut)
+
+        // Transition to round_complete phase
+        updatedGameState = {
+          ...updatedGameState,
           round: {
             ...updatedGameState.round,
             phase: { type: 'round_complete' }
@@ -1999,9 +1987,7 @@ export const useGameStore = create<GameStore>()(
         }
 
         const currentRoundNumber = gameState.round.roundNumber
-        const nextRoundNumber = (currentRoundNumber + 1) as 1 | 2 | 3 | 4
-
-        console.log(`[progressToNextRound] Progressing from round ${currentRoundNumber} to ${nextRoundNumber}`)
+        console.log(`[progressToNextRound] Progressing from round ${currentRoundNumber}`)
 
         // Check if game is over (after round 4)
         if (currentRoundNumber >= 4) {
@@ -2010,8 +1996,10 @@ export const useGameStore = create<GameStore>()(
           return
         }
 
-        // Start the next round (deals cards, sets up phase)
-        const nextRoundState = startRound(gameState, nextRoundNumber)
+        // Use nextRound which handles: auctioneer rotation, clearing purchasedThisRound, incrementing round number, dealing cards
+        const nextRoundState = nextRound(gameState)
+
+        console.log(`[progressToNextRound] Now in round ${nextRoundState.round.roundNumber}, auctioneer is player ${nextRoundState.round.currentAuctioneerIndex}`)
 
         set(
           { gameState: nextRoundState },
@@ -2026,6 +2014,43 @@ export const useGameStore = create<GameStore>()(
           const nextPlayer = nextRoundState.players[nextPlayerIndex]
           if (nextPlayer?.isAI) {
             console.log(`[progressToNextRound] Next player is AI (${nextPlayer.name}), triggering AI turn`)
+            setTimeout(() => {
+              get().processAITurn()
+            }, 1500)
+          }
+        }
+      },
+
+      /**
+       * Unified phase transition handler after a card is played
+       * Works for ANY player (human or AI) - no duplicate logic
+       * Handles auction start, round ending, and next player turn
+       */
+      handlePhaseTransitionAfterCardPlay: (newGameState: GameState) => {
+        const phase = newGameState.round.phase.type
+
+        console.log(`[handlePhaseTransition] New phase: ${phase}`)
+
+        if (phase === 'auction') {
+          console.log('[handlePhaseTransition] Auction started, triggering AI processing')
+          setTimeout(() => {
+            get().processAIActionsInAuction()
+          }, 1000)
+        } else if (phase === 'round_ending') {
+          console.log('[handlePhaseTransition] Round ending (5th card played)')
+          setTimeout(() => {
+            const { gameState: currentGameState } = get()
+            if (currentGameState && currentGameState.round.phase.type === 'round_ending') {
+              console.log('[handlePhaseTransition] Auto-triggering endRound() to transition to selling_to_bank')
+              const endedRoundState = endRound(currentGameState)
+              set({ gameState: endedRoundState }, false, 'endRound_from_5th_card')
+            }
+          }, 1500)
+        } else if (phase === 'awaiting_card_play') {
+          const nextPlayerIndex = newGameState.round.phase.activePlayerIndex
+          const nextPlayer = newGameState.players[nextPlayerIndex]
+          if (nextPlayer?.isAI) {
+            console.log(`[handlePhaseTransition] Next player is AI (${nextPlayer.name}), triggering AI turn`)
             setTimeout(() => {
               get().processAITurn()
             }, 1500)

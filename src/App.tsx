@@ -517,10 +517,11 @@ function PlayerCountSelection({
   onSelect,
   onBack,
 }: {
-  onSelect: (count: number, playerStarts?: boolean) => void
+  onSelect: (count: number, playerStarts?: boolean, debugMode?: boolean) => void
   onBack: () => void
 }) {
   const [playerStarts, setPlayerStarts] = useState(false)
+  const [debugMode, setDebugMode] = useState(false)
   return (
     <div style={{ position: 'relative', minHeight: '100vh' }}>
       <FloatingCardsBackground />
@@ -614,11 +615,59 @@ function PlayerCountSelection({
           </div>
         </div>
 
+        {/* Debug Mode option */}
+        <div style={{ marginBottom: 32 }}>
+          <label style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            cursor: 'pointer',
+            padding: '10px 16px',
+            borderRadius: 8,
+            backgroundColor: debugMode ? 'rgba(201,162,39,0.15)' : 'rgba(255,255,255,0.03)',
+            border: debugMode ? '1px solid rgba(201,162,39,0.5)' : '1px solid rgba(255,255,255,0.1)',
+            transition: 'all 0.2s ease'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = debugMode ? 'rgba(201,162,39,0.2)' : 'rgba(255,255,255,0.06)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = debugMode ? 'rgba(201,162,39,0.15)' : 'rgba(255,255,255,0.03)'
+          }}>
+            <input
+              type="checkbox"
+              checked={debugMode}
+              onChange={(e) => setDebugMode(e.target.checked)}
+              style={{
+                margin: 0,
+                width: 18,
+                height: 18,
+                cursor: 'pointer'
+              }}
+            />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <span style={{
+                color: debugMode ? '#C9A227' : 'rgba(255,255,255,0.8)',
+                fontSize: '0.9rem',
+                fontWeight: 500
+              }}>
+                Debug / Test Mode
+              </span>
+              <span style={{
+                color: 'rgba(255,255,255,0.4)',
+                fontSize: '0.75rem'
+              }}>
+                Skip to round 1 → 2 transition (4/5 cards played)
+              </span>
+            </div>
+          </label>
+        </div>
+
         <div style={{ display: 'flex', gap: 24, marginBottom: 48 }}>
           {[3, 4, 5].map((count) => (
             <button
               key={count}
-              onClick={() => onSelect(count, playerStarts)}
+              onClick={() => onSelect(count, playerStarts, debugMode)}
               style={{
                 width: 120,
                 height: 120,
@@ -699,25 +748,31 @@ function App() {
   const { startGameFromSetup, setPlayerCount: storeSetPlayerCount, resetGame } = useGameStore()
 
   // Handle player count selection - setup the game and go directly to main gameplay
-  const handlePlayerCountSelect = (count: number, playerStarts: boolean = false) => {
+  const handlePlayerCountSelect = (count: number, playerStarts: boolean = false, debugMode: boolean = false) => {
     setPlayerCount(count)
     storeSetPlayerCount(count as 3 | 4 | 5)
 
-    // Start the game - the mock game state will randomly select first player
-    startGameFromSetup()
+    if (debugMode) {
+      // Load debug scenario instead of normal game
+      console.log('[handlePlayerCountSelect] Loading debug mode scenario')
+      useGameStore.getState().loadDebugScenario(count as 3 | 4 | 5)
+    } else {
+      // Start the game - the mock game state will randomly select first player
+      startGameFromSetup()
 
-    // Handle first player selection
-    const { gameState } = useGameStore.getState()
-    if (gameState) {
-      if (playerStarts) {
-        // Human wants to go first - set to index 0
-        console.log('[handlePlayerCountSelect] Human selected to go first')
-        useGameStore.getState().setFirstPlayerIndex(0)
-      } else {
-        // Random selection - pick a random player to go first
-        const randomIndex = Math.floor(Math.random() * count)
-        console.log('[handlePlayerCountSelect] Randomly selected first player:', randomIndex, 'Player:', gameState.players[randomIndex]?.name)
-        useGameStore.getState().setFirstPlayerIndex(randomIndex)
+      // Handle first player selection
+      const { gameState } = useGameStore.getState()
+      if (gameState) {
+        if (playerStarts) {
+          // Human wants to go first - set to index 0
+          console.log('[handlePlayerCountSelect] Human selected to go first')
+          useGameStore.getState().setFirstPlayerIndex(0)
+        } else {
+          // Random selection - pick a random player to go first
+          const randomIndex = Math.floor(Math.random() * count)
+          console.log('[handlePlayerCountSelect] Randomly selected first player:', randomIndex, 'Player:', gameState.players[randomIndex]?.name)
+          useGameStore.getState().setFirstPlayerIndex(randomIndex)
+        }
       }
     }
 

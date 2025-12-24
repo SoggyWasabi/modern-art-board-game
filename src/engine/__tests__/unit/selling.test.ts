@@ -10,7 +10,7 @@ import {
   getPaintingDistribution,
   getPlayersMostValuableArtist
 } from '../../selling'
-import type { GameState, Painting, Card } from '../../../types/game'
+import type { GameState, Card } from '../../../types/game'
 import { ARTISTS } from '../../constants'
 
 describe('Selling Module', () => {
@@ -34,14 +34,14 @@ describe('Selling Module', () => {
           color: '#ff0000',
           purchases: [
             {
-              card: mockCard,
-              artist: ARTISTS[0],
+              ...mockCard,
               purchasePrice: 30,
               purchasedRound: 1
             },
             {
-              card: { ...mockCard, id: 'test_card_2', artist: ARTISTS[1] },
-              artist: ARTISTS[1], // 'Sigrid Thaler'
+              ...mockCard,
+              id: 'test_card_2',
+              artist: ARTISTS[1],
               purchasePrice: 20,
               purchasedRound: 1
             }
@@ -54,7 +54,8 @@ describe('Selling Module', () => {
           color: '#00ff00',
           purchases: [
             {
-              card: { ...mockCard, id: 'test_card_3', artist: ARTISTS[0] },
+              ...mockCard,
+              id: 'test_card_3',
               artist: ARTISTS[0],
               purchasePrice: 40,
               purchasedRound: 1
@@ -170,8 +171,9 @@ describe('Selling Module', () => {
     it('does not sell zero value paintings', () => {
       // Modify gameState to have unranked artist paintings
       gameState.players[0].purchases!.push({
-        card: { ...mockCard, id: 'test_card_4', artist: ARTISTS[3] }, // #4 artist (0 value)
-        artist: ARTISTS[3],
+        ...mockCard,
+        id: 'test_card_4',
+        artist: ARTISTS[3], // #4 artist (0 value)
         purchasePrice: 10,
         purchasedRound: 1
       })
@@ -224,8 +226,9 @@ describe('Selling Module', () => {
     it('returns only paintings with value > 0', () => {
       // Add a zero value painting to Alice
       gameState.players[0].purchases!.push({
-        card: { ...mockCard, id: 'test_card_4', artist: ARTISTS[4] }, // #5 artist (0 value)
-        artist: ARTISTS[4],
+        ...mockCard,
+        id: 'test_card_4',
+        artist: ARTISTS[4], // #5 artist (0 value)
         purchasePrice: 5,
         purchasedRound: 1
       })
@@ -254,8 +257,8 @@ describe('Selling Module', () => {
       const sellable = getPlayerSellablePaintings(gameState, 'p1')
 
       // Alice has ARTISTS[0] (#1, cumulative value 30) and ARTISTS[1] (#2, cumulative value 10)
-      expect(sellable.find(s => s.painting.artist === ARTISTS[0])?.value).toBe(30)
-      expect(sellable.find(s => s.painting.artist === ARTISTS[1])?.value).toBe(10)
+      expect(sellable.find(s => s.card.artist === ARTISTS[0])?.value).toBe(30)
+      expect(sellable.find(s => s.card.artist === ARTISTS[1])?.value).toBe(10)
     })
   })
 
@@ -419,7 +422,8 @@ describe('Selling Module', () => {
     it('handles tie by painting count', () => {
       // Add another ARTISTS[1] painting to Alice
       gameState.players[0].purchases!.push({
-        card: { ...mockCard, id: 'test_card_4', artist: ARTISTS[1] },
+        ...mockCard,
+        id: 'test_card_4',
         artist: ARTISTS[1],
         purchasePrice: 10,
         purchasedRound: 1

@@ -6,15 +6,29 @@ export type Artist = 'Manuel Carvalho' | 'Sigrid Thaler' | 'Daniel Melim' | 'Ram
 
 export type AuctionType = 'open' | 'one_offer' | 'hidden' | 'fixed_price' | 'double'
 
-export type { AuctionState } from './auction'
+// Import AuctionState from auction types
+import type { AuctionState } from './auction'
+export type { AuctionState }
 
+/**
+ * Card represents both:
+ * 1. Cards in hand (financial fields undefined)
+ * 2. Purchased paintings (financial fields set after auction)
+ */
 export interface Card {
   id: string
   artist: Artist
   auctionType: AuctionType
   artworkId: string // Reference to visual asset
+
+  // Optional financial fields (only set after purchase/sale)
+  purchasePrice?: number
+  purchasedRound?: number
+  salePrice?: number
+  soldRound?: number
 }
 
+/** @deprecated Use Card instead - Painting type has been merged into Card */
 export interface Painting {
   card: Card
   artist: Artist
@@ -29,8 +43,8 @@ export interface Player {
   name: string
   money: number // Hidden from other players until game end
   hand: Card[] // Cards available to auction
-  purchasedThisRound: Card[] // Cleared after selling each round
-  purchases?: Painting[] // All paintings owned by player
+  purchasedThisRound: Card[] // Cards purchased this round (with financial fields set)
+  purchases?: Card[] // All paintings owned by player (with financial fields set)
   isAI: boolean
   aiDifficulty?: 'easy' | 'medium' | 'hard'
 }
@@ -107,4 +121,4 @@ export type GameEvent =
   | { type: 'round_ended'; unsoldCards: Card[]; rankings: ArtistRoundResult[] }
   | { type: 'paintings_sold'; playerIndex: number; paintings: Card[]; totalValue: number }
   | { type: 'game_ended'; winner: string | null }
-  | { type: 'bank_sale'; playerId: string; totalSaleValue: number; paintingCount: number; paintings: Painting[] }
+  | { type: 'bank_sale'; playerId: string; totalSaleValue: number; paintingCount: number; paintings: Card[] }

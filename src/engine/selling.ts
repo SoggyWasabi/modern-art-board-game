@@ -1,6 +1,6 @@
 import type {
   GameState,
-  Painting
+  Card
 } from '../types/game'
 import { calculatePaintingValue } from './valuation'
 import { processBankSale } from './money'
@@ -9,7 +9,7 @@ import { processBankSale } from './money'
  * Selling Phase Engine
  *
  * Handles:
- * - Bank selling of paintings
+ * - Bank selling of paintings (purchased cards)
  * - Painting value calculation
  * - Money transactions for sold paintings
  * - Discarding sold paintings
@@ -28,13 +28,13 @@ export function sellPlayerPaintingsToBank(
   }
 
   let totalSaleValue = 0
-  const soldPaintings: Painting[] = []
+  const soldPaintings: Card[] = []
 
   // Calculate value for each painting
-  player.purchases.forEach(painting => {
+  player.purchases.forEach(card => {
     const value = calculatePaintingValue(
       gameState.board,
-      painting.artist,
+      card.artist,
       gameState.round.roundNumber - 1, // Use current round (values already updated)
       gameState.round.phase.type === 'selling_to_bank'
         ? gameState.round.phase.results
@@ -43,7 +43,7 @@ export function sellPlayerPaintingsToBank(
     if (value > 0) {
       totalSaleValue += value
       soldPaintings.push({
-        ...painting,
+        ...card,
         salePrice: value,
         soldRound: gameState.round.roundNumber
       })
@@ -55,10 +55,10 @@ export function sellPlayerPaintingsToBank(
 
   // Remove only sold paintings from player's collection and add to discard pile
   // Keep zero-value paintings in player's collection
-  const unsoldPaintings = player.purchases.filter(painting => {
+  const unsoldPaintings = player.purchases.filter(card => {
     const value = calculatePaintingValue(
       gameState.board,
-      painting.artist,
+      card.artist,
       gameState.round.roundNumber - 1,
       gameState.round.phase.type === 'selling_to_bank'
         ? gameState.round.phase.results
@@ -80,7 +80,7 @@ export function sellPlayerPaintingsToBank(
     }),
     discardPile: [
       ...newGameState.discardPile,
-      ...soldPaintings.map(p => p.card)
+      ...soldPaintings
     ]
   }
 
@@ -119,18 +119,18 @@ export function sellAllPaintingsToBank(gameState: GameState): GameState {
 export function getPlayerSellablePaintings(
   gameState: GameState,
   playerId: string
-): { painting: Painting; value: number }[] {
+): { card: Card; value: number }[] {
   const player = gameState.players.find(p => p.id === playerId)
   if (!player || !player.purchases) {
     return []
   }
 
   return player.purchases
-    .map(painting => ({
-      painting,
+    .map(card => ({
+      card,
       value: calculatePaintingValue(
         gameState.board,
-        painting.artist,
+        card.artist,
         gameState.round.roundNumber - 1,
         gameState.round.phase.type === 'selling_to_bank'
           ? gameState.round.phase.results
@@ -196,10 +196,10 @@ export function getTotalPaintingValue(gameState: GameState): number {
 
   gameState.players.forEach(player => {
     if (player.purchases) {
-      player.purchases.forEach(painting => {
+      player.purchases.forEach(card => {
         const value = calculatePaintingValue(
           gameState.board,
-          painting.artist,
+          card.artist,
           gameState.round.roundNumber - 1,
           roundResults
         )
@@ -219,8 +219,8 @@ export function getPaintingDistribution(gameState: GameState): Record<string, nu
 
   gameState.players.forEach(player => {
     if (player.purchases) {
-      player.purchases.forEach(painting => {
-        distribution[painting.artist] = (distribution[painting.artist] || 0) + 1
+      player.purchases.forEach(card => {
+        distribution[card.artist] = (distribution[card.artist] || 0) + 1
       })
     }
   })
@@ -246,18 +246,18 @@ export function getPlayersMostValuableArtist(
     ? gameState.round.phase.results
     : []
 
-  player.purchases.forEach(painting => {
+  player.purchases.forEach(card => {
     const value = calculatePaintingValue(
       gameState.board,
-      painting.artist,
+      card.artist,
       gameState.round.roundNumber - 1,
       roundResults
     )
-    if (!artistValues[painting.artist]) {
-      artistValues[painting.artist] = { value: 0, count: 0 }
+    if (!artistValues[card.artist]) {
+      artistValues[card.artist] = { value: 0, count: 0 }
     }
-    artistValues[painting.artist].value += value
-    artistValues[painting.artist].count += 1
+    artistValues[card.artist].value += value
+    artistValues[card.artist].count += 1
   })
 
   let bestArtist: string | null = null

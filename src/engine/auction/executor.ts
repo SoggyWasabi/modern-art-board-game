@@ -10,8 +10,23 @@ import { transferMoney, payToBank } from '../money'
  * - Running auctions and processing results
  * - Proper money transfers between players
  * - Updating game state with auction outcomes
- * - Moving paintings to winner's collection
+ * - Moving purchased cards to winner's collection with financial metadata
  */
+
+/**
+ * Add financial metadata to a purchased card
+ */
+function addPurchaseMetadata(
+  card: Card,
+  salePrice: number,
+  roundNumber: number
+): Card {
+  return {
+    ...card,
+    purchasePrice: salePrice,
+    purchasedRound: roundNumber
+  }
+}
 
 /**
  * Execute an auction result with proper money transfers
@@ -41,9 +56,17 @@ export function executeAuction(
   if (winnerId !== null) {
     newPlayers = newPlayers.map(player => {
       if (player.id === winnerId) {
-        const cardsToAdd = secondCard
-          ? [auctionCard, secondCard]  // Double auction - both cards
-          : [auctionCard]             // Regular auction - single card
+        // Add financial metadata to purchased cards
+        const cardsToAdd: Card[] = [
+          addPurchaseMetadata(auctionCard, salePrice, gameState.round.roundNumber)
+        ]
+
+        // Double auction - add second card with same price
+        if (secondCard) {
+          cardsToAdd.push(
+            addPurchaseMetadata(secondCard, salePrice, gameState.round.roundNumber)
+          )
+        }
 
         return {
           ...player,

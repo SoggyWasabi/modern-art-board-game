@@ -1777,7 +1777,7 @@ describe('Game Flow Integration', () => {
         // VERIFY: Card ownership transferred
         // Card should be in Player 1's purchasedThisRound
         expect(state.players[1].purchasedThisRound).toHaveLength(1)
-        expect(state.players[1].purchasedThisRound[0].card.id).toBe('card_1')
+        expect(state.players[1].purchasedThisRound[0].id).toBe('card_1')
         expect(state.players[1].purchasedThisRound[0].artist).toBe('Manuel Carvalho')
         expect(state.players[1].purchasedThisRound[0].purchasePrice).toBe(25)
         expect(state.players[1].purchasedThisRound[0].purchasedRound).toBe(1)
@@ -1827,7 +1827,7 @@ describe('Game Flow Integration', () => {
 
         // VERIFY: Card goes to auctioneer but they pay bank
         expect(state.players[0].purchasedThisRound).toHaveLength(1)
-        expect(state.players[0].purchasedThisRound[0].card.id).toBe('card_2')
+        expect(state.players[0].purchasedThisRound[0].id).toBe('card_2')
         expect(state.players[0].purchasedThisRound[0].artist).toBe('Sigrid Thaler')
         expect(state.players[0].purchasedThisRound[0].purchasePrice).toBe(30)
 

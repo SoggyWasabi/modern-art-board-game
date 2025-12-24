@@ -47,7 +47,7 @@ import { createOneOfferAuction, makeOffer, pass as oneOfferPass, acceptHighestBi
 import { createDoubleAuction, offerSecondCard, declineToOffer, acceptOffer as acceptDoubleOffer, concludeAuction as concludeDouble } from '../../auction/double'
 
 // Types
-import type { GameState, Player, Card, Painting, Artist, AuctionType } from '../../../types/game'
+import type { GameState, Player, Card, Artist, AuctionType } from '../../../types/game'
 import type { AuctionResult } from '../../../types/auction'
 import { ARTISTS, STARTING_MONEY, CARD_DISTRIBUTION, AUCTION_DISTRIBUTION } from '../../constants'
 
@@ -219,12 +219,11 @@ function card(artist: Artist, auctionType: AuctionType, id?: string): Card {
 }
 
 /**
- * Creates a painting from a card
+ * Creates a purchased card from a card with financial metadata
  */
-function painting(c: Card, purchasePrice: number, purchasedRound: number): Painting {
+function painting(c: Card, purchasePrice: number, purchasedRound: number): Card {
   return {
-    card: c,
-    artist: c.artist,
+    ...c,
     purchasePrice,
     purchasedRound
   }
@@ -2754,8 +2753,7 @@ describe('Complete Game E2E', () => {
         // Double auction special: also add the second Sigrid (Dave's card) to Carol's purchases
         const carolIdx = game.playerIndex('Carol')
         game.state.players[carolIdx].purchasedThisRound.push({
-          card: daveSigridCard,
-          artist: 'Sigrid Thaler',
+          ...daveSigridCard,
           purchasePrice: 40,
           purchasedRound: 2
         })
