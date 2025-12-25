@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { useGameStore, useCurrentPlayer, useIsCurrentPlayerTurn } from '../../store/gameStore'
 import { useTurnManagement } from '../../hooks/useTurnManagement'
 import { useRoundTransitionAnimation } from '../../hooks/useRoundTransitionAnimation'
@@ -9,7 +9,7 @@ import AuctionCenter from './AuctionCenter'
 import OpponentPanel from './OpponentPanel'
 import PlayerHand from './PlayerHand'
 import GameEndDisplay from './phases/GameEndDisplay'
-import PurchaseSaleAnimation from './animations/PurchaseSaleAnimation'
+// PurchaseSaleAnimation removed - replaced with BankExchangeAnimation in AuctionCenter
 // ArtistValuationAnimation removed - now rendered in AuctionCenter for selling_to_bank phase
 import CardDealingAnimation from './animations/CardDealingAnimation'
 // CardDiscardAnimation removed - AuctionCenter now shows FifthCardCeremony instead
@@ -28,6 +28,64 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
   const { turnIndicator, isPlayerTurn: isCurrentPlayerTurn, isAIThinking, turnMessage } = useTurnManagement()
   const animationState = useRoundTransitionAnimation()
   const [artistBoardCollapsed, setArtistBoardCollapsed] = useState(false)
+
+  // Track purchased card positions for Bank Exchange Animation
+  const purchasedCardRefs = useRef<Map<string, HTMLDivElement>>(new Map())
+  const [purchasedCardsPositions, setPurchasedCardsPositions] = useState<Array<{
+    card: Card
+    playerId: string
+    position: { x: number; y: number } | null
+  }>>([])
+
+  // Update positions when artist valuation animation triggers (before cards fly)
+  useEffect(() => {
+    if (animationState.showArtistValuation && gameState) {
+      // Small delay to ensure DOM is settled after phase transition
+      const timer = setTimeout(() => {
+        const positions: Array<{
+          card: Card
+          playerId: string
+          position: { x: number; y: number } | null
+        }> = []
+
+        // Collect all players' purchased cards
+        gameState.players.forEach((player) => {
+          player.purchasedThisRound.forEach((card) => {
+            const ref = purchasedCardRefs.current.get(card.id)
+            if (ref) {
+              const rect = ref.getBoundingClientRect()
+              positions.push({
+                card,
+                playerId: player.id,
+                position: {
+                  x: rect.left + rect.width / 2,
+                  y: rect.top + rect.height / 2,
+                },
+              })
+            } else {
+              // Card ref not found, add with null position
+              positions.push({
+                card,
+                playerId: player.id,
+                position: null,
+              })
+            }
+          })
+        })
+
+        setPurchasedCardsPositions(positions)
+      }, 100)
+
+      return () => clearTimeout(timer)
+    }
+  }, [animationState.showArtistValuation, gameState])
+
+  // Clear positions when animation ends
+  useEffect(() => {
+    if (!animationState.showArtistValuation) {
+      setPurchasedCardsPositions([])
+    }
+  }, [animationState.showArtistValuation])
 
   // Debug logging
   console.log('MainGameplay render:', {
@@ -305,7 +363,7 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
               </span>
             </div>
 
-            {currentPlayer.purchasedThisRound.length > 0 ? (
+            {currentPlayer.purchasedThisRound.length > 0 && !animationState.isFlyingCards ? (
               <div
                 style={{
                   display: 'flex',
@@ -314,7 +372,14 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
                 }}
               >
                 {currentPlayer.purchasedThisRound.map((card: Card, idx: number) => (
-                  <div key={`${card.id}-${idx}`} style={{ transform: 'scale(0.6)' }}>
+                  <div
+                    key={`${card.id}-${idx}`}
+                    ref={(el) => {
+                      if (el) purchasedCardRefs.current.set(card.id, el)
+                      else purchasedCardRefs.current.delete(card.id)
+                    }}
+                    style={{ transform: 'scale(0.6)' }}
+                  >
                     <GameCardComponent
                       card={{
                         id: card.id,
@@ -369,6 +434,8 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
               onPlayCard={handlePlayCard}
               onPass={handlePass}
               onClearSelectedDoubleCard={() => setSelectedDoubleCard(null)}
+              purchasedCardsPositions={purchasedCardsPositions}
+              showArtistValuation={animationState.showArtistValuation}
             />
           </div>
         </div>
@@ -396,6 +463,11 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
             players={players}
             currentPlayerIndex={currentPlayerIndex}
             activePlayerIndex={activePlayerIndex}
+            isFlyingCards={animationState.isFlyingCards}
+            registerCardRef={(cardId, el) => {
+              if (el) purchasedCardRefs.current.set(cardId, el)
+              else purchasedCardRefs.current.delete(cardId)
+            }}
           />
         </div>
       </div>
@@ -420,8 +492,7 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
       {/* Popup removed to improve UX - now using card highlighting in hand instead */}
 
       {/* Round Transition Animations */}
-      {/* FifthCardCeremony and ArtistValuationAnimation now render in AuctionCenter */}
-      <PurchaseSaleAnimation show={animationState.showPurchaseSales} />
+      {/* FifthCardCeremony, ArtistValuationAnimation, and BankExchangeAnimation now render in AuctionCenter */}
       <CardDealingAnimation show={animationState.showCardDealing} />
     </div>
   )

@@ -5,14 +5,14 @@ import { useGameStore } from '../store/gameStore'
  * Animation stage controls which visual elements are shown during round transitions
  * This is purely cosmetic and does not affect game state progression
  */
-type AnimationStage = 'idle' | 'card_discard' | 'artist_valuation' | 'purchase_sales' | 'card_dealing'
+type AnimationStage = 'idle' | 'card_discard' | 'artist_valuation' | 'card_dealing'
 
 interface RoundTransitionState {
   stage: AnimationStage
   showCardDiscard: boolean
   showArtistValuation: boolean
-  showPurchaseSales: boolean
   showCardDealing: boolean
+  isFlyingCards: boolean // Cards are flying to center, hide from purchased areas
 }
 
 /**
@@ -31,8 +31,8 @@ export function useRoundTransitionAnimation() {
     stage: 'idle',
     showCardDiscard: false,
     showArtistValuation: false,
-    showPurchaseSales: false,
     showCardDealing: false,
+    isFlyingCards: false,
   })
 
   // Track the previous phase to detect phase transitions
@@ -64,8 +64,8 @@ export function useRoundTransitionAnimation() {
         stage: 'card_discard',
         showCardDiscard: true,
         showArtistValuation: false,
-        showPurchaseSales: false,
         showCardDealing: false,
+        isFlyingCards: false,
       })
 
       // The game state will auto-transition to selling_to_bank after 4.5s
@@ -76,8 +76,8 @@ export function useRoundTransitionAnimation() {
           stage: 'idle',
           showCardDiscard: false,
           showArtistValuation: false,
-          showPurchaseSales: false,
           showCardDealing: false,
+          isFlyingCards: false,
         })
       }, 4500)
 
@@ -110,8 +110,8 @@ export function useRoundTransitionAnimation() {
         stage: 'card_dealing',
         showCardDiscard: false,
         showArtistValuation: false,
-        showPurchaseSales: false,
         showCardDealing: true,
+        isFlyingCards: false,
       })
 
       // After card dealing animation, auto-progress to next round
@@ -123,8 +123,8 @@ export function useRoundTransitionAnimation() {
           stage: 'idle',
           showCardDiscard: false,
           showArtistValuation: false,
-          showPurchaseSales: false,
           showCardDealing: false,
+          isFlyingCards: false,
         })
       }, 1500)
 
@@ -143,39 +143,39 @@ export function useRoundTransitionAnimation() {
   }, [gameState?.round.phase.type, completeRound, progressToNextRound])
 
   /**
-   * Start the artist valuation and purchase sales animation sequence
+   * Start the artist valuation animation sequence
+   * This includes cards flying to center and player earnings display
+   * After 6 seconds, trigger round completion
    */
   const startArtistValuationSequence = useCallback(() => {
-    // Stage 1: Artist valuation animation (5 seconds - EXTENDED)
+    // Phase 1: Show artist valuation, cards NOT flying yet
     setAnimationState({
       stage: 'artist_valuation',
       showCardDiscard: false,
       showArtistValuation: true,
-      showPurchaseSales: false,
       showCardDealing: false,
+      isFlyingCards: false,
     })
 
-    // Stage 2: After valuation, show purchase sales (8 seconds)
+    // Phase 2: At 2200ms (when flying cards start), fade out purchased cards
+    const flyingTimer = setTimeout(() => {
+      console.log('[Round Transition] Cards now flying, fading out purchased cards')
+      setAnimationState((prev) => ({
+        ...prev,
+        isFlyingCards: true,
+      }))
+    }, 2200)
+
+    // After 6 seconds, trigger round completion
     const valuationTimer = setTimeout(() => {
-      console.log('[Round Transition] Valuation complete, showing purchase sales')
-      setAnimationState({
-        stage: 'purchase_sales',
-        showCardDiscard: false,
-        showArtistValuation: false,
-        showPurchaseSales: true,
-        showCardDealing: false,
-      })
+      console.log('[Round Transition] Artist valuation complete, completing round')
+      completeRound()
+    }, 6000)
 
-      // Stage 3: After sales animation, trigger round completion
-      const salesTimer = setTimeout(() => {
-        console.log('[Round Transition] Sales animation complete, completing round')
-        completeRound()
-      }, 8000)
-
-      return () => clearTimeout(salesTimer)
-    }, 5000)
-
-    return () => clearTimeout(valuationTimer)
+    return () => {
+      clearTimeout(flyingTimer)
+      clearTimeout(valuationTimer)
+    }
   }, [completeRound])
 
   return animationState

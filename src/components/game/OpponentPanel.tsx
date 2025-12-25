@@ -12,6 +12,8 @@ interface OpponentPanelProps {
   currentPlayerIndex: number // The human player index (to exclude)
   activePlayerIndex?: number // Whose turn it is
   aiThinkingPlayers?: Set<number> // Set of AI player indices currently thinking
+  registerCardRef?: (cardId: string, element: HTMLDivElement | null) => void
+  isFlyingCards?: boolean // Hide purchased cards during flying animation
 }
 
 const OpponentPanel: React.FC<OpponentPanelProps> = ({
@@ -19,6 +21,8 @@ const OpponentPanel: React.FC<OpponentPanelProps> = ({
   currentPlayerIndex,
   activePlayerIndex,
   aiThinkingPlayers = new Set(),
+  registerCardRef,
+  isFlyingCards = false,
 }) => {
   // Filter out the current (human) player
   const opponents = players.filter((_, idx) => idx !== currentPlayerIndex)
@@ -139,8 +143,8 @@ const OpponentPanel: React.FC<OpponentPanelProps> = ({
             </div>
 
             {/* Purchased cards this round */}
-            {purchasedCards.length > 0 && (
-              <div>
+            {purchasedCards.length > 0 && !isFlyingCards ? (
+              <>
                 <div
                   style={{
                     fontSize: '10px',
@@ -160,7 +164,11 @@ const OpponentPanel: React.FC<OpponentPanelProps> = ({
                   }}
                 >
                   {purchasedCards.map((card: Card, idx: number) => (
-                    <div key={`${card.id}-${idx}`} style={{ transform: 'scale(0.6)' }}>
+                    <div
+                      key={`${card.id}-${idx}`}
+                      ref={(el) => registerCardRef?.(card.id, el)}
+                      style={{ transform: 'scale(0.6)' }}
+                    >
                       <GameCardComponent
                         card={{
                           id: card.id,
@@ -174,11 +182,9 @@ const OpponentPanel: React.FC<OpponentPanelProps> = ({
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
-
-            {/* Empty state */}
-            {purchasedCards.length === 0 && (
+              </>
+            ) : (
+              /* Empty state */
               <div
                 style={{
                   fontSize: '11px',

@@ -1,9 +1,21 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { useGameStore } from '../../../store/gameStore'
 import { colors } from '../../../design/premiumTokens'
+import FlyingCard from './FlyingCard'
+
+interface PurchasedCardPosition {
+  card: {
+    id: string
+    artist: string
+    auctionType: string
+  }
+  playerId: string
+  position: { x: number; y: number } | null
+}
 
 interface ArtistValuationAnimationProps {
   show: boolean
+  purchasedCardsPositions?: PurchasedCardPosition[]
 }
 
 /**
@@ -18,18 +30,31 @@ interface ArtistValuationAnimationProps {
  * Positioning: Centered over auction center area
  * Timing: ~3 seconds for full reveal
  */
-const ArtistValuationAnimation: React.FC<ArtistValuationAnimationProps> = ({ show }) => {
+const ArtistValuationAnimation: React.FC<ArtistValuationAnimationProps> = ({ show, purchasedCardsPositions = [] }) => {
   const { gameState } = useGameStore()
   const [phase, setPhase] = useState(0)
   const containerRef = useRef<HTMLDivElement>(null)
+  const [centerPosition, setCenterPosition] = useState<{ x: number; y: number } | null>(null)
+
+  // Get center position for flying cards target
+  useEffect(() => {
+    if (show && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect()
+      setCenterPosition({
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+      })
+    }
+  }, [show])
 
   useEffect(() => {
     if (!show) {
       setPhase(0)
+      setCenterPosition(null)
       return
     }
 
-    // Multi-stage animation sequence - EXTENDED TO 5 SECONDS
+    // Multi-stage animation sequence - 6 SECONDS TOTAL
     const timers = [
       // Phase 1: Fade in backdrop (100ms)
       setTimeout(() => setPhase(1), 100),
@@ -43,11 +68,17 @@ const ArtistValuationAnimation: React.FC<ArtistValuationAnimationProps> = ({ sho
       // Phase 4: Crown appears (1800ms)
       setTimeout(() => setPhase(4), 1800),
 
-      // Phase 5: Spotlight on winner (2200ms)
+      // Phase 5: Spotlight on winner + Cards fly to center (2200ms)
       setTimeout(() => setPhase(5), 2200),
 
-      // Phase 6: Hold for viewing (5000ms total)
-      setTimeout(() => setPhase(6), 5000),
+      // Phase 6: Cards arrive, show player earnings (3500ms)
+      setTimeout(() => setPhase(6), 3500),
+
+      // Phase 7: Hold earnings display for viewing (5000ms)
+      setTimeout(() => setPhase(7), 5000),
+
+      // Phase 8: Fade out (6000ms total)
+      setTimeout(() => setPhase(8), 6000),
     ]
 
     return () => timers.forEach(clearTimeout)
@@ -61,6 +92,15 @@ const ArtistValuationAnimation: React.FC<ArtistValuationAnimationProps> = ({ sho
       : []
 
   const rankedResults = results.filter((r) => r.rank !== null && r.value > 0)
+
+  // Calculate each player's total earnings
+  const playerEarnings = gameState.players.map((player) => {
+    const earnings = player.purchasedThisRound.reduce((total, card) => {
+      const result = results.find((r) => r.artist === card.artist)
+      return total + (result?.value || 0)
+    }, 0)
+    return { player, earnings }
+  }).filter((item) => item.earnings > 0)
 
   if (rankedResults.length === 0) return null
 
@@ -620,7 +660,120 @@ const ArtistValuationAnimation: React.FC<ArtistValuationAnimationProps> = ({ sho
             </div>
           )}
         </div>
+
+        {/* Player Earnings Display - Shows after cards arrive (phase 6+) */}
+        {phase >= 6 && playerEarnings.length > 0 && (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px',
+              width: '100%',
+              maxWidth: '320px',
+              marginTop: '40px',
+              opacity: phase >= 6 ? 1 : 0,
+              transform: phase >= 6 ? 'translateY(0)' : 'translateY(20px)',
+              transition: 'opacity 0.6s ease-out, transform 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
+            }}
+          >
+            {/* Earnings Header */}
+            <div
+              style={{
+                fontSize: '11px',
+                fontWeight: 700,
+                color: 'rgba(255, 255, 255, 0.6)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.15em',
+                textAlign: 'center',
+                marginBottom: '4px',
+              }}
+            >
+              Round Earnings
+            </div>
+
+            {/* Earnings Rows */}
+            {playerEarnings
+              .sort((a, b) => b.earnings - a.earnings)
+              .map(({ player, earnings }, index) => (
+                <div
+                  key={player.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px 18px',
+                    background: 'rgba(255, 255, 255, 0.06)',
+                    backdropFilter: 'blur(16px)',
+                    borderRadius: '12px',
+                    border: `1px solid ${index === 0 ? colors.accent.gold + '40' : 'rgba(255, 255, 255, 0.12)'}`,
+                    boxShadow: index === 0
+                      ? `0 4px 20px ${colors.accent.gold}30, inset 0 1px 0 rgba(255, 255, 255, 0.1)`
+                      : '0 4px 12px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+                    transition: 'transform 0.2s ease-out',
+                  }}
+                >
+                  {/* Rank Badge */}
+                  {index === 0 && (
+                    <div
+                      style={{
+                        width: '20px',
+                        height: '20px',
+                        borderRadius: '50%',
+                        background: colors.accent.gold,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '11px',
+                        fontWeight: 800,
+                        color: '#5a3a00',
+                        marginRight: '10px',
+                        boxShadow: `0 0 12px ${colors.accent.gold}60`,
+                      }}
+                    >
+                      1
+                    </div>
+                  )}
+
+                  <div
+                    style={{
+                      flex: 1,
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      color: 'white',
+                      textShadow: '0 1px 3px rgba(0, 0, 0, 0.5)',
+                    }}
+                  >
+                    {player.name}
+                  </div>
+
+                  <div
+                    style={{
+                      fontSize: '16px',
+                      fontWeight: 800,
+                      color: colors.accent.gold,
+                      textShadow: `0 0 16px ${colors.accent.gold}50, 0 2px 4px rgba(0, 0, 0, 0.3)`,
+                      letterSpacing: '0.02em',
+                    }}
+                  >
+                    +${earnings}k
+                  </div>
+                </div>
+              ))}
+          </div>
+        )}
       </div>
+
+      {/* Flying Cards - All cards fly to center simultaneously (phase 5-7) */}
+      {phase >= 5 && phase < 8 && centerPosition && purchasedCardsPositions.map((item, index) => (
+        <FlyingCard
+          key={item.card.id}
+          card={item.card}
+          sourcePosition={item.position}
+          targetPosition={centerPosition}
+          delay={0} // All fly simultaneously
+          visible={phase >= 5 && phase < 8}
+        />
+      ))}
     </div>
   )
 }

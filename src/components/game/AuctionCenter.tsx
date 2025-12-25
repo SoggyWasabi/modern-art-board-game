@@ -9,6 +9,12 @@ import ActiveAuction from './auction/ActiveAuction'
 import FifthCardCeremony from './auction/FifthCardCeremony'
 import ArtistValuationAnimation from './animations/ArtistValuationAnimation'
 
+interface PurchasedCardPosition {
+  card: Card
+  playerId: string
+  position: { x: number; y: number } | null
+}
+
 interface AuctionCenterProps {
   selectedCard: Card | null
   selectedDoubleCard?: Card | null  // Card selected for double auction preview
@@ -16,6 +22,8 @@ interface AuctionCenterProps {
   onPlayCard: () => void
   onPass: () => void
   onClearSelectedDoubleCard?: () => void
+  purchasedCardsPositions?: PurchasedCardPosition[]
+  showArtistValuation?: boolean
 }
 
 const AuctionCenter: React.FC<AuctionCenterProps> = ({
@@ -25,6 +33,8 @@ const AuctionCenter: React.FC<AuctionCenterProps> = ({
   onPlayCard,
   onPass,
   onClearSelectedDoubleCard,
+  purchasedCardsPositions = [],
+  showArtistValuation = false,
 }) => {
   const { gameState, placeBid, passBid } = useGameStore()
 
@@ -46,9 +56,9 @@ const AuctionCenter: React.FC<AuctionCenterProps> = ({
     }
   }
 
-  // Render artist valuation when selling to bank
-  if (gameState?.round.phase.type === 'selling_to_bank') {
-    return <ArtistValuationAnimation show={true} />
+  // Render artist valuation during selling_to_bank phase (with flying cards and earnings)
+  if (showArtistValuation) {
+    return <ArtistValuationAnimation show={true} purchasedCardsPositions={purchasedCardsPositions} />
   }
 
   // Render null state (no card selected, no active auction)
