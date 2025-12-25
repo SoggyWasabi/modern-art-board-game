@@ -22,7 +22,7 @@ const CardDealingAnimation: React.FC<CardDealingAnimationProps> = ({ show }) => 
       playerIndices.forEach((playerIndex, i) => {
         setTimeout(() => {
           setCardsDealingTo((prev) => [...prev, playerIndex])
-        }, i * 200) // Stagger by 200ms per player
+        }, i * 100) // Stagger by 100ms per player (2x faster)
       })
 
       // Clear after animation completes
@@ -87,7 +87,7 @@ const CardDealingAnimation: React.FC<CardDealingAnimationProps> = ({ show }) => 
             >
               <div
                 style={{
-                  fontSize: '20px',
+                  fontSize: '32px',
                   animation: 'cardFlip 0.6s ease-in-out',
                 }}
               >
