@@ -2045,7 +2045,7 @@ export const useGameStore = create<GameStore>()(
               const endedRoundState = endRound(currentGameState)
               set({ gameState: endedRoundState }, false, 'endRound_from_5th_card')
             }
-          }, 1500)
+          }, 4500)
         } else if (phase === 'awaiting_card_play') {
           const nextPlayerIndex = newGameState.round.phase.activePlayerIndex
           const nextPlayer = newGameState.players[nextPlayerIndex]

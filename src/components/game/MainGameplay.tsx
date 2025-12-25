@@ -10,8 +10,9 @@ import OpponentPanel from './OpponentPanel'
 import PlayerHand from './PlayerHand'
 import GameEndDisplay from './phases/GameEndDisplay'
 import PurchaseSaleAnimation from './animations/PurchaseSaleAnimation'
-import ArtistValuationAnimation from './animations/ArtistValuationAnimation'
+// ArtistValuationAnimation removed - now rendered in AuctionCenter for selling_to_bank phase
 import CardDealingAnimation from './animations/CardDealingAnimation'
+// CardDiscardAnimation removed - AuctionCenter now shows FifthCardCeremony instead
 // import DoubleAuctionPrompt from './DoubleAuctionPrompt' // Removed - now using card highlighting instead
 import { Card as GameCardComponent } from '../Card'
 import type { Card } from '../../types'
@@ -419,7 +420,7 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
       {/* Popup removed to improve UX - now using card highlighting in hand instead */}
 
       {/* Round Transition Animations */}
-      <ArtistValuationAnimation show={animationState.showArtistValuation} />
+      {/* FifthCardCeremony and ArtistValuationAnimation now render in AuctionCenter */}
       <PurchaseSaleAnimation show={animationState.showPurchaseSales} />
       <CardDealingAnimation show={animationState.showCardDealing} />
     </div>

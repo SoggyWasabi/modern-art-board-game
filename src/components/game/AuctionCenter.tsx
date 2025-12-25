@@ -6,6 +6,8 @@ import type { AuctionState } from '../../types/auction'
 import NullState from './auction/NullState'
 import SelectedCardState from './auction/SelectedCardState'
 import ActiveAuction from './auction/ActiveAuction'
+import FifthCardCeremony from './auction/FifthCardCeremony'
+import ArtistValuationAnimation from './animations/ArtistValuationAnimation'
 
 interface AuctionCenterProps {
   selectedCard: Card | null
@@ -35,6 +37,19 @@ const AuctionCenter: React.FC<AuctionCenterProps> = ({
   const currentPlayerInAuction = currentAuction && gameState
     ? getCurrentAuctionPlayer(currentAuction, gameState.players)
     : null
+
+  // Render 5th card ceremony when round is ending
+  if (gameState?.round.phase.type === 'round_ending') {
+    const discardedCard = gameState.round.phase.unsoldCards?.[0]
+    if (discardedCard) {
+      return <FifthCardCeremony card={discardedCard} />
+    }
+  }
+
+  // Render artist valuation when selling to bank
+  if (gameState?.round.phase.type === 'selling_to_bank') {
+    return <ArtistValuationAnimation show={true} />
+  }
 
   // Render null state (no card selected, no active auction)
   if (!currentAuction && !selectedCard) {

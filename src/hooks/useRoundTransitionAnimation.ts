@@ -5,10 +5,11 @@ import { useGameStore } from '../store/gameStore'
  * Animation stage controls which visual elements are shown during round transitions
  * This is purely cosmetic and does not affect game state progression
  */
-type AnimationStage = 'idle' | 'artist_valuation' | 'purchase_sales' | 'card_dealing'
+type AnimationStage = 'idle' | 'card_discard' | 'artist_valuation' | 'purchase_sales' | 'card_dealing'
 
 interface RoundTransitionState {
   stage: AnimationStage
+  showCardDiscard: boolean
   showArtistValuation: boolean
   showPurchaseSales: boolean
   showCardDealing: boolean
@@ -28,6 +29,7 @@ export function useRoundTransitionAnimation() {
   const { gameState, completeRound, progressToNextRound } = useGameStore()
   const [animationState, setAnimationState] = useState<RoundTransitionState>({
     stage: 'idle',
+    showCardDiscard: false,
     showArtistValuation: false,
     showPurchaseSales: false,
     showCardDealing: false,
@@ -36,15 +38,13 @@ export function useRoundTransitionAnimation() {
   // Track the previous phase to detect phase transitions
   const prevPhaseRef = useRef(gameState?.round.phase.type)
 
-  // Track if we've already started animations for this phase (prevent duplicate triggers)
+  // Track if we've already started animations for each phase (prevent duplicate triggers)
+  const roundEndingHandledRef = useRef(false)
   const sellingToBankHandledRef = useRef(false)
   const roundCompleteHandledRef = useRef(false)
 
   /**
    * Main effect: Detect phase transitions and trigger appropriate actions
-   *
-   * Key change: We ONLY look at game phase, not animation state.
-   * Animation runs independently and may be in any state when phase changes.
    */
   useEffect(() => {
     if (!gameState) return
@@ -53,15 +53,47 @@ export function useRoundTransitionAnimation() {
     const prevPhase = prevPhaseRef.current
 
     // ============================
+    // Transition TO round_ending (5th card played)
+    // ============================
+    if (phase === 'round_ending' && prevPhase !== 'round_ending' && !roundEndingHandledRef.current) {
+      console.log('[Round Transition] Entering round_ending phase, starting card discard animation')
+      roundEndingHandledRef.current = true
+
+      // Start card discard animation (cosmetic only)
+      setAnimationState({
+        stage: 'card_discard',
+        showCardDiscard: true,
+        showArtistValuation: false,
+        showPurchaseSales: false,
+        showCardDealing: false,
+      })
+
+      // The game state will auto-transition to selling_to_bank after 4.5s
+      // (handled in gameStore.ts handlePhaseTransitionAfterCardPlay)
+      // We just need to clear our animation state here
+      const clearTimer = setTimeout(() => {
+        setAnimationState({
+          stage: 'idle',
+          showCardDiscard: false,
+          showArtistValuation: false,
+          showPurchaseSales: false,
+          showCardDealing: false,
+        })
+      }, 4500)
+
+      return () => clearTimeout(clearTimer)
+    }
+
+    // ============================
     // Transition TO selling_to_bank
     // ============================
     if (phase === 'selling_to_bank' && prevPhase !== 'selling_to_bank' && !sellingToBankHandledRef.current) {
-      console.log('[Round Transition] Entering selling_to_bank phase, starting animations')
+      console.log('[Round Transition] Entering selling_to_bank phase, starting artist valuation')
       sellingToBankHandledRef.current = true
       roundCompleteHandledRef.current = false // Reset for next phase
 
-      // Start animation sequence (cosmetic only, doesn't block game flow)
-      startAnimationSequence()
+      // Start artist valuation sequence
+      startArtistValuationSequence()
     }
 
     // ============================
@@ -71,34 +103,37 @@ export function useRoundTransitionAnimation() {
       console.log('[Round Transition] Entering round_complete phase, starting card dealing')
       roundCompleteHandledRef.current = true
       sellingToBankHandledRef.current = false // Reset for next round
+      roundEndingHandledRef.current = false // Reset for next round
 
-      // Start card dealing animation (cosmetic only)
+      // Clear any previous animations
       setAnimationState({
         stage: 'card_dealing',
+        showCardDiscard: false,
         showArtistValuation: false,
         showPurchaseSales: false,
         showCardDealing: true,
       })
 
       // After card dealing animation, auto-progress to next round
-      // This timer is purely for visual effect - game progression happens regardless
       const cardDealTimer = setTimeout(() => {
         console.log('[Round Transition] Card dealing animation complete, progressing to next round')
         progressToNextRound()
         // Reset animation state after progression
         setAnimationState({
           stage: 'idle',
+          showCardDiscard: false,
           showArtistValuation: false,
           showPurchaseSales: false,
           showCardDealing: false,
         })
-      }, 1500) // Card dealing animation duration
+      }, 1500)
 
       return () => clearTimeout(cardDealTimer)
     }
 
     // Reset refs when leaving special phases (in case we loop back)
-    if (phase !== 'selling_to_bank' && phase !== 'round_complete') {
+    if (phase !== 'round_ending' && phase !== 'selling_to_bank' && phase !== 'round_complete') {
+      roundEndingHandledRef.current = false
       sellingToBankHandledRef.current = false
       roundCompleteHandledRef.current = false
     }
@@ -108,13 +143,13 @@ export function useRoundTransitionAnimation() {
   }, [gameState?.round.phase.type, completeRound, progressToNextRound])
 
   /**
-   * Start the animation sequence for round ending
-   * This is purely cosmetic - game state progresses independently
+   * Start the artist valuation and purchase sales animation sequence
    */
-  const startAnimationSequence = useCallback(() => {
-    // Stage 1: Artist valuation animation (2.5 seconds)
+  const startArtistValuationSequence = useCallback(() => {
+    // Stage 1: Artist valuation animation (5 seconds - EXTENDED)
     setAnimationState({
       stage: 'artist_valuation',
+      showCardDiscard: false,
       showArtistValuation: true,
       showPurchaseSales: false,
       showCardDealing: false,
@@ -125,6 +160,7 @@ export function useRoundTransitionAnimation() {
       console.log('[Round Transition] Valuation complete, showing purchase sales')
       setAnimationState({
         stage: 'purchase_sales',
+        showCardDiscard: false,
         showArtistValuation: false,
         showPurchaseSales: true,
         showCardDealing: false,
@@ -133,12 +169,11 @@ export function useRoundTransitionAnimation() {
       // Stage 3: After sales animation, trigger round completion
       const salesTimer = setTimeout(() => {
         console.log('[Round Transition] Sales animation complete, completing round')
-        completeRound() // This updates game state to round_complete
-        // Don't set animation state here - the round_complete transition will handle it
-      }, 8000) // Purchase sales animation duration (8s to show $$)
+        completeRound()
+      }, 8000)
 
       return () => clearTimeout(salesTimer)
-    }, 2500) // Artist valuation animation duration
+    }, 5000)
 
     return () => clearTimeout(valuationTimer)
   }, [completeRound])
