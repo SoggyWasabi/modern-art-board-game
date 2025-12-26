@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { useGameStore } from './store/gameStore'
 import MainGameplay from './components/game/MainGameplay'
 import { ErrorBoundary } from './components/game/ErrorBoundary'
+import { RulesPage } from './components/rules/RulesPage'
 
 // ============================================================================
 // TYPES
@@ -440,6 +441,90 @@ function FloatingCardsBackground() {
 }
 
 // ============================================================================
+// COLOR BAR NAVIGATION
+// ============================================================================
+
+const NAV_ITEMS = [
+  { label: 'Rules', color: '#F5C846' },      // Manuel yellow
+  { label: 'Gallery', color: '#DC2626' },    // Daniel red
+  { label: 'Tutorial', color: '#2DD4BF' },   // Sigrid teal
+  { label: 'Settings', color: '#22C55E' },   // Ramon green
+  { label: 'Buy', color: '#A855F7' },        // Rafael purple
+]
+
+function ColorBarNav({ onNavigate }: { onNavigate: (item: string) => void }) {
+  return (
+    <nav
+      style={{
+        position: 'fixed',
+        bottom: 32,
+        left: 24,
+        zIndex: 100,
+        display: 'flex',
+        gap: '32px',
+      }}
+    >
+      {NAV_ITEMS.map((item) => (
+        <div
+          key={item.label}
+          style={{
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'flex-start',
+            cursor: item.label === 'Rules' ? 'pointer' : 'not-allowed',
+          }}
+          onClick={() => {
+            if (item.label === 'Rules') {
+              onNavigate('rules')
+            }
+          }}
+          onMouseEnter={(e) => {
+            const bar = e.currentTarget.querySelector('[data-bar]')
+            if (bar) {
+              bar.style.width = '100%'
+            }
+          }}
+          onMouseLeave={(e) => {
+            const bar = e.currentTarget.querySelector('[data-bar]')
+            if (bar) {
+              bar.style.width = '20%'
+            }
+          }}
+        >
+          {/* Text label - always visible */}
+          <span
+            style={{
+              fontSize: '0.7rem',
+              fontWeight: 400,
+              letterSpacing: '0.25em',
+              textTransform: 'uppercase',
+              color: item.label === 'Rules' ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.15)',
+              transition: 'color 0.3s ease',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {item.label}
+          </span>
+          {/* Colored bar - grows on hover */}
+          <div
+            data-bar
+            style={{
+              width: '20%',
+              height: '2px',
+              backgroundColor: item.color,
+              marginTop: '4px',
+              transition: 'width 0.3s ease',
+              boxShadow: `0 0 8px ${item.color}80`,
+            }}
+          />
+        </div>
+      ))}
+    </nav>
+  )
+}
+
+// ============================================================================
 // LANDING PAGE
 // ============================================================================
 
@@ -798,7 +883,7 @@ function PlayerCountSelection({
 // MAIN APP COMPONENT
 // ============================================================================
 
-type Screen = 'menu' | 'playerCount' | 'game'
+type Screen = 'menu' | 'playerCount' | 'game' | 'rules'
 
 function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('menu')
@@ -806,7 +891,9 @@ function App() {
   const { startGameFromSetup, setPlayerCount: storeSetPlayerCount, resetGame } = useGameStore()
 
   // Show floating cards background on menu screens only
-  const showBackground = currentScreen === 'menu' || currentScreen === 'playerCount'
+  const showBackground = currentScreen === 'menu' || currentScreen === 'playerCount' || currentScreen === 'rules'
+  // Show nav bar on menu screens only (not on rules page)
+  const showNavBar = currentScreen === 'menu' || currentScreen === 'playerCount'
 
   // Handle player count selection - setup the game and go directly to main gameplay
   const handlePlayerCountSelect = (count: number, playerStarts: boolean = false, debugMode: boolean = false) => {
@@ -852,6 +939,9 @@ function App() {
       {/* Floating background - only on menu screens, continuous */}
       {showBackground && <FloatingCardsBackground />}
 
+      {/* Color bar navigation - only on menu screens (not rules page) */}
+      {showNavBar && <ColorBarNav onNavigate={setCurrentScreen} />}
+
       {/* Screen content */}
       {currentScreen === 'menu' && (
         <LandingPage onPlay={() => setCurrentScreen('playerCount')} />
@@ -862,6 +952,10 @@ function App() {
           onSelect={handlePlayerCountSelect}
           onBack={() => setCurrentScreen('menu')}
         />
+      )}
+
+      {currentScreen === 'rules' && (
+        <RulesPage onBack={() => setCurrentScreen('menu')} />
       )}
 
       {currentScreen === 'game' && (
