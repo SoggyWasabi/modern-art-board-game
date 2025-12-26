@@ -36,14 +36,19 @@ interface RulesPageProps {
 
 export function RulesPage({ onBack }: RulesPageProps) {
   const [activeChapter, setActiveChapter] = useState('overview')
+  const [isScrollingToChapter, setIsScrollingToChapter] = useState(false)
 
   // Handle scroll to update active chapter
   useEffect(() => {
     const handleScroll = () => {
+      // Don't update active chapter if we're programmatically scrolling
+      if (isScrollingToChapter) return
+
       const sections = CHAPTERS.map(ch => document.getElementById(ch.id)).filter(Boolean)
       for (const section of sections) {
         const rect = section.getBoundingClientRect()
-        if (rect.top <= 100 && rect.bottom >= 100) {
+        // Use a more lenient threshold - section is active if it's in the upper portion of viewport
+        if (rect.top <= 150 && rect.bottom >= 150) {
           setActiveChapter(section.id)
           break
         }
@@ -53,11 +58,14 @@ export function RulesPage({ onBack }: RulesPageProps) {
     window.addEventListener('scroll', handleScroll)
     handleScroll()
     return () => window.removeEventListener('scroll', handleScroll)
-  }, [])
+  }, [isScrollingToChapter])
 
   const scrollToChapter = (chapterId: string) => {
     const element = document.getElementById(chapterId)
     if (element) {
+      // Set flag to prevent scroll listener from overriding
+      setIsScrollingToChapter(true)
+
       // Calculate offset: header (72px) + nav (~80px) = ~150px total
       const headerHeight = 72
       const navHeight = 80
@@ -73,6 +81,11 @@ export function RulesPage({ onBack }: RulesPageProps) {
 
       // Immediately set active chapter
       setActiveChapter(chapterId)
+
+      // Re-enable scroll listener after scroll completes
+      setTimeout(() => {
+        setIsScrollingToChapter(false)
+      }, 1000) // 1 second should be enough for smooth scroll to complete
     }
   }
 
