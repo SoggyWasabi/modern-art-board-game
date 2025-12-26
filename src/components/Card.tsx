@@ -142,9 +142,21 @@ function AuctionIcon({ type, color, size = 16 }: { type: AuctionType; color: str
   }
 }
 
-// Placeholder art component
-function PlaceholderArt({ artistIndex, cardIndex }: { artistIndex: number; cardIndex: number }) {
+// Artwork image with fallback to placeholder gradient
+function CardArtwork({ artistIndex, cardIndex }: { artistIndex: number; cardIndex: number }) {
   const seed = artistIndex * 100 + cardIndex
+
+  // Artist folder names (lowercase, underscored)
+  const artistFolders: Record<number, string> = {
+    0: 'manuel_carvalho',
+    1: 'daniel_melim',
+    2: 'sigrid_thaler',
+    3: 'ramon_martins',
+    4: 'rafael_silveira',
+  }
+
+  const artistFolder = artistFolders[artistIndex] || 'manuel_carvalho'
+  const imagePath = `/assets/artworks/${artistFolder}/${artistFolder}_${String(cardIndex).padStart(2, '0')}.png`
 
   const gradients: Record<number, string> = {
     0: `linear-gradient(${135 + (seed % 90)}deg,
@@ -174,14 +186,30 @@ function PlaceholderArt({ artistIndex, cardIndex }: { artistIndex: number; cardI
         overflow: 'hidden',
       }}
     >
-      {/* Abstract shapes */}
+      {/* Try to load image, hide on error to show gradient */}
+      <img
+        src={imagePath}
+        alt=""
+        style={{
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+        }}
+        onError={(e) => {
+          e.currentTarget.style.display = 'none'
+        }}
+      />
+      {/* Abstract shapes overlay (subtle) */}
       <svg
         style={{
           position: 'absolute',
           inset: 0,
           width: '100%',
           height: '100%',
-          opacity: 0.4,
+          opacity: 0.15,
+          pointerEvents: 'none',
         }}
         viewBox="0 0 100 100"
         preserveAspectRatio="none"
@@ -197,28 +225,20 @@ function PlaceholderArt({ artistIndex, cardIndex }: { artistIndex: number; cardI
           y={50 + (seed % 30)}
           width={12 + (seed % 18)}
           height={15 + (seed % 20)}
-          fill="rgba(0,0,0,0.2)"
+          fill="rgba(0,0,0,0.1)"
           transform={`rotate(${(seed % 30) - 15} ${60 + (seed % 25)} ${55 + (seed % 30)})`}
-        />
-        <path
-          d={`M ${5 + (seed % 15)} ${75 - (seed % 20)}
-              Q ${45 + (seed % 25)} ${35 + (seed % 35)}
-              ${95 - (seed % 15)} ${60 + (seed % 25)}`}
-          stroke="rgba(255,255,255,0.1)"
-          strokeWidth="2"
-          fill="none"
         />
       </svg>
     </div>
   )
 }
 
-// Size configurations
+// Size configurations (heights adjusted to maintain 3:4 aspect ratio for artwork)
 const sizeConfig = {
-  sm: { width: '80px', height: '112px', headerHeight: '20px', fontSize: 10, iconSize: 14 },
-  md: { width: '120px', height: '168px', headerHeight: '24px', fontSize: 12, iconSize: 16 },
-  lg: { width: '160px', height: '224px', headerHeight: '30px', fontSize: 14, iconSize: 18 },
-  xl: { width: '200px', height: '280px', headerHeight: '36px', fontSize: 16, iconSize: 20 },
+  sm: { width: '80px', height: '127px', headerHeight: '20px', fontSize: 10, iconSize: 14 },
+  md: { width: '120px', height: '184px', headerHeight: '24px', fontSize: 12, iconSize: 16 },
+  lg: { width: '160px', height: '243px', headerHeight: '30px', fontSize: 14, iconSize: 18 },
+  xl: { width: '200px', height: '303px', headerHeight: '36px', fontSize: 16, iconSize: 20 },
 }
 
 export function Card({
@@ -358,7 +378,7 @@ export function Card({
 
       {/* Artwork */}
       <div style={{ height: `calc(${config.height} - ${config.headerHeight})` }}>
-        <PlaceholderArt artistIndex={card.artistIndex} cardIndex={card.cardIndex} />
+        <CardArtwork artistIndex={card.artistIndex} cardIndex={card.cardIndex} />
 
         {/* Selection indicator for highlighted cards */}
         {isHighlighted && (
