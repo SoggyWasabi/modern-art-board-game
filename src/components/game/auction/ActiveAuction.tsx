@@ -288,7 +288,7 @@ const ActiveAuction: React.FC<ActiveAuctionProps> = ({
                 id: auctionCard.id,
                 artist: auctionCard.artist,
                 artistIndex: ['Manuel Carvalho', 'Daniel Melim', 'Sigrid Thaler', 'Ramon Martins', 'Rafael Silveira'].indexOf(auctionCard.artist),
-                cardIndex: parseInt(auctionCard.id.split('_')[1]) || 0,
+                cardIndex: auctionCard.cardIndex,
                 auctionType: auctionCard.auctionType,
                 artworkId: auctionCard.artworkId || auctionCard.id
               }}

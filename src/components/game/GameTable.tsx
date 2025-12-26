@@ -170,7 +170,7 @@ const GameTable: React.FC = () => {
                               id: card.id,
                               artist: card.artist,
                               artistIndex: ['Manuel Carvalho', 'Daniel Melim', 'Sigrid Thaler', 'Ramon Martins', 'Rafael Silveira'].indexOf(card.artist),
-                              cardIndex: 0,
+                              cardIndex: card.cardIndex,
                               auctionType: card.auctionType
                             }}
                             size="sm"
@@ -222,7 +222,7 @@ const GameTable: React.FC = () => {
                       id: card.id,
                       artist: card.artist,
                       artistIndex: ['Manuel Carvalho', 'Daniel Melim', 'Sigrid Thaler', 'Ramon Martins', 'Rafael Silveira'].indexOf(card.artist),
-                      cardIndex: 0,
+                      cardIndex: card.cardIndex,
                       auctionType: card.auctionType
                     }}
                     size="md"

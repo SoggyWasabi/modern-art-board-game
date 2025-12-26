@@ -20,6 +20,7 @@ export interface Card {
   artist: Artist
   auctionType: AuctionType
   artworkId: string // Reference to visual asset
+  cardIndex: number // Per-artist index (0-11 for Manuel, 0-12 for Sigrid, etc.)
 
   // Optional financial fields (only set after purchase/sale)
   purchasePrice?: number

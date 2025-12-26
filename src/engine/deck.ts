@@ -39,6 +39,7 @@ export function createDeck(): Card[] {
           artist,
           auctionType: auctionType as AuctionType,
           artworkId: `${artist.toLowerCase().replace(' ', '_')}_${auctionType}_${i + 1}`,
+          cardIndex, // Per-artist index (0-11 for Manuel, etc.)
         }
 
         deck.push(card)

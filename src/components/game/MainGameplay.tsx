@@ -385,7 +385,7 @@ const MainGameplay: React.FC<MainGameplayProps> = ({ onExitToMenu }) => {
                         id: card.id,
                         artist: card.artist,
                         artistIndex: ['Manuel Carvalho', 'Daniel Melim', 'Sigrid Thaler', 'Ramon Martins', 'Rafael Silveira'].indexOf(card.artist),
-                        cardIndex: idx,
+                        cardIndex: card.cardIndex,
                         auctionType: card.auctionType
                       }}
                       size="sm"

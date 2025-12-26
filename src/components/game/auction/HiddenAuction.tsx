@@ -175,7 +175,7 @@ const HiddenAuction: React.FC<HiddenAuctionProps> = ({
                       id: card.id,
                       artist: card.artist,
                       artistIndex: ['Manuel Carvalho', 'Daniel Melim', 'Sigrid Thaler', 'Ramon Martins', 'Rafael Silveira'].indexOf(card.artist),
-                      cardIndex: parseInt(card.id.split('_')[1]) || 0,
+                      cardIndex: card.cardIndex,
                       auctionType: card.auctionType
                     }}
                     size="md"

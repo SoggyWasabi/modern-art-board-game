@@ -141,7 +141,7 @@ const DoubleAuctionWrapper: React.FC<DoubleAuctionWrapperProps> = ({
               id: currentAuction.doubleCard.id,
               artist: currentAuction.doubleCard.artist,
               artistIndex: artistIndex.indexOf(currentAuction.doubleCard.artist),
-              cardIndex: parseInt(currentAuction.doubleCard.id.split('_')[1]) || 0,
+              cardIndex: currentAuction.doubleCard.cardIndex,
               auctionType: currentAuction.doubleCard.auctionType
             }}
             size="md"
@@ -163,7 +163,7 @@ const DoubleAuctionWrapper: React.FC<DoubleAuctionWrapperProps> = ({
                 id: displayCard.id,
                 artist: displayCard.artist,
                 artistIndex: artistIndex.indexOf(displayCard.artist),
-                cardIndex: parseInt(displayCard.id.split('_')[1]) || 0,
+                cardIndex: displayCard.cardIndex,
                 auctionType: displayCard.auctionType
               }}
               size="md"

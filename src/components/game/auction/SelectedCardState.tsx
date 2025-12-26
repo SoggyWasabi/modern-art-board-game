@@ -73,7 +73,7 @@ const SelectedCardState: React.FC<SelectedCardStateProps> = ({
             id: selectedCard.id,
             artist: selectedCard.artist,
             artistIndex: ['Manuel Carvalho', 'Daniel Melim', 'Sigrid Thaler', 'Ramon Martins', 'Rafael Silveira'].indexOf(selectedCard.artist),
-            cardIndex: parseInt(selectedCard.id.split('_')[1]) || 0,
+            cardIndex: selectedCard.cardIndex,
             auctionType: selectedCard.auctionType,
             artworkId: selectedCard.artworkId || selectedCard.id
           }}

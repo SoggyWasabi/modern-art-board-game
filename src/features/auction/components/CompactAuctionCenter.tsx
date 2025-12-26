@@ -109,7 +109,7 @@ export const CompactAuctionCenter: React.FC<CompactAuctionCenterProps> = ({
                 id: selectedCard.id,
                 artist: selectedCard.artist,
                 artistIndex: ['Manuel Carvalho', 'Daniel Melim', 'Sigrid Thaler', 'Ramon Martins', 'Rafael Silveira'].indexOf(selectedCard.artist),
-                cardIndex: parseInt(selectedCard.id.split('_')[1]) || 0,
+                cardIndex: selectedCard.cardIndex,
                 auctionType: selectedCard.auctionType
               }}
               size="lg"
@@ -151,7 +151,7 @@ export const CompactAuctionCenter: React.FC<CompactAuctionCenterProps> = ({
               color: 'rgba(255, 255, 255, 0.7)',
             }}
           >
-            {selectedCard.artist} • Card #{parseInt(selectedCard.id.split('_')[1]) || 0 + 1}
+            {selectedCard.artist} • Card #{selectedCard.cardIndex + 1}
           </div>
         </div>
 
@@ -371,7 +371,7 @@ export const CompactAuctionCenter: React.FC<CompactAuctionCenterProps> = ({
                   id: auctionCard.id,
                   artist: auctionCard.artist,
                   artistIndex: ['Manuel Carvalho', 'Daniel Melim', 'Sigrid Thaler', 'Ramon Martins', 'Rafael Silveira'].indexOf(auctionCard.artist),
-                  cardIndex: parseInt(auctionCard.id.split('_')[1]) || 0,
+                  cardIndex: auctionCard.cardIndex,
                   auctionType: auctionCard.auctionType
                 }}
                 size="xl"
@@ -393,7 +393,7 @@ export const CompactAuctionCenter: React.FC<CompactAuctionCenterProps> = ({
                   color: 'rgba(255, 255, 255, 0.6)',
                 }}
               >
-                Card #{parseInt(auctionCard.id.split('_')[1]) || 0 + 1}
+                Card #{auctionCard.cardIndex + 1}
               </div>
             </div>
           </div>
