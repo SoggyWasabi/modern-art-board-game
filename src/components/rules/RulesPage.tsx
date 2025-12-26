@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { Card } from '../Card'
 import type { CardData } from '../Card'
@@ -36,17 +36,27 @@ interface RulesPageProps {
 
 export function RulesPage({ onBack }: RulesPageProps) {
   const [activeChapter, setActiveChapter] = useState('overview')
-  const [isScrollingToChapter, setIsScrollingToChapter] = useState(false)
+  const targetChapterRef = useRef<string | null>(null)
 
   // Handle scroll to update active chapter
   useEffect(() => {
     const handleScroll = () => {
-      // Don't update active chapter if we're programmatically scrolling
-      if (isScrollingToChapter) return
+      // If we have a target chapter, check if we've reached it
+      if (targetChapterRef.current) {
+        const targetElement = document.getElementById(targetChapterRef.current)
+        if (targetElement) {
+          const rect = targetElement.getBoundingClientRect()
+          // If target is in view (within viewport with some margin), clear the target
+          if (rect.top <= 180 && rect.bottom >= 100) {
+            targetChapterRef.current = null
+          }
+          return // Keep showing target chapter while navigating
+        }
+      }
 
       const sections = CHAPTERS.map(ch => document.getElementById(ch.id)).filter(Boolean)
 
-      // Check which section is most visible
+      // Find which section is most prominent in the viewport
       let maxVisibility = 0
       let activeSection = sections[0]?.id
 
@@ -54,14 +64,14 @@ export function RulesPage({ onBack }: RulesPageProps) {
         const rect = section.getBoundingClientRect()
         const viewportHeight = window.innerHeight
 
-        // Calculate how much of the section is visible in the viewport
+        // Calculate visibility - how much of section is in viewport
         const visibleTop = Math.max(0, rect.top)
         const visibleBottom = Math.min(viewportHeight, rect.bottom)
         const visibleHeight = Math.max(0, visibleBottom - visibleTop)
 
-        // Prefer sections that are in the upper portion of viewport
-        const topBonus = rect.top < 200 ? (200 - rect.top) / 200 : 0
-        const score = visibleHeight + topBonus * 100
+        // Strong preference for sections near the top of viewport
+        const topBonus = rect.top >= 0 && rect.top < 200 ? (200 - rect.top) / 2 : 0
+        const score = visibleHeight + topBonus
 
         if (score > maxVisibility) {
           maxVisibility = score
@@ -74,16 +84,17 @@ export function RulesPage({ onBack }: RulesPageProps) {
       }
     }
 
-    window.addEventListener('scroll', handleScroll)
+    window.addEventListener('scroll', handleScroll, { passive: true })
     handleScroll()
     return () => window.removeEventListener('scroll', handleScroll)
-  }, [isScrollingToChapter])
+  }, [])
 
   const scrollToChapter = (chapterId: string) => {
     const element = document.getElementById(chapterId)
     if (element) {
-      // Set flag to prevent scroll listener from overriding
-      setIsScrollingToChapter(true)
+      // Set target to prevent scroll listener from changing it
+      targetChapterRef.current = chapterId
+      setActiveChapter(chapterId)
 
       // Calculate offset: header (72px) + nav (~80px) = ~150px total
       const headerHeight = 72
@@ -98,13 +109,10 @@ export function RulesPage({ onBack }: RulesPageProps) {
         behavior: 'smooth'
       })
 
-      // Immediately set active chapter
-      setActiveChapter(chapterId)
-
-      // Re-enable scroll listener after scroll completes
+      // Clear target after scroll completes (failsafe timeout)
       setTimeout(() => {
-        setIsScrollingToChapter(false)
-      }, 1000) // 1 second should be enough for smooth scroll to complete
+        targetChapterRef.current = null
+      }, 1500)
     }
   }
 
