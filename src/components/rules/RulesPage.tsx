@@ -37,21 +37,21 @@ interface RulesPageProps {
 export function RulesPage({ onBack }: RulesPageProps) {
   const [activeChapter, setActiveChapter] = useState('overview')
   const targetChapterRef = useRef<string | null>(null)
+  const targetReleaseTimeRef = useRef<number>(0)
 
   // Handle scroll to update active chapter
   useEffect(() => {
     const handleScroll = () => {
-      // If we have a target chapter, check if we've reached it
-      if (targetChapterRef.current) {
-        const targetElement = document.getElementById(targetChapterRef.current)
-        if (targetElement) {
-          const rect = targetElement.getBoundingClientRect()
-          // If target is in view (within viewport with some margin), clear the target
-          if (rect.top <= 180 && rect.bottom >= 100) {
-            targetChapterRef.current = null
-          }
-          return // Keep showing target chapter while navigating
-        }
+      const now = Date.now()
+
+      // If we have a target chapter and haven't reached the release time, keep it active
+      if (targetChapterRef.current && now < targetReleaseTimeRef.current) {
+        return // Keep showing target chapter while navigating
+      }
+
+      // Clear target if we've passed the release time
+      if (now >= targetReleaseTimeRef.current) {
+        targetChapterRef.current = null
       }
 
       const sections = CHAPTERS.map(ch => document.getElementById(ch.id)).filter(Boolean)
@@ -92,8 +92,9 @@ export function RulesPage({ onBack }: RulesPageProps) {
   const scrollToChapter = (chapterId: string) => {
     const element = document.getElementById(chapterId)
     if (element) {
-      // Set target to prevent scroll listener from changing it
+      // Set target and release time to prevent flicker
       targetChapterRef.current = chapterId
+      targetReleaseTimeRef.current = Date.now() + 1600 // 1.6s from now
       setActiveChapter(chapterId)
 
       // Calculate offset: header (72px) + nav (~80px) = ~150px total
@@ -108,11 +109,6 @@ export function RulesPage({ onBack }: RulesPageProps) {
         top: offsetPosition,
         behavior: 'smooth'
       })
-
-      // Clear target after scroll completes (failsafe timeout)
-      setTimeout(() => {
-        targetChapterRef.current = null
-      }, 1500)
     }
   }
 
