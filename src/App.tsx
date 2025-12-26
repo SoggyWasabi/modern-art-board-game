@@ -1,9 +1,13 @@
 import { useState, useMemo } from 'react'
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useGameStore } from './store/gameStore'
 import MainGameplay from './components/game/MainGameplay'
 import { ErrorBoundary } from './components/game/ErrorBoundary'
 import { RulesPage } from './components/rules/RulesPage'
+import { LandingPage, ColorBarNav } from './pages/LandingPage'
+import { PlayerCountSelection } from './pages/PlayerCountSelection'
+import { CARD_DISTRIBUTION, ARTIST_COLORS } from './engine/constants'
 
 // ============================================================================
 // TYPES
@@ -20,19 +24,16 @@ interface CardData {
 }
 
 // ============================================================================
-// CONSTANTS
+// CONSTANTS (imported from engine/constants where available)
 // ============================================================================
 
-const ARTISTS = [
-  { name: 'Manuel Carvalho', color: '#F5C846', textColor: '#000000' },
-  { name: 'Daniel Melim', color: '#DC2626', textColor: '#FFFFFF' },
-  { name: 'Sigrid Thaler', color: '#2DD4BF', textColor: '#000000' },
-  { name: 'Ramon Martins', color: '#22C55E', textColor: '#000000' },
-  { name: 'Rafael Silveira', color: '#A855F7', textColor: '#FFFFFF' },
-]
+// NOTE: ARTIST_COLORS imported from engine/constants
+// NOTE: CARD_DISTRIBUTION imported from engine/constants (using Record<Artist, number> format)
+
+// Convert the Record format to array for legacy code
+const DISTRIBUTION_ARRAY = Object.values(CARD_DISTRIBUTION) // [12, 13, 14, 15, 16]
 
 const AUCTION_TYPES: AuctionType[] = ['open', 'one_offer', 'hidden', 'fixed_price', 'double']
-const CARD_DISTRIBUTION = [12, 13, 14, 15, 16] // 70 total cards
 
 // ============================================================================
 // GENERATE ALL 70 CARDS
@@ -42,8 +43,8 @@ function generateAllCards(): CardData[] {
   const cards: CardData[] = []
   let globalIndex = 0
 
-  ARTISTS.forEach((artist, artistIndex) => {
-    const count = CARD_DISTRIBUTION[artistIndex]
+  ARTIST_COLORS.forEach((artist, artistIndex) => {
+    const count = DISTRIBUTION_ARRAY[artistIndex]
     for (let i = 0; i < count; i++) {
       cards.push({
         id: globalIndex,
@@ -291,7 +292,7 @@ const CARD_HEIGHT = 'clamp(168px, 16.8vw, 280px)'
 const HEADER_HEIGHT = 'clamp(24px, 2.4vw, 36px)'
 
 function GameCard({ card }: { card: CardData }) {
-  const artist = ARTISTS[card.artistIndex]
+  const artist = ARTIST_COLORS[card.artistIndex]
 
   return (
     <div
@@ -441,482 +442,42 @@ function FloatingCardsBackground() {
 }
 
 // ============================================================================
-// COLOR BAR NAVIGATION
+// PAGE WRAPPERS
 // ============================================================================
 
-const NAV_ITEMS = [
-  { label: 'Rules', color: '#F5C846' },      // Manuel yellow
-  { label: 'Gallery', color: '#DC2626' },    // Daniel red
-  { label: 'Tutorial', color: '#2DD4BF' },   // Sigrid teal
-  { label: 'Settings', color: '#22C55E' },   // Ramon green
-  { label: 'Buy', color: '#A855F7' },        // Rafael purple
-]
+function LandingPageWrapper() {
+  const navigate = useNavigate()
 
-function ColorBarNav({ onNavigate }: { onNavigate: (item: string) => void }) {
   return (
-    <nav
-      style={{
-        position: 'fixed',
-        bottom: 32,
-        left: 24,
-        zIndex: 100,
-        display: 'flex',
-        gap: '32px',
-      }}
-    >
-      {NAV_ITEMS.map((item) => (
-        <div
-          key={item.label}
-          style={{
-            position: 'relative',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'flex-start',
-            cursor: item.label === 'Rules' ? 'pointer' : 'not-allowed',
-          }}
-          onClick={() => {
-            if (item.label === 'Rules') {
-              onNavigate('rules')
-            }
-          }}
-          onMouseEnter={(e) => {
-            const bar = e.currentTarget.querySelector('[data-bar]')
-            if (bar) {
-              bar.style.width = '100%'
-            }
-          }}
-          onMouseLeave={(e) => {
-            const bar = e.currentTarget.querySelector('[data-bar]')
-            if (bar) {
-              bar.style.width = '20%'
-            }
-          }}
-        >
-          {/* Text label - always visible */}
-          <span
-            style={{
-              fontSize: '0.7rem',
-              fontWeight: 400,
-              letterSpacing: '0.25em',
-              textTransform: 'uppercase',
-              color: item.label === 'Rules' ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.15)',
-              transition: 'color 0.3s ease',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {item.label}
-          </span>
-          {/* Colored bar - grows on hover */}
-          <div
-            data-bar
-            style={{
-              width: '20%',
-              height: '2px',
-              backgroundColor: item.color,
-              marginTop: '4px',
-              transition: 'width 0.3s ease',
-              boxShadow: `0 0 8px ${item.color}80`,
-            }}
-          />
-        </div>
-      ))}
-    </nav>
+    <>
+      <FloatingCardsBackground />
+      <ColorBarNav onNavigate={(item) => {
+        if (item === 'rules') navigate('/rules')
+      }} />
+      <LandingPage onPlay={() => navigate('/player-count')} />
+    </>
   )
 }
 
-// ============================================================================
-// LANDING PAGE
-// ============================================================================
+function PlayerCountSelectionWrapper() {
+  const navigate = useNavigate()
+  const { startGameFromSetup, setPlayerCount: storeSetPlayerCount } = useGameStore()
 
-function LandingPage({ onPlay }: { onPlay: () => void }) {
-  return (
-    <div style={{ position: 'relative', minHeight: '100vh' }}>
-
-      {/* Main content */}
-      <div
-        style={{
-          position: 'relative',
-          zIndex: 10,
-          minHeight: '100vh',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '0 24px',
-        }}
-      >
-        {/* Title */}
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1, ease: 'easeOut' }}
-          style={{ textAlign: 'center', marginBottom: 60 }}
-        >
-          <h1
-            style={{
-              fontSize: 'clamp(3.5rem, 12vw, 9rem)',
-              fontWeight: 200,
-              letterSpacing: '0.15em',
-              color: '#FFFFFF',
-              margin: 0,
-              lineHeight: 1,
-              textShadow: '0 4px 30px rgba(0,0,0,0.5)',
-              fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-            }}
-          >
-            MODERN
-          </h1>
-          <h1
-            style={{
-              fontSize: 'clamp(3.5rem, 12vw, 9rem)',
-              fontWeight: 200,
-              letterSpacing: '0.15em',
-              margin: 0,
-              lineHeight: 1,
-              background: 'linear-gradient(135deg, #C9A227 0%, #E5C158 50%, #C9A227 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
-              textShadow: 'none',
-              fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-            }}
-          >
-            ART
-          </h1>
-          <p
-            style={{
-              fontSize: '1rem',
-              color: 'rgba(255,255,255,0.4)',
-              marginTop: 24,
-              letterSpacing: '0.3em',
-              textTransform: 'uppercase',
-              fontWeight: 300,
-            }}
-          >
-            The Auction Game
-          </p>
-        </motion.div>
-
-        {/* Play button - using CSS for snappy interactions */}
-        <button
-          onClick={onPlay}
-          style={{
-            padding: '20px 56px',
-            fontSize: '1.1rem',
-            fontWeight: 500,
-            letterSpacing: '0.2em',
-            textTransform: 'uppercase',
-            color: '#0a0a0a',
-            background: 'linear-gradient(135deg, #C9A227 0%, #E5C158 50%, #C9A227 100%)',
-            border: 'none',
-            borderRadius: 6,
-            cursor: 'pointer',
-            boxShadow: '0 4px 30px rgba(201,162,39,0.25)',
-            transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'scale(1.05)'
-            e.currentTarget.style.boxShadow = '0 8px 40px rgba(201,162,39,0.4)'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'scale(1)'
-            e.currentTarget.style.boxShadow = '0 4px 30px rgba(201,162,39,0.25)'
-          }}
-          onMouseDown={(e) => {
-            e.currentTarget.style.transform = 'scale(0.98)'
-          }}
-          onMouseUp={(e) => {
-            e.currentTarget.style.transform = 'scale(1.05)'
-          }}
-        >
-          Play Offline
-        </button>
-
-        {/* Footer */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1, delay: 0.6 }}
-          style={{
-            position: 'absolute',
-            bottom: 32,
-            color: 'rgba(255,255,255,0.25)',
-            fontSize: '0.75rem',
-            letterSpacing: '0.2em',
-            textTransform: 'uppercase',
-          }}
-        >
-          70 Unique Artworks
-        </motion.div>
-      </div>
-    </div>
-  )
-}
-
-// ============================================================================
-// PLAYER COUNT SELECTION
-// ============================================================================
-
-function PlayerCountSelection({
-  onSelect,
-  onBack,
-}: {
-  onSelect: (count: number, playerStarts?: boolean, debugMode?: boolean) => void
-  onBack: () => void
-}) {
-  const [playerStarts, setPlayerStarts] = useState(false)
-  const [debugMode, setDebugMode] = useState(false)
-  return (
-    <div style={{ position: 'relative', minHeight: '100vh' }}>
-
-      <div
-        style={{
-          position: 'relative',
-          zIndex: 10,
-          minHeight: '100vh',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '0 24px',
-        }}
-      >
-        <h2
-          style={{
-            fontSize: 'clamp(1.5rem, 4vw, 2.5rem)',
-            fontWeight: 200,
-            color: '#FFFFFF',
-            marginBottom: 48,
-            letterSpacing: '0.1em',
-          }}
-        >
-          Select Players
-        </h2>
-
-        {/* Who should start option */}
-        <div style={{ marginBottom: 40 }}>
-          <p style={{
-            color: 'rgba(255,255,255,0.7)',
-            fontSize: '0.9rem',
-            marginBottom: 16,
-            textAlign: 'center'
-          }}>
-            Who should start the game?
-          </p>
-          <div style={{ display: 'flex', gap: 16, justifyContent: 'center' }}>
-            <label style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              cursor: 'pointer',
-              padding: '8px 16px',
-              borderRadius: 8,
-              backgroundColor: playerStarts ? 'rgba(255,255,255,0.1)' : 'transparent',
-              border: playerStarts ? '1px solid rgba(255,255,255,0.3)' : '1px solid transparent',
-              transition: 'all 0.2s ease'
-            }}>
-              <input
-                type="radio"
-                name="whoStarts"
-                checked={playerStarts}
-                onChange={() => setPlayerStarts(true)}
-                style={{ margin: 0 }}
-              />
-              <span style={{
-                color: playerStarts ? '#FFFFFF' : 'rgba(255,255,255,0.5)',
-                fontSize: '0.9rem'
-              }}>
-                You go first
-              </span>
-            </label>
-
-            <label style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              cursor: 'pointer',
-              padding: '8px 16px',
-              borderRadius: 8,
-              backgroundColor: !playerStarts ? 'rgba(255,255,255,0.1)' : 'transparent',
-              border: !playerStarts ? '1px solid rgba(255,255,255,0.3)' : '1px solid transparent',
-              transition: 'all 0.2s ease'
-            }}>
-              <input
-                type="radio"
-                name="whoStarts"
-                checked={!playerStarts}
-                onChange={() => setPlayerStarts(false)}
-                style={{ margin: 0 }}
-              />
-              <span style={{
-                color: !playerStarts ? '#FFFFFF' : 'rgba(255,255,255,0.5)',
-                fontSize: '0.9rem'
-              }}>
-                Random
-              </span>
-            </label>
-          </div>
-        </div>
-
-        {/* Debug Mode option */}
-        <div style={{ marginBottom: 32 }}>
-          <label style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            cursor: 'pointer',
-            padding: '10px 16px',
-            borderRadius: 8,
-            backgroundColor: debugMode ? 'rgba(201,162,39,0.15)' : 'rgba(255,255,255,0.03)',
-            border: debugMode ? '1px solid rgba(201,162,39,0.5)' : '1px solid rgba(255,255,255,0.1)',
-            transition: 'all 0.2s ease'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = debugMode ? 'rgba(201,162,39,0.2)' : 'rgba(255,255,255,0.06)'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = debugMode ? 'rgba(201,162,39,0.15)' : 'rgba(255,255,255,0.03)'
-          }}>
-            <input
-              type="checkbox"
-              checked={debugMode}
-              onChange={(e) => setDebugMode(e.target.checked)}
-              style={{
-                margin: 0,
-                width: 18,
-                height: 18,
-                cursor: 'pointer'
-              }}
-            />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <span style={{
-                color: debugMode ? '#C9A227' : 'rgba(255,255,255,0.8)',
-                fontSize: '0.9rem',
-                fontWeight: 500
-              }}>
-                Debug / Test Mode
-              </span>
-              <span style={{
-                color: 'rgba(255,255,255,0.4)',
-                fontSize: '0.75rem'
-              }}>
-                Skip to round 1 → 2 transition (4/5 cards played)
-              </span>
-            </div>
-          </label>
-        </div>
-
-        <div style={{ display: 'flex', gap: 24, marginBottom: 48 }}>
-          {[3, 4, 5].map((count) => (
-            <button
-              key={count}
-              onClick={() => onSelect(count, playerStarts, debugMode)}
-              style={{
-                width: 120,
-                height: 120,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: 'rgba(255,255,255,0.05)',
-                border: '2px solid rgba(255,255,255,0.2)',
-                borderRadius: 12,
-                color: '#FFFFFF',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'scale(1.08)'
-                e.currentTarget.style.borderColor = 'rgba(201,162,39,0.8)'
-                e.currentTarget.style.boxShadow = '0 0 30px rgba(201,162,39,0.25)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'scale(1)'
-                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'
-                e.currentTarget.style.boxShadow = 'none'
-              }}
-              onMouseDown={(e) => {
-                e.currentTarget.style.transform = 'scale(0.95)'
-              }}
-              onMouseUp={(e) => {
-                e.currentTarget.style.transform = 'scale(1.08)'
-              }}
-            >
-              <span style={{ fontSize: '3rem', fontWeight: 200 }}>{count}</span>
-            </button>
-          ))}
-        </div>
-
-        <button
-          onClick={onBack}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: 'rgba(255,255,255,0.4)',
-            fontSize: '0.875rem',
-            letterSpacing: '0.1em',
-            cursor: 'pointer',
-            padding: 12,
-            transition: 'color 0.15s ease',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.color = 'rgba(255,255,255,0.8)'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.color = 'rgba(255,255,255,0.4)'
-          }}
-        >
-          Back
-        </button>
-      </div>
-    </div>
-  )
-}
-
-// ============================================================================
-// GAME SCREEN (Now using actual gameplay components)
-// ============================================================================
-
-// GameScreen placeholder removed - now using GameStartSequence and MainGameplay
-
-// ============================================================================
-// MAIN APP COMPONENT
-// ============================================================================
-
-type Screen = 'menu' | 'playerCount' | 'game' | 'rules'
-
-function App() {
-  const [currentScreen, setCurrentScreen] = useState<Screen>('menu')
-  const [_playerCount, setPlayerCount] = useState<number>(3)
-  const { startGameFromSetup, setPlayerCount: storeSetPlayerCount, resetGame } = useGameStore()
-
-  // Show floating cards background on menu screens only
-  const showBackground = currentScreen === 'menu' || currentScreen === 'playerCount' || currentScreen === 'rules'
-  // Show nav bar on menu screens only (not on rules page)
-  const showNavBar = currentScreen === 'menu' || currentScreen === 'playerCount'
-
-  // Handle player count selection - setup the game and go directly to main gameplay
   const handlePlayerCountSelect = (count: number, playerStarts: boolean = false, debugMode: boolean = false) => {
-    setPlayerCount(count)
     storeSetPlayerCount(count as 3 | 4 | 5)
 
     if (debugMode) {
-      // Load debug scenario instead of normal game
       console.log('[handlePlayerCountSelect] Loading debug mode scenario')
       useGameStore.getState().loadDebugScenario(count as 3 | 4 | 5)
     } else {
-      // Start the game - the mock game state will randomly select first player
       startGameFromSetup()
 
-      // Handle first player selection
       const { gameState } = useGameStore.getState()
       if (gameState) {
         if (playerStarts) {
-          // Human wants to go first - set to index 0
           console.log('[handlePlayerCountSelect] Human selected to go first')
           useGameStore.getState().setFirstPlayerIndex(0)
         } else {
-          // Random selection - pick a random player to go first
           const randomIndex = Math.floor(Math.random() * count)
           console.log('[handlePlayerCountSelect] Randomly selected first player:', randomIndex, 'Player:', gameState.players[randomIndex]?.name)
           useGameStore.getState().setFirstPlayerIndex(randomIndex)
@@ -924,46 +485,66 @@ function App() {
       }
     }
 
-    setCurrentScreen('game') // Skip GameStartSequence, go directly to game
+    navigate('/game')
   }
 
-  // Handle returning to menu
-  const handleReturnToMenu = () => {
-    resetGame()
-    setCurrentScreen('menu')
-  }
-
-  // Render background continuously for menu screens
   return (
     <>
-      {/* Floating background - only on menu screens, continuous */}
-      {showBackground && <FloatingCardsBackground />}
-
-      {/* Color bar navigation - only on menu screens (not rules page) */}
-      {showNavBar && <ColorBarNav onNavigate={setCurrentScreen} />}
-
-      {/* Screen content */}
-      {currentScreen === 'menu' && (
-        <LandingPage onPlay={() => setCurrentScreen('playerCount')} />
-      )}
-
-      {currentScreen === 'playerCount' && (
-        <PlayerCountSelection
-          onSelect={handlePlayerCountSelect}
-          onBack={() => setCurrentScreen('menu')}
-        />
-      )}
-
-      {currentScreen === 'rules' && (
-        <RulesPage onBack={() => setCurrentScreen('menu')} />
-      )}
-
-      {currentScreen === 'game' && (
-        <ErrorBoundary>
-          <MainGameplay onExitToMenu={handleReturnToMenu} />
-        </ErrorBoundary>
-      )}
+      <FloatingCardsBackground />
+      <ColorBarNav onNavigate={(item) => {
+        if (item === 'rules') navigate('/rules')
+      }} />
+      <PlayerCountSelection
+        onSelect={handlePlayerCountSelect}
+        onBack={() => navigate('/')}
+      />
     </>
+  )
+}
+
+function RulesPageWrapper() {
+  const navigate = useNavigate()
+  return (
+    <>
+      <FloatingCardsBackground />
+      <RulesPage onBack={() => navigate('/')} />
+    </>
+  )
+}
+
+function GamePageWrapper() {
+  const navigate = useNavigate()
+  const { resetGame, gameState } = useGameStore()
+
+  const handleReturnToMenu = () => {
+    navigate('/')
+  }
+
+  // Route guard: redirect if game not initialized
+  if (!gameState) {
+    return <Navigate to="/player-count" replace />
+  }
+
+  return (
+    <ErrorBoundary>
+      <MainGameplay onExitToMenu={handleReturnToMenu} />
+    </ErrorBoundary>
+  )
+}
+
+// ============================================================================
+// MAIN APP COMPONENT
+// ============================================================================
+
+function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<LandingPageWrapper />} />
+      <Route path="/player-count" element={<PlayerCountSelectionWrapper />} />
+      <Route path="/rules" element={<RulesPageWrapper />} />
+      <Route path="/game" element={<GamePageWrapper />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   )
 }
 

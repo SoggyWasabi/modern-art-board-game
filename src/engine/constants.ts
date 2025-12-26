@@ -14,6 +14,15 @@ export const ARTISTS: readonly Artist[] = [
   'Rafael Silveira', // Priority 5 (loses ties)
 ] as const
 
+// Artist display colors for UI
+export const ARTIST_COLORS = [
+  { name: 'Manuel Carvalho', color: '#F5C846', textColor: '#000000' },
+  { name: 'Sigrid Thaler', color: '#DC2626', textColor: '#FFFFFF' },
+  { name: 'Daniel Melim', color: '#2DD4BF', textColor: '#000000' },
+  { name: 'Ramon Martins', color: '#22C55E', textColor: '#000000' },
+  { name: 'Rafael Silveira', color: '#A855F7', textColor: '#FFFFFF' },
+] as const
+
 export const AUCTION_TYPES: readonly AuctionType[] = [
   'open',
   'one_offer',
