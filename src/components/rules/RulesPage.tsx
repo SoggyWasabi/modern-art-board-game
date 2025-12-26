@@ -45,13 +45,32 @@ export function RulesPage({ onBack }: RulesPageProps) {
       if (isScrollingToChapter) return
 
       const sections = CHAPTERS.map(ch => document.getElementById(ch.id)).filter(Boolean)
+
+      // Check which section is most visible
+      let maxVisibility = 0
+      let activeSection = sections[0]?.id
+
       for (const section of sections) {
         const rect = section.getBoundingClientRect()
-        // Use a more lenient threshold - section is active if it's in the upper portion of viewport
-        if (rect.top <= 150 && rect.bottom >= 150) {
-          setActiveChapter(section.id)
-          break
+        const viewportHeight = window.innerHeight
+
+        // Calculate how much of the section is visible in the viewport
+        const visibleTop = Math.max(0, rect.top)
+        const visibleBottom = Math.min(viewportHeight, rect.bottom)
+        const visibleHeight = Math.max(0, visibleBottom - visibleTop)
+
+        // Prefer sections that are in the upper portion of viewport
+        const topBonus = rect.top < 200 ? (200 - rect.top) / 200 : 0
+        const score = visibleHeight + topBonus * 100
+
+        if (score > maxVisibility) {
+          maxVisibility = score
+          activeSection = section.id
         }
+      }
+
+      if (activeSection) {
+        setActiveChapter(activeSection)
       }
     }
 
