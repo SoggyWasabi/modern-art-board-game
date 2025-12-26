@@ -58,7 +58,21 @@ export function RulesPage({ onBack }: RulesPageProps) {
   const scrollToChapter = (chapterId: string) => {
     const element = document.getElementById(chapterId)
     if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      // Calculate offset: header (72px) + nav (~80px) = ~150px total
+      const headerHeight = 72
+      const navHeight = 80
+      const offset = headerHeight + navHeight
+
+      const elementPosition = element.getBoundingClientRect().top + window.pageYOffset
+      const offsetPosition = elementPosition - offset
+
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: 'smooth'
+      })
+
+      // Immediately set active chapter
+      setActiveChapter(chapterId)
     }
   }
 
