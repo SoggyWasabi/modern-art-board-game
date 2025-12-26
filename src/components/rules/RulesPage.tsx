@@ -402,19 +402,19 @@ export function RulesPage({ onBack }: RulesPageProps) {
                 {[
                   {
                     title: 'Shuffle the Deck',
-                    content: 'Take all 70 painting cards and shuffle them thoroughly. Place the deck face-down in the center of the table.',
+                    content: 'All 70 painting cards are shuffled and ready for dealing. The game automatically handles card distribution.',
                   },
                   {
                     title: 'Deal Starting Hands',
-                    content: 'Deal cards face-down to each player based on the total number of players. See the chart below for exact amounts.',
+                    content: 'Each player is dealt their starting cards based on the number of players. See the chart below for exact amounts.',
                   },
                   {
-                    title: 'Set Aside Remaining Cards',
-                    content: 'The undealt cards form a draw pile. These will be used in future rounds - <strong>do not shuffle them back in</strong> until a new round begins.',
+                    title: 'Remaining Cards',
+                    content: 'The undealt cards are reserved for future rounds. You\'ll receive more cards at the start of Rounds 2 and 3.',
                   },
                   {
                     title: 'Starting Money',
-                    content: 'Each player receives <strong>$100,000</strong> to start. This is your budget for buying paintings in the first round.',
+                    content: 'Each player starts with <strong>$100,000</strong>. This is your budget for the entire game - manage it wisely!',
                   },
                   {
                     title: 'Determine First Player',
@@ -486,7 +486,7 @@ export function RulesPage({ onBack }: RulesPageProps) {
                     margin: '0 0 16px 0',
                   }}
                 >
-                  📋 Starting Cards (Round 1)
+                  🎴 Starting Cards (Round 1)
                 </h3>
                 <p style={{ margin: '0 0 16px 0', fontSize: '0.9rem', color: 'rgba(255,255,255,0.6)' }}>
                   The number of cards dealt to each player depends on your total player count:
@@ -546,8 +546,8 @@ export function RulesPage({ onBack }: RulesPageProps) {
                     color: 'rgba(255,255,255,0.6)',
                   }}
                 >
-                  <strong style={{ color: ARTISTS[1].color }}>Important:</strong> Keep the remaining cards face-down as a draw pile.
-                  You'll deal more cards at the start of Rounds 2, 3, and 4 (see Gameplay section for details).
+                  <strong style={{ color: ARTISTS[1].color }}>Important:</strong> The game automatically keeps the remaining cards in reserve.
+                  You'll be dealt more cards at the start of Rounds 2 and 3 (see Gameplay section for details).
                 </div>
               </div>
             </div>
@@ -1296,6 +1296,39 @@ export function RulesPage({ onBack }: RulesPageProps) {
             </div>
           </motion.div>
         </section>
+
+        {/* Footer with rulebook reference */}
+        <footer
+          style={{
+            padding: '40px 24px',
+            borderTop: '1px solid rgba(255,255,255,0.05)',
+            textAlign: 'center',
+          }}
+        >
+          <p style={{ margin: '0 0 12px 0', fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)' }}>
+            Based on the official Modern Art rulebook by Reiner Knizia
+          </p>
+          <a
+            href="/9b-modern-art-rulebook.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              fontSize: '0.85rem',
+              color: ARTISTS[0].color,
+              textDecoration: 'none',
+              borderBottom: `1px solid ${ARTISTS[0].color}40`,
+              paddingBottom: '2px',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.opacity = '0.8'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.opacity = '1'
+            }}
+          >
+            📄 View Official Rulebook PDF
+          </a>
+        </footer>
       </main>
     </div>
   )
