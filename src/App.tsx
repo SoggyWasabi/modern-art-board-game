@@ -446,7 +446,6 @@ function FloatingCardsBackground() {
 function LandingPage({ onPlay }: { onPlay: () => void }) {
   return (
     <div style={{ position: 'relative', minHeight: '100vh' }}>
-      <FloatingCardsBackground />
 
       {/* Main content */}
       <div
@@ -584,7 +583,6 @@ function PlayerCountSelection({
   const [debugMode, setDebugMode] = useState(false)
   return (
     <div style={{ position: 'relative', minHeight: '100vh' }}>
-      <FloatingCardsBackground />
 
       <div
         style={{
@@ -807,6 +805,9 @@ function App() {
   const [_playerCount, setPlayerCount] = useState<number>(3)
   const { startGameFromSetup, setPlayerCount: storeSetPlayerCount, resetGame } = useGameStore()
 
+  // Show floating cards background on menu screens only
+  const showBackground = currentScreen === 'menu' || currentScreen === 'playerCount'
+
   // Handle player count selection - setup the game and go directly to main gameplay
   const handlePlayerCountSelect = (count: number, playerStarts: boolean = false, debugMode: boolean = false) => {
     setPlayerCount(count)
@@ -845,28 +846,31 @@ function App() {
     setCurrentScreen('menu')
   }
 
-  if (currentScreen === 'menu') {
-    return <LandingPage onPlay={() => setCurrentScreen('playerCount')} />
-  }
+  // Render background continuously for menu screens
+  return (
+    <>
+      {/* Floating background - only on menu screens, continuous */}
+      {showBackground && <FloatingCardsBackground />}
 
-  if (currentScreen === 'playerCount') {
-    return (
-      <PlayerCountSelection
-        onSelect={handlePlayerCountSelect}
-        onBack={() => setCurrentScreen('menu')}
-      />
-    )
-  }
+      {/* Screen content */}
+      {currentScreen === 'menu' && (
+        <LandingPage onPlay={() => setCurrentScreen('playerCount')} />
+      )}
 
-  if (currentScreen === 'game') {
-    return (
-      <ErrorBoundary>
-        <MainGameplay onExitToMenu={handleReturnToMenu} />
-      </ErrorBoundary>
-    )
-  }
+      {currentScreen === 'playerCount' && (
+        <PlayerCountSelection
+          onSelect={handlePlayerCountSelect}
+          onBack={() => setCurrentScreen('menu')}
+        />
+      )}
 
-  return null
+      {currentScreen === 'game' && (
+        <ErrorBoundary>
+          <MainGameplay onExitToMenu={handleReturnToMenu} />
+        </ErrorBoundary>
+      )}
+    </>
+  )
 }
 
 export default App
