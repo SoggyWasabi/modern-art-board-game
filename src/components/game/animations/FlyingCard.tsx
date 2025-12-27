@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { Card as GameCardComponent } from '../../Card'
 import type { Card } from '../../types'
+import { getArtistIndex } from '../../../engine/constants'
 
 interface FlyingCardProps {
   card: Card
@@ -88,7 +89,7 @@ const FlyingCard: React.FC<FlyingCardProps> = ({
           card={{
             id: card.id,
             artist: card.artist,
-            artistIndex: ['Manuel Carvalho', 'Daniel Melim', 'Sigrid Thaler', 'Ramon Martins', 'Rafael Silveira'].indexOf(card.artist),
+            artistIndex: getArtistIndex(card.artist),
             cardIndex: card.cardIndex,
             auctionType: card.auctionType
           }}

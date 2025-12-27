@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { Card as GameCardComponent } from '../Card'
 import { useGameStore, useCurrentPlayer } from '../../store/gameStore'
 import { Brush, Users, TrendingUp } from 'lucide-react'
+import { getArtistIndex } from '../../engine/constants'
 
 const GameTable: React.FC = () => {
   const { gameState, isGameStarted } = useGameStore()
@@ -169,7 +170,7 @@ const GameTable: React.FC = () => {
                             card={{
                               id: card.id,
                               artist: card.artist,
-                              artistIndex: ['Manuel Carvalho', 'Daniel Melim', 'Sigrid Thaler', 'Ramon Martins', 'Rafael Silveira'].indexOf(card.artist),
+                              artistIndex: getArtistIndex(card.artist),
                               cardIndex: card.cardIndex,
                               auctionType: card.auctionType
                             }}
@@ -221,7 +222,7 @@ const GameTable: React.FC = () => {
                     card={{
                       id: card.id,
                       artist: card.artist,
-                      artistIndex: ['Manuel Carvalho', 'Daniel Melim', 'Sigrid Thaler', 'Ramon Martins', 'Rafael Silveira'].indexOf(card.artist),
+                      artistIndex: getArtistIndex(card.artist),
                       cardIndex: card.cardIndex,
                       auctionType: card.auctionType
                     }}

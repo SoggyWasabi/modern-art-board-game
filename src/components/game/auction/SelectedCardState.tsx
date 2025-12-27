@@ -1,6 +1,7 @@
 import React from 'react'
 import { Card as GameCardComponent } from '../../Card'
 import type { Card, AuctionType } from '../../../types'
+import { getArtistIndex } from '../../../engine/constants'
 
 const AUCTION_TYPE_INFO: Record<AuctionType, {
   name: string
@@ -72,7 +73,7 @@ const SelectedCardState: React.FC<SelectedCardStateProps> = ({
           card={{
             id: selectedCard.id,
             artist: selectedCard.artist,
-            artistIndex: ['Manuel Carvalho', 'Daniel Melim', 'Sigrid Thaler', 'Ramon Martins', 'Rafael Silveira'].indexOf(selectedCard.artist),
+            artistIndex: getArtistIndex(selectedCard.artist),
             cardIndex: selectedCard.cardIndex,
             auctionType: selectedCard.auctionType,
             artworkId: selectedCard.artworkId || selectedCard.id

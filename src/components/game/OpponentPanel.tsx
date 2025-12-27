@@ -4,6 +4,7 @@ import { Card as GameCardComponent } from '../Card'
 import { AIStatusBadge, AIThinkingIndicator } from '../ai/AIThinkingIndicator'
 import type { Player, Card } from '../../types'
 import { colors } from '../../design/premiumTokens'
+import { getArtistIndex } from '../../engine/constants'
 
 const PLAYER_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6']
 
@@ -173,7 +174,7 @@ const OpponentPanel: React.FC<OpponentPanelProps> = ({
                         card={{
                           id: card.id,
                           artist: card.artist,
-                          artistIndex: ['Manuel Carvalho', 'Daniel Melim', 'Sigrid Thaler', 'Ramon Martins', 'Rafael Silveira'].indexOf(card.artist),
+                          artistIndex: getArtistIndex(card.artist),
                           cardIndex: card.cardIndex,
                           auctionType: card.auctionType
                         }}

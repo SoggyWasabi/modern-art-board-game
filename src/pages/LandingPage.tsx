@@ -36,11 +36,13 @@ function ColorBarNav({ onNavigate }: ColorBarNavProps) {
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'flex-start',
-            cursor: item.label === 'Rules' ? 'pointer' : 'not-allowed',
+            cursor: item.label === 'Rules' || item.label === 'Gallery' ? 'pointer' : 'not-allowed',
           }}
           onClick={() => {
             if (item.label === 'Rules') {
               onNavigate('rules')
+            } else if (item.label === 'Gallery') {
+              onNavigate('gallery')
             }
           }}
           onMouseEnter={(e) => {
@@ -63,7 +65,7 @@ function ColorBarNav({ onNavigate }: ColorBarNavProps) {
               fontWeight: 400,
               letterSpacing: '0.25em',
               textTransform: 'uppercase',
-              color: item.label === 'Rules' ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.15)',
+              color: item.label === 'Rules' || item.label === 'Gallery' ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.15)',
               transition: 'color 0.3s ease',
               whiteSpace: 'nowrap',
             }}

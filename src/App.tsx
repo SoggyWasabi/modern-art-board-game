@@ -5,6 +5,7 @@ import { ErrorBoundary } from './components/game/ErrorBoundary'
 import { RulesPage } from './components/rules/RulesPage'
 import { LandingPage, ColorBarNav } from './pages/LandingPage'
 import { PlayerCountSelection } from './pages/PlayerCountSelection'
+import { GalleryPage } from './pages/GalleryPage'
 import { FloatingCardsBackground } from './components/background/FloatingCardsBackground'
 
 // ============================================================================
@@ -16,9 +17,9 @@ function LandingPageWrapper() {
 
   return (
     <>
-      <FloatingCardsBackground />
       <ColorBarNav onNavigate={(item) => {
         if (item === 'rules') navigate('/rules')
+        if (item === 'gallery') navigate('/gallery')
       }} />
       <LandingPage onPlay={() => navigate('/player-count')} />
     </>
@@ -56,9 +57,9 @@ function PlayerCountSelectionWrapper() {
 
   return (
     <>
-      <FloatingCardsBackground />
       <ColorBarNav onNavigate={(item) => {
         if (item === 'rules') navigate('/rules')
+        if (item === 'gallery') navigate('/gallery')
       }} />
       <PlayerCountSelection
         onSelect={handlePlayerCountSelect}
@@ -72,8 +73,20 @@ function RulesPageWrapper() {
   const navigate = useNavigate()
   return (
     <>
-      <FloatingCardsBackground />
       <RulesPage onBack={() => navigate('/')} />
+    </>
+  )
+}
+
+function GalleryPageWrapper() {
+  const navigate = useNavigate()
+  return (
+    <>
+      <ColorBarNav onNavigate={(item) => {
+        if (item === 'rules') navigate('/rules')
+        if (item === 'gallery') navigate('/gallery')
+      }} />
+      <GalleryPage onBack={() => navigate('/')} />
     </>
   )
 }
@@ -86,7 +99,6 @@ function GamePageWrapper() {
     navigate('/')
   }
 
-  // Route guard: redirect if game not initialized
   if (!gameState) {
     return <Navigate to="/player-count" replace />
   }
@@ -104,13 +116,20 @@ function GamePageWrapper() {
 
 function App() {
   return (
-    <Routes>
-      <Route path="/" element={<LandingPageWrapper />} />
-      <Route path="/player-count" element={<PlayerCountSelectionWrapper />} />
-      <Route path="/rules" element={<RulesPageWrapper />} />
-      <Route path="/game" element={<GamePageWrapper />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <>
+      {/* Persistent background across all routes */}
+      <FloatingCardsBackground />
+
+      {/* Route content */}
+      <Routes>
+        <Route path="/" element={<LandingPageWrapper />} />
+        <Route path="/player-count" element={<PlayerCountSelectionWrapper />} />
+        <Route path="/rules" element={<RulesPageWrapper />} />
+        <Route path="/gallery" element={<GalleryPageWrapper />} />
+        <Route path="/game" element={<GamePageWrapper />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </>
   )
 }
 

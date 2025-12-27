@@ -1,10 +1,6 @@
-export const ARTISTS = [
-  { name: 'Manuel Carvalho', color: '#F5C846', textColor: '#000000' },
-  { name: 'Daniel Melim', color: '#DC2626', textColor: '#FFFFFF' },
-  { name: 'Sigrid Thaler', color: '#2DD4BF', textColor: '#000000' },
-  { name: 'Ramon Martins', color: '#22C55E', textColor: '#000000' },
-  { name: 'Rafael Silveira', color: '#A855F7', textColor: '#FFFFFF' },
-]
+import { ARTIST_COLORS } from '../../engine/constants'
+
+export const ARTISTS = ARTIST_COLORS
 
 export type AuctionType = 'open' | 'one_offer' | 'hidden' | 'fixed_price' | 'double'
 
@@ -17,7 +13,7 @@ export interface CardData {
 }
 
 const AUCTION_TYPES: AuctionType[] = ['open', 'one_offer', 'hidden', 'fixed_price', 'double']
-const CARD_DISTRIBUTION = [12, 13, 14, 15, 16] // 70 total cards
+const CARD_DISTRIBUTION = [12, 13, 14, 15, 16] // 70 total cards (Manuel: 12, Sigrid: 13, Daniel: 14, Ramon: 15, Rafael: 16)
 
 // Deterministic shuffle based on seed
 export function seededShuffle<T>(array: T[], seed: number): T[] {

@@ -5,6 +5,7 @@ import type { BidHistoryItem } from '../../../types/auction'
 import type { OpenAuctionProps } from '../../../types/auctionComponents'
 import { normalizeCardsForAuction, getAuctionHeaderText } from '../../../types/auctionComponents'
 import { colors } from '../../../design/premiumTokens'
+import { getArtistIndex } from '../../../engine/constants'
 
 const OpenAuction: React.FC<OpenAuctionProps> = ({
   currentAuction,
@@ -216,7 +217,7 @@ const OpenAuction: React.FC<OpenAuctionProps> = ({
                     card={{
                       id: card.id,
                       artist: card.artist,
-                      artistIndex: ['Manuel Carvalho', 'Daniel Melim', 'Sigrid Thaler', 'Ramon Martins', 'Rafael Silveira'].indexOf(card.artist),
+                      artistIndex: getArtistIndex(card.artist),
                       cardIndex: card.cardIndex,
                       auctionType: card.auctionType
                     }}

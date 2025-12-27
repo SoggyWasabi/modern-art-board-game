@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Card as GameCardComponent } from '../Card'
 import type { Card } from '../../types'
 import { colors } from '../../design/premiumTokens'
+import { getArtistIndex } from '../../engine/constants'
 
 interface PlayerHandProps {
   cards: Card[]
@@ -173,7 +174,7 @@ const PlayerHand: React.FC<PlayerHandProps> = ({
                         card={{
                           id: card.id,
                           artist: card.artist,
-                          artistIndex: ['Manuel Carvalho', 'Daniel Melim', 'Sigrid Thaler', 'Ramon Martins', 'Rafael Silveira'].indexOf(card.artist),
+                          artistIndex: getArtistIndex(card.artist),
                           cardIndex: card.cardIndex,
                           auctionType: card.auctionType
                         }}

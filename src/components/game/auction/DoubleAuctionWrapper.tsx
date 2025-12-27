@@ -8,6 +8,7 @@ import OneOfferAuction from './OneOfferAuction'
 import OpenAuction from './OpenAuction'
 import HiddenAuction from './HiddenAuction'
 import FixedPriceAuction from './FixedPriceAuction'
+import { getArtistIndex } from '../../../engine/constants'
 
 interface DoubleAuctionWrapperProps {
   currentAuction: DoubleAuctionState
@@ -108,8 +109,6 @@ const DoubleAuctionWrapper: React.FC<DoubleAuctionWrapperProps> = ({
 
   // Render both cards with preview support
   const renderCards = () => {
-    const artistIndex = ['Manuel Carvalho', 'Daniel Melim', 'Sigrid Thaler', 'Ramon Martins', 'Rafael Silveira']
-
     // Determine which card to show: preview card or actual second card
     const displayCard = isPreviewMode && previewCard ? previewCard : currentAuction.secondCard
 
@@ -140,7 +139,7 @@ const DoubleAuctionWrapper: React.FC<DoubleAuctionWrapperProps> = ({
             card={{
               id: currentAuction.doubleCard.id,
               artist: currentAuction.doubleCard.artist,
-              artistIndex: artistIndex.indexOf(currentAuction.doubleCard.artist),
+              artistIndex: getArtistIndex(currentAuction.doubleCard.artist),
               cardIndex: currentAuction.doubleCard.cardIndex,
               auctionType: currentAuction.doubleCard.auctionType
             }}
@@ -162,7 +161,7 @@ const DoubleAuctionWrapper: React.FC<DoubleAuctionWrapperProps> = ({
               card={{
                 id: displayCard.id,
                 artist: displayCard.artist,
-                artistIndex: artistIndex.indexOf(displayCard.artist),
+                artistIndex: getArtistIndex(displayCard.artist),
                 cardIndex: displayCard.cardIndex,
                 auctionType: displayCard.auctionType
               }}

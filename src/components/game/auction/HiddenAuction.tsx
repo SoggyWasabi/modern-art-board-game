@@ -4,6 +4,7 @@ import { useGameStore } from '../../../store/gameStore'
 import type { HiddenAuctionProps } from '../../../types/auctionComponents'
 import { normalizeCardsForAuction, getAuctionHeaderText } from '../../../types/auctionComponents'
 import { colors } from '../../../design/premiumTokens'
+import { getArtistIndex } from '../../../engine/constants'
 
 const HiddenAuction: React.FC<HiddenAuctionProps> = ({
   currentAuction,
@@ -174,7 +175,7 @@ const HiddenAuction: React.FC<HiddenAuctionProps> = ({
                     card={{
                       id: card.id,
                       artist: card.artist,
-                      artistIndex: ['Manuel Carvalho', 'Daniel Melim', 'Sigrid Thaler', 'Ramon Martins', 'Rafael Silveira'].indexOf(card.artist),
+                      artistIndex: getArtistIndex(card.artist),
                       cardIndex: card.cardIndex,
                       auctionType: card.auctionType
                     }}

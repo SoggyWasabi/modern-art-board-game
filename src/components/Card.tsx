@@ -1,11 +1,4 @@
-// Artist configurations
-const ARTISTS = [
-  { name: 'Manuel Carvalho', color: '#F5C846', textColor: '#000000' },
-  { name: 'Daniel Melim', color: '#DC2626', textColor: '#FFFFFF' },
-  { name: 'Sigrid Thaler', color: '#2DD4BF', textColor: '#000000' },
-  { name: 'Ramon Martins', color: '#22C55E', textColor: '#000000' },
-  { name: 'Rafael Silveira', color: '#A855F7', textColor: '#FFFFFF' },
-]
+import { getArtistColor, getArtistFolderName } from '../engine/constants'
 
 type AuctionType = 'open' | 'one_offer' | 'hidden' | 'fixed_price' | 'double'
 
@@ -29,7 +22,7 @@ interface CardProps {
 }
 
 // Auction icon component
-function AuctionIcon({ type, color, size = 16 }: { type: AuctionType; color: string; size?: number }) {
+export function AuctionIcon({ type, color, size = 16 }: { type: AuctionType; color: string; size?: number }) {
   const iconStyle = { width: size, height: size }
 
   switch (type) {
@@ -143,19 +136,10 @@ function AuctionIcon({ type, color, size = 16 }: { type: AuctionType; color: str
 }
 
 // Artwork image with fallback to placeholder gradient
-function CardArtwork({ artistIndex, cardIndex }: { artistIndex: number; cardIndex: number }) {
+export function CardArtwork({ artistIndex, cardIndex }: { artistIndex: number; cardIndex: number }) {
   const seed = artistIndex * 100 + cardIndex
 
-  // Artist folder names (lowercase, underscored)
-  const artistFolders: Record<number, string> = {
-    0: 'manuel_carvalho',
-    1: 'daniel_melim',
-    2: 'sigrid_thaler',
-    3: 'ramon_martins',
-    4: 'rafael_silveira',
-  }
-
-  const artistFolder = artistFolders[artistIndex] || 'manuel_carvalho'
+  const artistFolder = getArtistFolderName(artistIndex)
   const imagePath = `/assets/artworks/${artistFolder}/${artistFolder}_${String(cardIndex).padStart(2, '0')}.png`
 
   const gradients: Record<number, string> = {
@@ -250,7 +234,7 @@ export function Card({
   isPartiallyHighlighted = false,
   onClick
 }: CardProps) {
-  const artist = ARTISTS[card.artistIndex] || ARTISTS[0]
+  const artist = getArtistColor(card.artistIndex)
   const config = sizeConfig[size]
 
   // Base styles

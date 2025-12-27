@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { ALL_CARDS, type AuctionType, type CardData } from '../../shared/services/cardGenerator'
-import { ARTIST_COLORS } from '../../engine/constants'
+import { ARTIST_COLORS, getArtistFolderName } from '../../engine/constants'
 
 // ============================================================================
 // AUCTION ICON COMPONENT
@@ -76,15 +76,7 @@ function AuctionIcon({ type, color }: { type: AuctionType; color: string }) {
 function PlaceholderArt({ artistIndex, cardIndex }: { artistIndex: number; cardIndex: number }) {
   const seed = artistIndex * 100 + cardIndex
 
-  const artistFolders: Record<number, string> = {
-    0: 'manuel_carvalho',
-    1: 'daniel_melim',
-    2: 'sigrid_thaler',
-    3: 'ramon_martins',
-    4: 'rafael_silveira',
-  }
-
-  const artistFolder = artistFolders[artistIndex] || 'manuel_carvalho'
+  const artistFolder = getArtistFolderName(artistIndex)
   const imagePath = `/assets/artworks/${artistFolder}/${artistFolder}_${String(cardIndex).padStart(2, '0')}.png`
 
   const gradients: Record<number, string> = {

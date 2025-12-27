@@ -17,8 +17,8 @@ export const ARTISTS: readonly Artist[] = [
 // Artist display colors for UI
 export const ARTIST_COLORS = [
   { name: 'Manuel Carvalho', color: '#F5C846', textColor: '#000000' },
-  { name: 'Sigrid Thaler', color: '#DC2626', textColor: '#FFFFFF' },
-  { name: 'Daniel Melim', color: '#2DD4BF', textColor: '#000000' },
+  { name: 'Sigrid Thaler', color: '#2DD4BF', textColor: '#000000' },
+  { name: 'Daniel Melim', color: '#DC2626', textColor: '#FFFFFF' },
   { name: 'Ramon Martins', color: '#22C55E', textColor: '#000000' },
   { name: 'Rafael Silveira', color: '#A855F7', textColor: '#FFFFFF' },
 ] as const
@@ -155,4 +155,40 @@ export function getTurnOrder(auctioneerIndex: number, playerCount: number): numb
     order.push((auctioneerIndex + i) % playerCount)
   }
   return order // Auctioneer is last
+}
+
+// ===================
+// ARTIST HELPERS
+// ===================
+
+// Artist folder names for artwork paths
+const ARTIST_FOLDERS = [
+  'manuel_carvalho',
+  'sigrid_thaler',
+  'daniel_melim',
+  'ramon_martins',
+  'rafael_silveira',
+] as const
+
+// Artist initials for card numbering (e.g., M-01, S-02)
+const ARTIST_INITIALS = ['M', 'S', 'D', 'R', 'RF'] as const
+
+// Get artist color info by index
+export function getArtistColor(artistIndex: number) {
+  return ARTIST_COLORS[artistIndex] || ARTIST_COLORS[0]
+}
+
+// Get artist folder name for artwork path
+export function getArtistFolderName(artistIndex: number): string {
+  return ARTIST_FOLDERS[artistIndex] || ARTIST_FOLDERS[0]
+}
+
+// Get artist initials for card numbering
+export function getArtistInitials(artistIndex: number): string {
+  return ARTIST_INITIALS[artistIndex] || 'X'
+}
+
+// Get artist index from artist name
+export function getArtistIndex(artistName: Artist): number {
+  return ARTISTS.indexOf(artistName)
 }

@@ -9,6 +9,7 @@ import HiddenAuction from './HiddenAuction'
 import OpenAuction from './OpenAuction'
 import OneOfferAuction from './OneOfferAuction'
 import DoubleAuctionWrapper from './DoubleAuctionWrapper'
+import { getArtistIndex } from '../../../engine/constants'
 
 interface ActiveAuctionProps {
   currentAuction: AuctionState
@@ -287,7 +288,7 @@ const ActiveAuction: React.FC<ActiveAuctionProps> = ({
               card={{
                 id: auctionCard.id,
                 artist: auctionCard.artist,
-                artistIndex: ['Manuel Carvalho', 'Daniel Melim', 'Sigrid Thaler', 'Ramon Martins', 'Rafael Silveira'].indexOf(auctionCard.artist),
+                artistIndex: getArtistIndex(auctionCard.artist),
                 cardIndex: auctionCard.cardIndex,
                 auctionType: auctionCard.auctionType,
                 artworkId: auctionCard.artworkId || auctionCard.id
