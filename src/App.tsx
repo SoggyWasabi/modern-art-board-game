@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { useGameStore } from './store/gameStore'
 import MainGameplay from './components/game/MainGameplay'
 import { ErrorBoundary } from './components/game/ErrorBoundary'
@@ -115,10 +115,13 @@ function GamePageWrapper() {
 // ============================================================================
 
 function App() {
+  const location = useLocation()
+  const isGameRoute = location.pathname === '/game'
+
   return (
     <>
-      {/* Persistent background across all routes */}
-      <FloatingCardsBackground />
+      {/* Persistent background across all routes except game */}
+      {!isGameRoute && <FloatingCardsBackground />}
 
       {/* Route content */}
       <Routes>
